@@ -63,6 +63,16 @@ def _blocked_author_search_fetch() -> FetchResult:
     )
 
 
+def _network_timeout_fetch() -> FetchResult:
+    return FetchResult(
+        requested_url="https://scholar.google.com/citations?hl=en&view_op=search_authors&mauthors=ada",
+        status_code=None,
+        final_url=None,
+        body="",
+        error="timed out",
+    )
+
+
 @pytest.mark.asyncio
 async def test_search_author_candidates_serves_cached_response_for_same_query() -> None:
     source = StubScholarSource([_ok_author_search_fetch()])
@@ -148,6 +158,79 @@ async def test_search_author_candidates_trips_cooldown_after_blocked_responses()
     assert second.state == ParseState.BLOCKED_OR_CAPTCHA
     assert second.state_reason == scholar_service.SEARCH_COOLDOWN_REASON
     assert "author_search_cooldown_active" in second.warnings
+
+
+@pytest.mark.asyncio
+async def test_search_author_candidates_emits_cooldown_alert_warning_after_threshold() -> None:
+    source = StubScholarSource([_blocked_author_search_fetch()])
+
+    _ = await scholar_service.search_author_candidates(
+        source=source,
+        query="Blocked Query",
+        limit=10,
+        network_error_retries=0,
+        retry_backoff_seconds=0.0,
+        search_enabled=True,
+        cache_ttl_seconds=0,
+        blocked_cache_ttl_seconds=0,
+        cache_max_entries=64,
+        min_interval_seconds=0.0,
+        interval_jitter_seconds=0.0,
+        cooldown_block_threshold=1,
+        cooldown_seconds=300,
+        cooldown_rejection_alert_threshold=1,
+    )
+    second = await scholar_service.search_author_candidates(
+        source=source,
+        query="Blocked Query",
+        limit=10,
+        network_error_retries=0,
+        retry_backoff_seconds=0.0,
+        search_enabled=True,
+        cache_ttl_seconds=0,
+        blocked_cache_ttl_seconds=0,
+        cache_max_entries=64,
+        min_interval_seconds=0.0,
+        interval_jitter_seconds=0.0,
+        cooldown_block_threshold=1,
+        cooldown_seconds=300,
+        cooldown_rejection_alert_threshold=1,
+    )
+
+    assert second.state == ParseState.BLOCKED_OR_CAPTCHA
+    assert "author_search_cooldown_alert_threshold_exceeded" in second.warnings
+
+
+@pytest.mark.asyncio
+async def test_search_author_candidates_adds_retry_threshold_warning() -> None:
+    source = StubScholarSource(
+        [
+            _network_timeout_fetch(),
+            _network_timeout_fetch(),
+            _ok_author_search_fetch(),
+        ]
+    )
+
+    result = await scholar_service.search_author_candidates(
+        source=source,
+        query="Ada Lovelace",
+        limit=10,
+        network_error_retries=2,
+        retry_backoff_seconds=0.0,
+        search_enabled=True,
+        cache_ttl_seconds=0,
+        blocked_cache_ttl_seconds=0,
+        cache_max_entries=64,
+        min_interval_seconds=0.0,
+        interval_jitter_seconds=0.0,
+        cooldown_block_threshold=3,
+        cooldown_seconds=300,
+        retry_alert_threshold=2,
+    )
+
+    assert result.state == ParseState.OK
+    assert "author_search_retry_threshold_exceeded_2" in result.warnings
+    assert source.calls == 3
 
 
 @pytest.mark.asyncio

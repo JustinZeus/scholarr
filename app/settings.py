@@ -62,6 +62,18 @@ class Settings:
         30,
     )
     ingestion_page_size: int = _env_int("INGESTION_PAGE_SIZE", 100)
+    ingestion_alert_blocked_failure_threshold: int = _env_int(
+        "INGESTION_ALERT_BLOCKED_FAILURE_THRESHOLD",
+        1,
+    )
+    ingestion_alert_network_failure_threshold: int = _env_int(
+        "INGESTION_ALERT_NETWORK_FAILURE_THRESHOLD",
+        2,
+    )
+    ingestion_alert_retry_scheduled_threshold: int = _env_int(
+        "INGESTION_ALERT_RETRY_SCHEDULED_THRESHOLD",
+        3,
+    )
     ingestion_continuation_queue_enabled: bool = _env_bool(
         "INGESTION_CONTINUATION_QUEUE_ENABLED",
         True,
@@ -117,6 +129,14 @@ class Settings:
     scholar_name_search_cooldown_seconds: int = _env_int(
         "SCHOLAR_NAME_SEARCH_COOLDOWN_SECONDS",
         1800,
+    )
+    scholar_name_search_alert_retry_count_threshold: int = _env_int(
+        "SCHOLAR_NAME_SEARCH_ALERT_RETRY_COUNT_THRESHOLD",
+        2,
+    )
+    scholar_name_search_alert_cooldown_rejections_threshold: int = _env_int(
+        "SCHOLAR_NAME_SEARCH_ALERT_COOLDOWN_REJECTIONS_THRESHOLD",
+        3,
     )
 
 

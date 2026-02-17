@@ -67,26 +67,65 @@ def _summary_dict(error_log: object) -> dict[str, Any]:
     return summary
 
 
+def _summary_int_dict(summary: dict[str, Any], key: str) -> dict[str, int]:
+    value = summary.get(key)
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(item_key): _safe_int(item_value, 0)
+        for item_key, item_value in value.items()
+        if isinstance(item_key, str)
+    }
+
+
+def _summary_bool_dict(summary: dict[str, Any], key: str) -> dict[str, bool]:
+    value = summary.get(key)
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(item_key): bool(item_value)
+        for item_key, item_value in value.items()
+        if isinstance(item_key, str)
+    }
+
+
 def extract_run_summary(error_log: object) -> dict[str, Any]:
     summary = _summary_dict(error_log)
     return {
         "succeeded_count": _safe_int(summary.get("succeeded_count", 0)),
         "failed_count": _safe_int(summary.get("failed_count", 0)),
         "partial_count": _safe_int(summary.get("partial_count", 0)),
-        "failed_state_counts": {
-            str(key): _safe_int(value, 0)
-            for key, value in summary.get("failed_state_counts", {}).items()
-            if isinstance(key, str)
-        }
-        if isinstance(summary.get("failed_state_counts"), dict)
-        else {},
-        "failed_reason_counts": {
-            str(key): _safe_int(value, 0)
-            for key, value in summary.get("failed_reason_counts", {}).items()
-            if isinstance(key, str)
-        }
-        if isinstance(summary.get("failed_reason_counts"), dict)
-        else {},
+        "failed_state_counts": _summary_int_dict(summary, "failed_state_counts"),
+        "failed_reason_counts": _summary_int_dict(summary, "failed_reason_counts"),
+        "scrape_failure_counts": _summary_int_dict(summary, "scrape_failure_counts"),
+        "retry_counts": {
+            "retries_scheduled_count": _safe_int(
+                (
+                    summary.get("retry_counts", {}).get("retries_scheduled_count")
+                    if isinstance(summary.get("retry_counts"), dict)
+                    else 0
+                ),
+                0,
+            ),
+            "scholars_with_retries_count": _safe_int(
+                (
+                    summary.get("retry_counts", {}).get("scholars_with_retries_count")
+                    if isinstance(summary.get("retry_counts"), dict)
+                    else 0
+                ),
+                0,
+            ),
+            "retry_exhausted_count": _safe_int(
+                (
+                    summary.get("retry_counts", {}).get("retry_exhausted_count")
+                    if isinstance(summary.get("retry_counts"), dict)
+                    else 0
+                ),
+                0,
+            ),
+        },
+        "alert_thresholds": _summary_int_dict(summary, "alert_thresholds"),
+        "alert_flags": _summary_bool_dict(summary, "alert_flags"),
     }
 
 

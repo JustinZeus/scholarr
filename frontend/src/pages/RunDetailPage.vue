@@ -21,6 +21,35 @@ const errorMessage = ref<string | null>(null);
 const errorRequestId = ref<string | null>(null);
 
 const runId = computed(() => Number(route.params.id));
+const defaultRetryCounts = {
+  retries_scheduled_count: 0,
+  scholars_with_retries_count: 0,
+  retry_exhausted_count: 0,
+};
+
+function sortedCountEntries(record: Record<string, number> | null | undefined): Array<[string, number]> {
+  if (!record) {
+    return [];
+  }
+  return Object.entries(record)
+    .filter(([, value]) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
+}
+
+const failureBucketEntries = computed(() =>
+  detail.value ? sortedCountEntries(detail.value.summary.scrape_failure_counts) : [],
+);
+
+const alertFlagEntries = computed(() => {
+  if (!detail.value) {
+    return [];
+  }
+  return Object.entries(detail.value.summary.alert_flags ?? {})
+    .filter(([, enabled]) => Boolean(enabled))
+    .sort((a, b) => a[0].localeCompare(b[0]));
+});
+
+const retryCounts = computed(() => detail.value?.summary.retry_counts ?? defaultRetryCounts);
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -96,6 +125,40 @@ onMounted(() => {
           Outcome summary: {{ detail.summary.succeeded_count }} succeeded, {{ detail.summary.partial_count }} partial,
           {{ detail.summary.failed_count }} failed.
         </p>
+        <div class="grid gap-3 md:grid-cols-3">
+          <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Retries scheduled</p>
+            <p>{{ retryCounts.retries_scheduled_count }}</p>
+          </div>
+          <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Scholars with retries</p>
+            <p>{{ retryCounts.scholars_with_retries_count }}</p>
+          </div>
+          <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Retry exhausted</p>
+            <p>{{ retryCounts.retry_exhausted_count }}</p>
+          </div>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Scrape failure buckets</p>
+            <p v-if="failureBucketEntries.length === 0" class="text-secondary">n/a</p>
+            <ul v-else class="space-y-1">
+              <li v-for="[name, count] in failureBucketEntries" :key="name">
+                <code>{{ name }}</code>: {{ count }}
+              </li>
+            </ul>
+          </div>
+          <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Active alerts</p>
+            <p v-if="alertFlagEntries.length === 0" class="text-secondary">none</p>
+            <ul v-else class="space-y-1">
+              <li v-for="[name] in alertFlagEntries" :key="name">
+                <code>{{ name }}</code>
+              </li>
+            </ul>
+          </div>
+        </div>
       </AppCard>
 
       <AppCard class="space-y-4">

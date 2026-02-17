@@ -1,0 +1,54 @@
+name: Scheduled Probes
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "20 6 * * *"
+
+jobs:
+  fixture-probes:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: scholar
+          POSTGRES_USER: scholar
+          POSTGRES_PASSWORD: scholar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scholar -d scholar"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://scholar:scholar@localhost:5432/scholar
+      SCHOLAR_IMAGE_UPLOAD_DIR: /tmp/scholarr_uploads/scholar_images
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Fixture-backed parser unit probes
+        run: >-
+          uv run pytest
+          tests/unit/test_scholar_parser.py
+          tests/unit/test_scholar_search_safety.py
+
+      - name: Fixture-backed integration probe
+        run: >-
+          uv run pytest -m integration
+          tests/integration/test_fixture_probe_runs.py

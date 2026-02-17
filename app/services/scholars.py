@@ -38,6 +38,8 @@ DEFAULT_AUTHOR_SEARCH_COOLDOWN_BLOCK_THRESHOLD = 1
 DEFAULT_AUTHOR_SEARCH_COOLDOWN_SECONDS = 1800
 DEFAULT_AUTHOR_SEARCH_MIN_INTERVAL_SECONDS = 3.0
 DEFAULT_AUTHOR_SEARCH_INTERVAL_JITTER_SECONDS = 1.0
+DEFAULT_AUTHOR_SEARCH_RETRY_ALERT_THRESHOLD = 2
+DEFAULT_AUTHOR_SEARCH_COOLDOWN_REJECTION_ALERT_THRESHOLD = 3
 ALLOWED_IMAGE_UPLOAD_CONTENT_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -101,6 +103,8 @@ _AUTHOR_SEARCH_CACHE: OrderedDict[str, _AuthorSearchCacheEntry] = OrderedDict()
 _AUTHOR_SEARCH_LAST_LIVE_REQUEST_MONOTONIC = 0.0
 _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC: datetime | None = None
 _AUTHOR_SEARCH_CONSECUTIVE_BLOCKED_COUNT = 0
+_AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT = 0
+_AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED = False
 
 
 class ScholarServiceError(ValueError):
@@ -281,10 +285,14 @@ def _reset_author_search_runtime_state_for_tests() -> None:
     global _AUTHOR_SEARCH_LAST_LIVE_REQUEST_MONOTONIC
     global _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC
     global _AUTHOR_SEARCH_CONSECUTIVE_BLOCKED_COUNT
+    global _AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT
+    global _AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED
     _AUTHOR_SEARCH_CACHE.clear()
     _AUTHOR_SEARCH_LAST_LIVE_REQUEST_MONOTONIC = 0.0
     _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC = None
     _AUTHOR_SEARCH_CONSECUTIVE_BLOCKED_COUNT = 0
+    _AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT = 0
+    _AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED = False
 
 
 async def list_scholars_for_user(
@@ -379,10 +387,14 @@ async def search_author_candidates(
     interval_jitter_seconds: float = DEFAULT_AUTHOR_SEARCH_INTERVAL_JITTER_SECONDS,
     cooldown_block_threshold: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_BLOCK_THRESHOLD,
     cooldown_seconds: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_SECONDS,
+    retry_alert_threshold: int = DEFAULT_AUTHOR_SEARCH_RETRY_ALERT_THRESHOLD,
+    cooldown_rejection_alert_threshold: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_REJECTION_ALERT_THRESHOLD,
 ) -> ParsedAuthorSearchPage:
     global _AUTHOR_SEARCH_LAST_LIVE_REQUEST_MONOTONIC
     global _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC
     global _AUTHOR_SEARCH_CONSECUTIVE_BLOCKED_COUNT
+    global _AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT
+    global _AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED
 
     normalized_query = query.strip()
     if len(normalized_query) < 2:
@@ -408,8 +420,47 @@ async def search_author_candidates(
         now_utc = datetime.now(timezone.utc)
         now_monotonic = time.monotonic()
 
+        if (
+            _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC is not None
+            and now_utc >= _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC
+        ):
+            logger.info(
+                "scholar_search.cooldown_expired",
+                extra={
+                    "event": "scholar_search.cooldown_expired",
+                    "cooldown_until_utc": _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC.isoformat(),
+                },
+            )
+            _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC = None
+            _AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT = 0
+            _AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED = False
+
         cooldown_remaining_seconds = _author_search_cooldown_remaining_seconds(now_utc)
         if cooldown_remaining_seconds > 0:
+            _AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT += 1
+            bounded_cooldown_rejection_alert_threshold = max(
+                1,
+                int(cooldown_rejection_alert_threshold),
+            )
+            if (
+                _AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT
+                >= bounded_cooldown_rejection_alert_threshold
+                and not _AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED
+            ):
+                logger.error(
+                    "scholar_search.cooldown_rejection_threshold_exceeded",
+                    extra={
+                        "event": "scholar_search.cooldown_rejection_threshold_exceeded",
+                        "query": normalized_query,
+                        "cooldown_rejection_count": _AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT,
+                        "threshold": bounded_cooldown_rejection_alert_threshold,
+                        "cooldown_until_utc": _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC.isoformat()
+                        if _AUTHOR_SEARCH_COOLDOWN_UNTIL_UTC
+                        else None,
+                    },
+                )
+                _AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED = True
+
             logger.warning(
                 "scholar_search.cooldown_active",
                 extra={
@@ -421,12 +472,15 @@ async def search_author_candidates(
                     else None,
                 },
             )
+            warning_codes = [
+                "author_search_cooldown_active",
+                f"author_search_cooldown_remaining_{cooldown_remaining_seconds}s",
+            ]
+            if _AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED:
+                warning_codes.append("author_search_cooldown_alert_threshold_exceeded")
             return _policy_blocked_author_search_result(
                 reason=SEARCH_COOLDOWN_REASON,
-                warning_codes=[
-                    "author_search_cooldown_active",
-                    f"author_search_cooldown_remaining_{cooldown_remaining_seconds}s",
-                ],
+                warning_codes=warning_codes,
                 limit=bounded_limit,
             )
 
@@ -472,6 +526,7 @@ async def search_author_candidates(
         max_attempts = max(1, int(network_error_retries) + 1)
         parsed: ParsedAuthorSearchPage | None = None
         retry_warnings: list[str] = []
+        retry_scheduled_count = 0
 
         for attempt_index in range(max_attempts):
             fetch_result = await source.fetch_author_search_html(normalized_query, start=0)
@@ -480,6 +535,7 @@ async def search_author_candidates(
                 break
 
             retry_warnings.append("network_retry_scheduled_for_author_search")
+            retry_scheduled_count += 1
             sleep_seconds = max(float(retry_backoff_seconds), 0.0) * (2**attempt_index)
             if sleep_seconds > 0:
                 await asyncio.sleep(sleep_seconds)
@@ -493,6 +549,27 @@ async def search_author_candidates(
             parsed,
             warnings=_merge_warnings(parsed.warnings, retry_warnings),
         )
+
+        bounded_retry_alert_threshold = max(1, int(retry_alert_threshold))
+        if retry_scheduled_count >= bounded_retry_alert_threshold:
+            logger.warning(
+                "scholar_search.retry_threshold_exceeded",
+                extra={
+                    "event": "scholar_search.retry_threshold_exceeded",
+                    "query": normalized_query,
+                    "retry_scheduled_count": retry_scheduled_count,
+                    "threshold": bounded_retry_alert_threshold,
+                    "final_state": merged_parsed.state.value,
+                    "final_state_reason": merged_parsed.state_reason,
+                },
+            )
+            merged_parsed = replace(
+                merged_parsed,
+                warnings=_merge_warnings(
+                    merged_parsed.warnings,
+                    [f"author_search_retry_threshold_exceeded_{retry_scheduled_count}"],
+                ),
+            )
 
         if _is_author_search_block_state(merged_parsed):
             _AUTHOR_SEARCH_CONSECUTIVE_BLOCKED_COUNT += 1
@@ -510,6 +587,8 @@ async def search_author_candidates(
                     seconds=max(60, int(cooldown_seconds))
                 )
                 _AUTHOR_SEARCH_CONSECUTIVE_BLOCKED_COUNT = 0
+                _AUTHOR_SEARCH_COOLDOWN_REJECTION_COUNT = 0
+                _AUTHOR_SEARCH_COOLDOWN_ALERT_EMITTED = False
                 merged_parsed = replace(
                     merged_parsed,
                     warnings=_merge_warnings(

@@ -20,6 +20,7 @@ from app.db.session import get_session_factory
 from app.services import continuation_queue as queue_service
 from app.services.ingestion import RunAlreadyInProgressError, ScholarIngestionService
 from app.services.scholar_source import LiveScholarSource
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,9 @@ class SchedulerService:
                     page_size=self._page_size,
                     auto_queue_continuations=self._continuation_queue_enabled,
                     queue_delay_seconds=self._continuation_base_delay_seconds,
+                    alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
+                    alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
+                    alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
                 )
             except RunAlreadyInProgressError:
                 await session.rollback()
@@ -326,6 +330,9 @@ class SchedulerService:
                     },
                     auto_queue_continuations=self._continuation_queue_enabled,
                     queue_delay_seconds=self._continuation_base_delay_seconds,
+                    alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
+                    alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
+                    alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
                 )
             except RunAlreadyInProgressError:
                 await session.rollback()

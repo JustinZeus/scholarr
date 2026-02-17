@@ -40,6 +40,11 @@ FAILED_STATES = {
     ParseState.NETWORK_ERROR.value,
     "ingestion_error",
 }
+FAILURE_BUCKET_BLOCKED = "blocked_or_captcha"
+FAILURE_BUCKET_NETWORK = "network_error"
+FAILURE_BUCKET_LAYOUT = "layout_changed"
+FAILURE_BUCKET_INGESTION = "ingestion_error"
+FAILURE_BUCKET_OTHER = "other_failure"
 RUN_LOCK_NAMESPACE = 8217
 RESUMABLE_PARTIAL_REASONS = {
     "max_pages_reached",
@@ -83,6 +88,28 @@ class RunAlreadyInProgressError(RuntimeError):
     """Raised when a run lock for a user is already held by another process."""
 
 
+def _int_or_default(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _classify_failure_bucket(*, state: str, state_reason: str) -> str:
+    reason = state_reason.strip().lower()
+    normalized_state = state.strip().lower()
+
+    if normalized_state == ParseState.BLOCKED_OR_CAPTCHA.value or reason.startswith("blocked_"):
+        return FAILURE_BUCKET_BLOCKED
+    if normalized_state == ParseState.NETWORK_ERROR.value or reason.startswith("network_"):
+        return FAILURE_BUCKET_NETWORK
+    if normalized_state == ParseState.LAYOUT_CHANGED.value:
+        return FAILURE_BUCKET_LAYOUT
+    if normalized_state == "ingestion_error":
+        return FAILURE_BUCKET_INGESTION
+    return FAILURE_BUCKET_OTHER
+
+
 class ScholarIngestionService:
     def __init__(self, *, source: ScholarSource) -> None:
         self._source = source
@@ -103,6 +130,9 @@ class ScholarIngestionService:
         auto_queue_continuations: bool = True,
         queue_delay_seconds: int = 60,
         idempotency_key: str | None = None,
+        alert_blocked_failure_threshold: int = 1,
+        alert_network_failure_threshold: int = 2,
+        alert_retry_scheduled_threshold: int = 3,
     ) -> RunExecutionSummary:
         lock_acquired = await self._try_acquire_user_lock(
             db_session,
@@ -161,6 +191,9 @@ class ScholarIngestionService:
                 "max_pages_per_scholar": max_pages_per_scholar,
                 "page_size": page_size,
                 "idempotency_key": idempotency_key,
+                "alert_blocked_failure_threshold": alert_blocked_failure_threshold,
+                "alert_network_failure_threshold": alert_network_failure_threshold,
+                "alert_retry_scheduled_threshold": alert_retry_scheduled_threshold,
             },
         )
 
@@ -416,16 +449,86 @@ class ScholarIngestionService:
 
         failed_state_counts: dict[str, int] = {}
         failed_reason_counts: dict[str, int] = {}
+        scrape_failure_counts: dict[str, int] = {}
+        retries_scheduled_count = 0
+        scholars_with_retries_count = 0
+        retry_exhausted_count = 0
         for entry in scholar_results:
-            if str(entry.get("outcome", "")) != "failed":
+            attempt_count = max(0, _int_or_default(entry.get("attempt_count"), 0))
+            retries_for_entry = max(0, attempt_count - 1)
+            if retries_for_entry > 0:
+                retries_scheduled_count += retries_for_entry
+                scholars_with_retries_count += 1
+
+            outcome = str(entry.get("outcome", ""))
+            if outcome != "failed":
                 continue
-            state = str(entry.get("state", ""))
+
+            state = str(entry.get("state", "")).strip()
             if state not in FAILED_STATES:
                 continue
             failed_state_counts[state] = failed_state_counts.get(state, 0) + 1
+
             reason = str(entry.get("state_reason", "")).strip()
             if reason:
                 failed_reason_counts[reason] = failed_reason_counts.get(reason, 0) + 1
+
+            failure_bucket = _classify_failure_bucket(state=state, state_reason=reason)
+            scrape_failure_counts[failure_bucket] = (
+                scrape_failure_counts.get(failure_bucket, 0) + 1
+            )
+
+            if (
+                state == ParseState.NETWORK_ERROR.value
+                and retries_for_entry > 0
+            ):
+                retry_exhausted_count += 1
+
+        blocked_failure_count = int(scrape_failure_counts.get(FAILURE_BUCKET_BLOCKED, 0))
+        network_failure_count = int(scrape_failure_counts.get(FAILURE_BUCKET_NETWORK, 0))
+
+        bounded_blocked_threshold = max(1, int(alert_blocked_failure_threshold))
+        bounded_network_threshold = max(1, int(alert_network_failure_threshold))
+        bounded_retry_threshold = max(1, int(alert_retry_scheduled_threshold))
+        alert_flags = {
+            "blocked_failure_threshold_exceeded": blocked_failure_count >= bounded_blocked_threshold,
+            "network_failure_threshold_exceeded": network_failure_count >= bounded_network_threshold,
+            "retry_scheduled_threshold_exceeded": retries_scheduled_count >= bounded_retry_threshold,
+        }
+
+        if alert_flags["blocked_failure_threshold_exceeded"]:
+            logger.warning(
+                "ingestion.alert_blocked_failure_threshold_exceeded",
+                extra={
+                    "event": "ingestion.alert_blocked_failure_threshold_exceeded",
+                    "user_id": user_id,
+                    "crawl_run_id": run.id,
+                    "blocked_failure_count": blocked_failure_count,
+                    "threshold": bounded_blocked_threshold,
+                },
+            )
+        if alert_flags["network_failure_threshold_exceeded"]:
+            logger.warning(
+                "ingestion.alert_network_failure_threshold_exceeded",
+                extra={
+                    "event": "ingestion.alert_network_failure_threshold_exceeded",
+                    "user_id": user_id,
+                    "crawl_run_id": run.id,
+                    "network_failure_count": network_failure_count,
+                    "threshold": bounded_network_threshold,
+                },
+            )
+        if alert_flags["retry_scheduled_threshold_exceeded"]:
+            logger.warning(
+                "ingestion.alert_retry_scheduled_threshold_exceeded",
+                extra={
+                    "event": "ingestion.alert_retry_scheduled_threshold_exceeded",
+                    "user_id": user_id,
+                    "crawl_run_id": run.id,
+                    "retries_scheduled_count": retries_scheduled_count,
+                    "threshold": bounded_retry_threshold,
+                },
+            )
 
         run.end_dt = datetime.now(timezone.utc)
         run.status = self._resolve_run_status(
@@ -442,6 +545,18 @@ class ScholarIngestionService:
                 "partial_count": partial_count,
                 "failed_state_counts": failed_state_counts,
                 "failed_reason_counts": failed_reason_counts,
+                "scrape_failure_counts": scrape_failure_counts,
+                "retry_counts": {
+                    "retries_scheduled_count": retries_scheduled_count,
+                    "scholars_with_retries_count": scholars_with_retries_count,
+                    "retry_exhausted_count": retry_exhausted_count,
+                },
+                "alert_thresholds": {
+                    "blocked_failure_threshold": bounded_blocked_threshold,
+                    "network_failure_threshold": bounded_network_threshold,
+                    "retry_scheduled_threshold": bounded_retry_threshold,
+                },
+                "alert_flags": alert_flags,
             },
             "meta": {
                 "idempotency_key": idempotency_key,
@@ -463,6 +578,10 @@ class ScholarIngestionService:
                 "failed_count": failed_count,
                 "partial_count": partial_count,
                 "new_publication_count": run.new_pub_count,
+                "blocked_failure_count": blocked_failure_count,
+                "network_failure_count": network_failure_count,
+                "retries_scheduled_count": retries_scheduled_count,
+                "alert_flags": alert_flags,
             },
         )
 

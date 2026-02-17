@@ -219,6 +219,10 @@ class RunSummaryData(BaseModel):
     partial_count: int
     failed_state_counts: dict[str, int] = Field(default_factory=dict)
     failed_reason_counts: dict[str, int] = Field(default_factory=dict)
+    scrape_failure_counts: dict[str, int] = Field(default_factory=dict)
+    retry_counts: dict[str, int] = Field(default_factory=dict)
+    alert_thresholds: dict[str, int] = Field(default_factory=dict)
+    alert_flags: dict[str, bool] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="forbid")
 

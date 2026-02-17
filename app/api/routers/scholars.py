@@ -167,6 +167,10 @@ async def search_scholars(
             interval_jitter_seconds=settings.scholar_name_search_interval_jitter_seconds,
             cooldown_block_threshold=settings.scholar_name_search_cooldown_block_threshold,
             cooldown_seconds=settings.scholar_name_search_cooldown_seconds,
+            retry_alert_threshold=settings.scholar_name_search_alert_retry_count_threshold,
+            cooldown_rejection_alert_threshold=(
+                settings.scholar_name_search_alert_cooldown_rejections_threshold
+            ),
         )
     except scholar_service.ScholarServiceError as exc:
         raise ApiException(
