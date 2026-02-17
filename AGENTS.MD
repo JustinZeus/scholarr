@@ -2,8 +2,6 @@
 
 This file is the consolidated source of truth for project scope, constraints, scrape contract, and UI implementation flow.
 
-Raw probe artifacts in `planning/scholar_probe_tmp/notes/*.json` and `planning/scholar_probe_tmp/notes/*.md` remain historical evidence and fixture references.
-
 ## 1. Product Objective
 
 - Build a self-hosted scholar tracking system ("scholarr") with reliable, low-cost scraping and clear, actionable UI.
@@ -94,7 +92,12 @@ Admin users:
 Scholars:
 - `GET /api/v1/scholars`
 - `POST /api/v1/scholars`
+- `GET /api/v1/scholars/search`
 - `PATCH /api/v1/scholars/{id}/toggle`
+- `PUT /api/v1/scholars/{id}/image/url`
+- `POST /api/v1/scholars/{id}/image/upload`
+- `GET /api/v1/scholars/{id}/image/upload`
+- `DELETE /api/v1/scholars/{id}/image`
 - `DELETE /api/v1/scholars/{id}`
 
 Settings:
@@ -112,10 +115,41 @@ Runs/diagnostics/queue:
 
 Publications:
 - `GET /api/v1/publications`
+- `POST /api/v1/publications/mark-read`
 - `POST /api/v1/publications/mark-all-read`
 
 Ops:
 - `GET /healthz`
+
+## 5.1 Runtime Semantics (Locked)
+
+Manual run idempotency:
+- `Idempotency-Key` is optional on `POST /api/v1/runs/manual`.
+- Idempotency scope is `(user_id, idempotency_key)`.
+- Replaying the same key for the same user returns the same run payload after completion.
+- If the keyed run is still in progress, respond with `409 run_in_progress` and include `run_id`.
+- Enforcement is database-backed, not best-effort in-memory logic.
+- Frontend triggers generate keys internally; key input is not user-facing.
+
+Continuation queue attempt policy:
+- `attempt_count` is a failed-attempt budget, not a total execution counter.
+- Increment attempts only when a continuation execution fails to make progress.
+- Reset attempts to `0` after successful progress (success or resumable partial progress).
+- Drop queue items only after failed-attempt threshold is reached.
+
+Scholar no-change skip policy:
+- Persist first-page fingerprint snapshots per scholar.
+- If the first-page fingerprint is unchanged for a normal run (`cstart=0`), skip deep pagination/upsert work.
+- Record run scholar result `state_reason` as `no_change_initial_page_signature`.
+
+Scholar create naming policy:
+- Do not accept custom display names during scholar create.
+- Hydrate names from scraped profile metadata.
+
+Scholar name-search safety policy:
+- Treat name search as best-effort only.
+- Apply single-flight execution, pacing/jitter, cache, and cooldown circuit breaker after repeated blocked responses.
+- Prefer Scholar URL/ID adds for reliable ingestion onboarding.
 
 ## 6. Required UI Behavior (MVP)
 
@@ -132,6 +166,7 @@ Critical semantics:
 - First-time ingestion should not imply user read-state.
 - Surface partial runs and warnings clearly.
 - Show loading, empty, and error states explicitly.
+- Support both light and dark modes with consistent status semantics.
 
 ## 7. UI Information Architecture
 
@@ -160,18 +195,47 @@ Authenticated:
 3. Logout calls `POST /api/v1/auth/logout`.
 
 ## 8.3 Dashboard
-
+1. Fetch latest publications summary from `GET /api/v1/publications?mode=new&limit=20`.
+2. Fetch recent runs from `GET /api/v1/runs?limit=5`.
+3. Fetch queue status from `GET /api/v1/runs/queue/items?limit=200` (aggregate in UI).
+4. Show:
+   - new publications count (`new_count`)
+   - total tracked publications (`total_count`)
+   - latest run status/started time
+   - queue badges (`queued`, `retrying`, `dropped`)
+5. Admin users additionally see a diagnostics shortcut block to full runs/queue page.
+6. Every dashboard error panel must display request-id for support.
 
 
 ## 8.4 Scholars
 
 1. List via `GET /api/v1/scholars`.
 2. Add/toggle/delete actions mapped to scholar endpoints.
-3. Per-row quick links:
+3. Search by name via `GET /api/v1/scholars/search` with candidate add actions.
+4. Profile image controls:
+   - scraped image fallback from Scholar metadata
+   - custom URL override
+   - image upload + reset to scraped/default
+5. Per-row quick links:
    - all publications filtered by scholar
    - new publications filtered by scholar
 
 ## 8.5 Publications
+
+1. Default view mode is `new` (`GET /api/v1/publications?mode=new`).
+2. Support mode toggle:
+   - `new`: scoped to latest completed run
+   - `all`: full history
+3. Support scholar filter via `scholar_profile_id` query param.
+4. Render both badges independently:
+   - `is_new_in_latest_run`
+   - `is_read`
+5. "Mark all read" action calls `POST /api/v1/publications/mark-all-read` with CSRF.
+6. Show explicit empty states:
+   - no publications tracked
+   - no new publications in latest run
+   - filtered scholar has no items
+7. Surface run recency context when mode is `new` (latest completed run semantics).
 
 ## 8.6 Runs and diagnostics (admin)
 
@@ -215,6 +279,36 @@ Authenticated:
 
 ## 11. Open Items (Known Future Work)
 
-- Scholar discovery by real name (search Google Scholar candidates, select one, then add scholar ID).
 - API contract freeze/changelog discipline for external UI clients.
 - Additional API-first smoke coverage for end-to-end UI critical flows.
+- Optional background image enrichment/refresh jobs for already-tracked scholars.
+
+## 12. UI Rebuild Program Artifacts
+
+- Phase 0 through Phase 3 decisions are consolidated into this handbook and `README.md`.
+- Local scratch notes, probes, and temporary planning artifacts are intentionally not tracked in git.
+
+## 13. Frontend Scaffold Status (Implemented)
+
+- Frontend scaffold path: `frontend/`
+- Implemented core:
+  - App shell + routing + auth/role route guards
+  - Shared API client with envelope parsing, credentials, and CSRF header injection
+  - Pinia stores for auth, theme, and global UI errors
+  - Tailwind-first design foundation with light/dark themes and pre-paint theme initialization
+  - Page shells for login, dashboard, scholars, publications, runs, run detail, settings, and admin users
+  - Initial feature modules under `frontend/src/features/*` mapped to current API endpoints
+- Deployment boundary:
+  - No in-repo reverse-proxy implementation
+  - Frontend edge/proxy routing is managed externally (for example, Caddy)
+
+## 14. Frontend Quality Gates (Phase 3 Implemented)
+
+- CI now includes frontend quality gates in `.github/workflows/ci.yml`:
+  - API contract drift check (`scripts/check_frontend_api_contract.py`)
+  - frontend typecheck (`npm run typecheck`)
+  - frontend unit tests (`npm run test:run`)
+  - frontend build (`npm run build`)
+- Frontend test harness:
+  - `vitest` configured in `frontend/vitest.config.ts`
+  - baseline tests in `frontend/src/lib/api/envelope.test.ts` and `frontend/src/lib/api/errors.test.ts`

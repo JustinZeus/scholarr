@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.errors import register_api_exception_handlers
@@ -68,3 +71,42 @@ async def healthz() -> dict[str, str]:
     if await check_database():
         return {"status": "ok"}
     raise HTTPException(status_code=500, detail="database unavailable")
+
+
+def _configure_frontend_routes(application: FastAPI) -> None:
+    if not settings.frontend_enabled:
+        return
+
+    dist_dir = Path(settings.frontend_dist_dir)
+    index_file = dist_dir / "index.html"
+
+    if not index_file.is_file():
+        return
+
+    assets_dir = dist_dir / "assets"
+    if assets_dir.is_dir():
+        application.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    @application.get("/", include_in_schema=False)
+    async def frontend_index() -> FileResponse:
+        return FileResponse(index_file)
+
+    @application.get("/{full_path:path}", include_in_schema=False)
+    async def frontend_entry(full_path: str) -> FileResponse:
+        normalized = full_path.lstrip("/")
+        if normalized in {"healthz", "api"} or normalized.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+
+        candidate = (dist_dir / normalized).resolve()
+        try:
+            candidate.relative_to(dist_dir.resolve())
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail="Not Found") from error
+
+        if candidate.is_file():
+            return FileResponse(candidate)
+
+        return FileResponse(index_file)
+
+
+_configure_frontend_routes(app)
