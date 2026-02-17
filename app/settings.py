@@ -83,7 +83,7 @@ class Settings:
     frontend_dist_dir: str = _env_str("FRONTEND_DIST_DIR", "/app/frontend/dist")
     scholar_image_upload_dir: str = _env_str(
         "SCHOLAR_IMAGE_UPLOAD_DIR",
-        "/var/lib/scholarr/uploads",
+        "/tmp/scholarr_uploads/scholar_images",
     )
     scholar_image_upload_max_bytes: int = _env_int(
         "SCHOLAR_IMAGE_UPLOAD_MAX_BYTES",

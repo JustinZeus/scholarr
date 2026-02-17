@@ -26,6 +26,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+asyncpg://scholar:scholar@localhost:5432/scholar
+      SCHOLAR_IMAGE_UPLOAD_DIR: /tmp/scholarr_uploads/scholar_images
 
     steps:
       - name: Checkout
