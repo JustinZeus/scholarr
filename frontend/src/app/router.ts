@@ -28,7 +28,7 @@ export const router = createRouter({
       path: "/dashboard",
       name: "dashboard",
       component: DashboardPage,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, lockMainScroll: true },
     },
     {
       path: "/scholars",

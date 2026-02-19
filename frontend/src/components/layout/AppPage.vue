@@ -15,7 +15,7 @@ const props = withDefaults(
   <section
     :class="
       props.fill
-        ? 'min-w-0 flex min-h-0 flex-col gap-6 lg:h-full'
+        ? 'min-w-0 flex min-h-0 flex-col gap-6 lg:h-full lg:overflow-hidden'
         : 'page-stack min-w-0'
     "
   >
@@ -23,7 +23,7 @@ const props = withDefaults(
       <h1 class="page-title">{{ props.title }}</h1>
       <p v-if="props.subtitle" class="page-subtitle">{{ props.subtitle }}</p>
     </header>
-    <div v-if="props.fill" class="min-h-0 flex-1">
+    <div v-if="props.fill" class="flex min-h-0 flex-1 flex-col">
       <slot />
     </div>
     <slot v-else />

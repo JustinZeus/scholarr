@@ -87,7 +87,7 @@ onMounted(() => {
     subtitle="Track recent publication updates and monitor background profile checks."
     fill
   >
-    <div class="flex min-h-0 flex-1 flex-col gap-4">
+    <div class="flex min-h-0 flex-1 flex-col gap-4 xl:overflow-hidden">
       <RequestStateAlerts
         :success-message="successMessage"
         :error-message="errorMessage"
@@ -96,10 +96,10 @@ onMounted(() => {
         @dismiss-success="successMessage = null"
       />
 
-      <div class="min-h-0 flex-1">
+      <div class="h-0 min-h-0 flex-1 xl:overflow-hidden">
         <AsyncStateGate :loading="loading" :loading-lines="6" :show-empty="false">
           <template v-if="snapshot">
-            <section class="grid min-h-0 gap-4 xl:h-full xl:grid-cols-2">
+            <section class="grid min-h-0 gap-4 xl:h-full xl:grid-cols-2 xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
               <AppCard class="flex min-h-0 flex-col gap-4 xl:h-full xl:overflow-hidden">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div class="space-y-1">
@@ -120,7 +120,7 @@ onMounted(() => {
                   body="When a completed update check discovers changes, they will appear here."
                 />
 
-                <ul v-else class="grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
+                <ul v-else class="grid min-h-0 flex-1 content-start gap-3 overflow-y-scroll overscroll-contain pr-1">
                   <li
                     v-for="item in snapshot.recentPublications.slice(0, 20)"
                     :key="item.publication_id"
@@ -149,7 +149,7 @@ onMounted(() => {
                 </ul>
               </AppCard>
 
-              <div class="grid min-h-0 gap-4 xl:h-full xl:grid-rows-[auto_minmax(0,1fr)]">
+              <div class="grid min-h-0 gap-4 xl:h-full xl:grid-rows-[auto_minmax(0,1fr)] xl:overflow-hidden">
                 <AppCard class="flex min-h-0 flex-col gap-4">
                   <div class="flex items-center gap-1">
                     <h2 class="text-lg font-semibold text-ink-primary">Overview</h2>
@@ -237,14 +237,14 @@ onMounted(() => {
                     body="Start an update check to begin monitoring activity."
                   />
 
-                  <div class="grid min-h-0 flex-1 gap-2 xl:overflow-hidden">
+                  <div class="flex min-h-0 flex-1 flex-col gap-2 xl:overflow-hidden">
                     <p class="text-xs font-semibold uppercase tracking-wide text-muted">Recent checks</p>
                     <AppEmptyState
                       v-if="snapshot.recentRuns.length === 0"
                       title="No checks yet"
                       body="Check history will appear here."
                     />
-                    <ul v-else class="grid gap-2 overflow-y-auto pr-1">
+                    <ul v-else class="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto overscroll-contain pr-1">
                       <li
                         v-for="run in snapshot.recentRuns"
                         :key="run.id"
