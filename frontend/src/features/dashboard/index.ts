@@ -40,7 +40,7 @@ function countQueueStatuses(statuses: string[]): QueueHealth {
 export async function fetchDashboardSnapshot(): Promise<DashboardSnapshot> {
   const [publications, runs, queueItems] = await Promise.all([
     listPublications({ mode: "new", limit: 20 }),
-    listRuns({ limit: 5 }),
+    listRuns({ limit: 20 }),
     listQueueItems(200),
   ]);
 
