@@ -18,6 +18,14 @@ export interface RunSummary {
   partial_count: number;
   failed_state_counts: Record<string, number>;
   failed_reason_counts: Record<string, number>;
+  scrape_failure_counts: Record<string, number>;
+  retry_counts: {
+    retries_scheduled_count: number;
+    scholars_with_retries_count: number;
+    retry_exhausted_count: number;
+  };
+  alert_thresholds: Record<string, number>;
+  alert_flags: Record<string, boolean>;
 }
 
 export interface RunScholarResult {

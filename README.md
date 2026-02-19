@@ -69,12 +69,15 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 - `.env.example`: full env variable template.
 - `Dockerfile`: multi-stage build (frontend + backend runtime).
 - `README.md`: deployment and operations reference.
+- `CONTRIBUTING.md`: contribution policy and merge checklist.
+- `scripts/check_no_generated_artifacts.sh`: tracked-artifact guard used by CI.
 
 ## Environment Variables (Complete Reference)
 
 Notes:
 - Boolean envs accept: `1/0`, `true/false`, `yes/no`, `on/off`.
-- Values shown are defaults from `.env.example`.
+- Values shown are deployment defaults from `.env.example` and `docker-compose.yml`.
+- Some internal app fallbacks may differ for local test/dev safety when env vars are omitted.
 - `deploy` means used in regular deployment.
 - `dev` means used in local dev workflow.
 
@@ -119,6 +122,26 @@ Notes:
 | `LOGIN_RATE_LIMIT_ATTEMPTS` | `5` | integer >= 1 | deploy, dev | Login attempts allowed per window. |
 | `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | `60` | integer >= 1 | deploy, dev | Login rate limit window in seconds. |
 
+### HTTP Security Headers and CSP
+
+| Variable | Default | Options | Scope | Description |
+| --- | --- | --- | --- | --- |
+| `SECURITY_HEADERS_ENABLED` | `1` | boolean | deploy, dev | Global switch for response security headers middleware. |
+| `SECURITY_X_CONTENT_TYPE_OPTIONS` | `nosniff` | header value | deploy, dev | `X-Content-Type-Options` response header value. |
+| `SECURITY_X_FRAME_OPTIONS` | `DENY` | header value | deploy, dev | `X-Frame-Options` response header value. |
+| `SECURITY_REFERRER_POLICY` | `strict-origin-when-cross-origin` | header value | deploy, dev | `Referrer-Policy` response header value. |
+| `SECURITY_PERMISSIONS_POLICY` | `accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()` | permissions policy string | deploy, dev | `Permissions-Policy` response header value. |
+| `SECURITY_CROSS_ORIGIN_OPENER_POLICY` | `same-origin` | header value | deploy, dev | `Cross-Origin-Opener-Policy` response header value. |
+| `SECURITY_CROSS_ORIGIN_RESOURCE_POLICY` | `same-origin` | header value | deploy, dev | `Cross-Origin-Resource-Policy` response header value. |
+| `SECURITY_CSP_ENABLED` | `1` | boolean | deploy, dev | Enable Content Security Policy headers. |
+| `SECURITY_CSP_POLICY` | strict SPA/API default | CSP policy string | deploy, dev | CSP applied to app/API routes (excluding docs paths). |
+| `SECURITY_CSP_DOCS_POLICY` | relaxed docs default | CSP policy string | deploy, dev | CSP override for `/docs` and `/redoc` to keep Swagger/ReDoc usable. |
+| `SECURITY_CSP_REPORT_ONLY` | `0` | boolean | deploy, dev | Emit CSP in report-only mode instead of enforcement mode. |
+| `SECURITY_STRICT_TRANSPORT_SECURITY_ENABLED` | `0` | boolean | deploy, dev | Enable `Strict-Transport-Security` header. |
+| `SECURITY_STRICT_TRANSPORT_SECURITY_MAX_AGE` | `31536000` | integer >= 0 | deploy, dev | `max-age` for HSTS header. |
+| `SECURITY_STRICT_TRANSPORT_SECURITY_INCLUDE_SUBDOMAINS` | `1` | boolean | deploy, dev | Add `includeSubDomains` directive to HSTS header. |
+| `SECURITY_STRICT_TRANSPORT_SECURITY_PRELOAD` | `0` | boolean | deploy, dev | Add `preload` directive to HSTS header. |
+
 ### Logging
 
 | Variable | Default | Options | Scope | Description |
@@ -141,6 +164,9 @@ Notes:
 | `INGESTION_RETRY_BACKOFF_SECONDS` | `1.0` | float >= 0 | deploy, dev | Backoff delay for retry attempts. |
 | `INGESTION_MAX_PAGES_PER_SCHOLAR` | `30` | integer >= 1 | deploy, dev | Upper bound of pages fetched per scholar run. |
 | `INGESTION_PAGE_SIZE` | `100` | integer >= 1 | deploy, dev | Requested Scholar page size. |
+| `INGESTION_ALERT_BLOCKED_FAILURE_THRESHOLD` | `1` | integer >= 1 | deploy, dev | Trigger blocked/captcha scrape alert flag when this many blocked failures occur in a run. |
+| `INGESTION_ALERT_NETWORK_FAILURE_THRESHOLD` | `2` | integer >= 1 | deploy, dev | Trigger network scrape alert flag when this many network failures occur in a run. |
+| `INGESTION_ALERT_RETRY_SCHEDULED_THRESHOLD` | `3` | integer >= 1 | deploy, dev | Trigger retry alert flag when scheduled retry count reaches this threshold in a run. |
 | `INGESTION_CONTINUATION_QUEUE_ENABLED` | `1` | boolean | deploy, dev | Enable continuation queue for long runs. |
 | `INGESTION_CONTINUATION_BASE_DELAY_SECONDS` | `120` | integer >= 0 | deploy, dev | Initial delay before retrying continuation queue items. |
 | `INGESTION_CONTINUATION_MAX_DELAY_SECONDS` | `3600` | integer >= 0 | deploy, dev | Maximum continuation retry delay. |
@@ -150,7 +176,7 @@ Notes:
 
 | Variable | Default | Options | Scope | Description |
 | --- | --- | --- | --- | --- |
-| `SCHOLAR_IMAGE_UPLOAD_DIR` | `/var/lib/scholarr/uploads` | writable absolute path | deploy, dev | Storage path for uploaded scholar images. |
+| `SCHOLAR_IMAGE_UPLOAD_DIR` | `/var/lib/scholarr/uploads` | writable absolute path | deploy, dev | Storage path for uploaded scholar images in compose deployments. App fallback without env is `/tmp/scholarr_uploads/scholar_images`. |
 | `SCHOLAR_IMAGE_UPLOAD_MAX_BYTES` | `2000000` | integer >= 1 | deploy, dev | Max uploaded image size in bytes. |
 | `SCHOLAR_NAME_SEARCH_ENABLED` | `1` | boolean | deploy, dev | Enable name-search helper endpoint. |
 | `SCHOLAR_NAME_SEARCH_CACHE_TTL_SECONDS` | `21600` | integer >= 1 | deploy, dev | Cache TTL for successful name-search responses. |
@@ -160,6 +186,8 @@ Notes:
 | `SCHOLAR_NAME_SEARCH_INTERVAL_JITTER_SECONDS` | `2.0` | float >= 0 | deploy, dev | Added jitter to reduce request burst patterns. |
 | `SCHOLAR_NAME_SEARCH_COOLDOWN_BLOCK_THRESHOLD` | `1` | integer >= 1 | deploy, dev | Consecutive blocked responses before cooldown starts. |
 | `SCHOLAR_NAME_SEARCH_COOLDOWN_SECONDS` | `1800` | integer >= 1 | deploy, dev | Cooldown duration after repeated blocked responses. |
+| `SCHOLAR_NAME_SEARCH_ALERT_RETRY_COUNT_THRESHOLD` | `2` | integer >= 1 | deploy, dev | Emit retry-threshold observability warning when name-search retry count reaches this value. |
+| `SCHOLAR_NAME_SEARCH_ALERT_COOLDOWN_REJECTIONS_THRESHOLD` | `3` | integer >= 1 | deploy, dev | Emit cooldown-threshold observability alert after this many requests are rejected during active cooldown. |
 
 ### Startup Bootstrap and DB Wait
 
@@ -196,6 +224,14 @@ Contract drift:
 ```bash
 python3 scripts/check_frontend_api_contract.py
 ```
+
+Repository hygiene:
+
+```bash
+./scripts/check_no_generated_artifacts.sh
+```
+
+Scheduled fixture probes run in GitHub Actions via `.github/workflows/scheduled-probes.yml`.
 
 ## API Contract
 

@@ -382,6 +382,9 @@ async def run_manual(
             auto_queue_continuations=settings.ingestion_continuation_queue_enabled,
             queue_delay_seconds=settings.ingestion_continuation_base_delay_seconds,
             idempotency_key=idempotency_key,
+            alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
+            alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
+            alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
         )
     except ingestion_service.RunAlreadyInProgressError as exc:
         await db_session.rollback()
