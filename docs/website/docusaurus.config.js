@@ -7,10 +7,10 @@ const config = {
   favicon: "img/favicon.ico",
 
   url: "https://justinzeus.github.io",
-  baseUrl: "/scholar-scraper/",
+  baseUrl: "/scholarr/",
 
   organizationName: "JustinZeus",
-  projectName: "scholar-scraper",
+  projectName: "scholarr",
 
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
@@ -25,10 +25,11 @@ const config = {
       "classic",
       {
         docs: {
-          path: "../docs",
+          path: "..",
+          exclude: ["website/**", "README.md"],
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: "https://github.com/JustinZeus/scholar-scraper/tree/main/",
+          editUrl: "https://github.com/JustinZeus/scholarr/tree/main/",
         },
         blog: false,
         theme: {
@@ -49,7 +50,7 @@ const config = {
           label: "Docs",
         },
         {
-          href: "https://github.com/JustinZeus/scholar-scraper",
+          href: "https://github.com/JustinZeus/scholarr",
           label: "GitHub",
           position: "right",
         },
@@ -67,7 +68,7 @@ const config = {
           items: [
             {
               label: "GitHub",
-              href: "https://github.com/JustinZeus/scholar-scraper",
+              href: "https://github.com/JustinZeus/scholarr",
             },
           ],
         },
