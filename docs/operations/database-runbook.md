@@ -88,7 +88,7 @@ python3 scripts/db/repair_publication_links.py --user-id <id> --requested-by "<o
 
 Dry-run first, then re-run with `--apply` once scope and summary counts match expectation.
 
-If cleanup changes schema assumptions, follow `docs/ops/migration_checklist.md` before any migration rollout.
+If cleanup changes schema assumptions, follow `docs/operations/migration-checklist.md` before any migration rollout.
 
 ## Restore Drill Cadence
 

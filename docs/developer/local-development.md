@@ -1,30 +1,6 @@
-# Deploy and Dev Quickstart
+# Developer Local Development
 
-## Required Setup
-
-1. Copy `.env.example` to `.env`.
-2. Set `POSTGRES_PASSWORD`.
-3. Set `SESSION_SECRET_KEY`.
-
-## Deploy Method A: Prebuilt Image
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-Open:
-- App/API: `http://localhost:8000`
-- Health endpoint: `http://localhost:8000/healthz`
-
-Upgrade:
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-## Deploy Method B: Local Source + Dev Frontend
+## Start the Dev Stack
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
@@ -40,16 +16,14 @@ Stop:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 ```
 
-## Quality Commands
-
-Backend:
+## Backend Validation
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app uv run pytest tests/unit
 docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app uv run pytest -m integration
 ```
 
-Frontend:
+## Frontend Validation
 
 ```bash
 cd frontend
@@ -59,10 +33,20 @@ npm run test:run
 npm run build
 ```
 
-Repository checks:
+## Repository Gates
 
 ```bash
 python3 scripts/check_frontend_api_contract.py
 python3 scripts/check_env_contract.py
 ./scripts/check_no_generated_artifacts.sh
+```
+
+## Docs Site (Contributor Workflow)
+
+Docs tooling is colocated in `docs/website/`:
+
+```bash
+cd docs/website
+npm install
+npm run build
 ```

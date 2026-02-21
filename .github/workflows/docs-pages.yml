@@ -7,7 +7,6 @@ on:
       - main
     paths:
       - docs/**
-      - website/**
       - .github/workflows/docs-pages.yml
 
 permissions:
@@ -33,15 +32,15 @@ jobs:
           node-version: "20"
 
       - name: Install docs dependencies
-        run: npm install --prefix website
+        run: npm install --prefix docs/website
 
       - name: Build docs site
-        run: npm --prefix website run build
+        run: npm --prefix docs/website run build
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: website/build
+          path: docs/website/build
 
   deploy:
     needs: build

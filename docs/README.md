@@ -1,30 +1,23 @@
 # Documentation Index
 
-Use this directory for project documentation outside `README.md` and `agents.md`.
+This directory contains both docs content and docs tooling.
 
-## Deploy
+## Audience-Based Structure
 
-- `docs/deploy/quickstart.md`: deployment modes, local dev startup, and quality command reference.
+- `docs/user/`: onboarding and usage-oriented docs for self-hosters.
+- `docs/operations/`: runbooks and rollout checklists for ongoing operations.
+- `docs/developer/`: architecture, contribution standards, and local development workflows.
+- `docs/reference/`: canonical API and environment contracts.
 
-## Reference
+## Docs Tooling
 
-- `docs/reference/environment.md`: complete environment-variable catalog and contract/audit notes.
-- `docs/reference/api_contract.md`: API envelope contract and endpoint semantics.
+- `docs/website/`: Docusaurus app used to publish docs to GitHub Pages.
 
-## Architecture
+## Recommended Reading Paths
 
-- `docs/architecture/domain_boundaries.md`: domain boundaries, user-scoped data rules, and frontend behavior notes.
+- Users: `docs/user/getting-started.md`
+- Operators: `docs/operations/overview.md`
+- Developers: `docs/developer/overview.md`
+- Contract consumers: `docs/reference/overview.md`
 
-## Operations
-
-- `docs/ops/scrape_safety_runbook.md`: scrape cooldown and blocked-IP operations.
-- `docs/ops/db_runbook.md`: backup, restore, and verification workflows.
-- `docs/ops/migration_checklist.md`: migration planning and rollout checklist.
-
-## Frontend
-
-- `docs/frontend/theme_phase0_inventory.md`: theme-token inventory and adoption notes.
-
-## Contribution
-
-- `docs/contributing.md`: contribution policy and merge checklist.
+Published site: https://justinzeus.github.io/scholarr/

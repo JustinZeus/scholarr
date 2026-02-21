@@ -124,10 +124,10 @@ jobs:
           node-version: "20"
 
       - name: Install docs dependencies
-        run: npm install --prefix website
+        run: npm install --prefix docs/website
 
       - name: Docs build
-        run: npm --prefix website run build
+        run: npm --prefix docs/website run build
 
   docker-publish:
     runs-on: ubuntu-latest
