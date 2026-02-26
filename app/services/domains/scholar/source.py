@@ -101,13 +101,6 @@ class LiveScholarSource:
             cstart=cstart,
             pagesize=pagesize,
         )
-        structured_log(
-            logger, "debug", "scholar_source.fetch_started",
-            scholar_id=scholar_id,
-            requested_url=requested_url,
-            cstart=cstart,
-            pagesize=pagesize,
-        )
         return await self._fetch_with_global_throttle(requested_url)
 
     async def fetch_author_search_html(
@@ -120,19 +113,9 @@ class LiveScholarSource:
             query=query,
             start=start,
         )
-        structured_log(
-            logger, "debug", "scholar_source.search_fetch_started",
-            query=query,
-            requested_url=requested_url,
-            start=start,
-        )
         return await self._fetch_with_global_throttle(requested_url)
 
     async def fetch_publication_html(self, publication_url: str) -> FetchResult:
-        structured_log(
-            logger, "debug", "scholar_source.publication_fetch_started",
-            requested_url=publication_url,
-        )
         return await self._fetch_with_global_throttle(publication_url)
 
     async def _fetch_with_global_throttle(self, requested_url: str) -> FetchResult:

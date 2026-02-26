@@ -232,7 +232,7 @@ async def requeue_pdf_lookup(
             message="Publication not found.",
         )
     status, message = _requeue_response_state(queued=result.queued)
-    structured_log(logger, "info", "api.admin.db.pdf_queue_requeue_requested", admin_user_id=int(admin_user.id), publication_id=int(publication_id), queued=bool(result.queued))
+    structured_log(logger, "info", "api.admin.db.pdf_requeued", admin_user_id=int(admin_user.id), publication_id=int(publication_id), queued=bool(result.queued))
     return success_payload(
         request,
         data={
@@ -340,7 +340,7 @@ async def trigger_publication_near_duplicate_repair(
             code="invalid_near_duplicate_repair_request",
             message=str(exc),
         ) from exc
-    structured_log(logger, "info", "api.admin.db.publication_near_duplicate_repair_triggered", admin_user_id=int(admin_user.id), dry_run=bool(payload.dry_run), selected_cluster_count=len(payload.selected_cluster_keys), job_id=int(result["job_id"]), status=result["status"])
+    structured_log(logger, "info", "api.admin.db.dedup_repair_triggered", admin_user_id=int(admin_user.id), dry_run=bool(payload.dry_run), selected_cluster_count=len(payload.selected_cluster_keys), job_id=int(result["job_id"]), status=result["status"])
     return success_payload(request, data=result)
 
 

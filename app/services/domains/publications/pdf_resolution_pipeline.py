@@ -45,7 +45,7 @@ async def resolve_publication_pdf_outcome_for_row(
     except ArxivRateLimitError:
         arxiv_rate_limited = True
         arxiv_outcome = None
-        structured_log(logger, "warning", "publications.pdf_resolution.arxiv_rate_limited", publication_id=int(row.publication_id))
+        structured_log(logger, "warning", "pdf_resolution.arxiv_rate_limited", publication_id=int(row.publication_id))
     if arxiv_outcome and arxiv_outcome.pdf_url:
         return PipelineOutcome(arxiv_outcome, None, arxiv_rate_limited=arxiv_rate_limited)
 
@@ -94,7 +94,7 @@ async def _openalex_outcome(
         # Re-raise so the caller's batch loop can stop hitting the API.
         raise
     except Exception as exc:
-        structured_log(logger, "warning", "publications.pdf_resolution.openalex_failed", error=str(exc))
+        structured_log(logger, "warning", "pdf_resolution.openalex_failed", error=str(exc))
     return None
 
 
@@ -107,12 +107,12 @@ async def _arxiv_outcome(
     from app.services.domains.arxiv.application import discover_arxiv_id_for_publication
 
     if not allow_lookup:
-        structured_log(logger, "info", "publications.pdf_resolution.arxiv_skipped", publication_id=int(row.publication_id), skip_reason="batch_arxiv_cooldown_active")
+        structured_log(logger, "info", "pdf_resolution.arxiv_skipped", publication_id=int(row.publication_id), skip_reason="batch_arxiv_cooldown_active")
         return None
 
     skip_reason = arxiv_skip_reason_for_item(item=row)
     if skip_reason is not None:
-        structured_log(logger, "info", "publications.pdf_resolution.arxiv_skipped", publication_id=int(row.publication_id), skip_reason=skip_reason)
+        structured_log(logger, "info", "pdf_resolution.arxiv_skipped", publication_id=int(row.publication_id), skip_reason=skip_reason)
         return None
 
     try:
@@ -130,7 +130,7 @@ async def _arxiv_outcome(
     except ArxivRateLimitError:
         raise  # propagate so orchestration can switch to non-arXiv fallback
     except Exception as exc:
-        structured_log(logger, "warning", "publications.pdf_resolution.arxiv_failed", error=str(exc))
+        structured_log(logger, "warning", "pdf_resolution.arxiv_failed", error=str(exc))
     return None
 
 

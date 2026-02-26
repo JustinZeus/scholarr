@@ -82,7 +82,7 @@ def test_structured_log_console_formatter(caplog) -> None:
     output = formatter.format(record)
 
     assert "export.failed" in output
-    assert "scholar_id=7" in output
+    assert "scholar=7" in output
 
 
 def test_structured_log_strips_metric_fields(caplog) -> None:

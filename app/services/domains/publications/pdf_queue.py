@@ -514,9 +514,9 @@ async def _run_resolution_task(
             )
             if arxiv_rate_limited and arxiv_lookup_allowed:
                 arxiv_lookup_allowed = False
-                structured_log(logger, "warning", "publications.pdf_queue.arxiv_batch_disabled", detail="arXiv temporarily disabled for remaining batch after rate limit")
+                structured_log(logger, "warning", "pdf_queue.arxiv_batch_disabled", detail="arXiv temporarily disabled for remaining batch after rate limit")
         except OpenAlexBudgetExhaustedError:
-            structured_log(logger, "warning", "publications.pdf_queue.budget_exhausted", detail="Stopping PDF resolution batch — OpenAlex daily budget exhausted")
+            structured_log(logger, "warning", "pdf_queue.budget_exhausted", detail="Stopping PDF resolution batch — OpenAlex daily budget exhausted")
             break
 
 

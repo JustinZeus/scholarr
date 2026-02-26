@@ -153,7 +153,7 @@ class ScholarIngestionService:
             await db_session.commit()
             await db_session.refresh(user_settings)
             structured_log(
-                logger, "info", "ingestion.safety_cooldown_cleared",
+                logger, "info", "ingestion.cooldown_cleared",
                 user_id=user_id,
                 reason=previous.get("cooldown_reason"),
                 cooldown_until=previous.get("cooldown_until"),
@@ -962,7 +962,7 @@ class ScholarIngestionService:
             )
         elif pre_apply_state.get("cooldown_active") and not safety_state.get("cooldown_active"):
             structured_log(
-                logger, "info", "ingestion.safety_cooldown_cleared",
+                logger, "info", "ingestion.cooldown_cleared",
                 user_id=user_id,
                 crawl_run_id=int(run.id),
                 reason=pre_apply_state.get("cooldown_reason"),
@@ -1319,7 +1319,7 @@ class ScholarIngestionService:
         effective_delay = self._effective_request_delay_seconds(request_delay_seconds)
         if effective_delay != _int_or_default(request_delay_seconds, effective_delay):
             structured_log(
-                logger, "warning", "ingestion.request_delay_coerced_to_policy_floor",
+                logger, "warning", "ingestion.delay_coerced",
                 user_id=user_id,
                 requested_request_delay_seconds=_int_or_default(request_delay_seconds, 0),
                 effective_request_delay_seconds=effective_delay,
@@ -2596,13 +2596,6 @@ class ScholarIngestionService:
             db_session.add(link)
             discovered_count += 1
 
-            structured_log(
-                logger, "debug", "ingestion.publication_discovered",
-                scholar_profile_id=scholar.id,
-                publication_id=publication.id,
-                crawl_run_id=run.id,
-            )
-            
             await self._commit_discovered_publication(
                 db_session,
                 run=run,
@@ -2720,11 +2713,6 @@ class ScholarIngestionService:
         )
         db_session.add(publication)
         await db_session.flush()
-        structured_log(
-            logger, "debug", "ingestion.publication_created",
-            publication_id=publication.id,
-            cluster_id=publication.cluster_id,
-        )
         return publication
 
     @staticmethod

@@ -108,6 +108,14 @@ class JsonLogFormatter(logging.Formatter):
         return value
 
 
+_CONSOLE_SHORT_KEYS = {
+    "user_id": "user",
+    "scholar_id": "scholar",
+    "crawl_run_id": "run",
+    "run_id": "run",
+}
+
+
 class ConsoleLogFormatter(logging.Formatter):
     def __init__(self, *, redact_fields: set[str]) -> None:
         super().__init__()
@@ -140,7 +148,8 @@ class ConsoleLogFormatter(logging.Formatter):
         for key in sorted(payload.keys()):
             if key in {"timestamp", "level", "logger", "event", "exception"}:
                 continue
-            parts.append(f"{key}={payload[key]}")
+            display_key = _CONSOLE_SHORT_KEYS.get(key, key)
+            parts.append(f"{display_key}={payload[key]}")
 
         if "exception" in payload:
             parts.append(f"exception={payload['exception']}")

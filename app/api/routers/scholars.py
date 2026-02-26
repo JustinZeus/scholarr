@@ -575,7 +575,7 @@ async def clear_scholar_image_customization(
         profile=profile,
         upload_dir=settings.scholar_image_upload_dir,
     )
-    structured_log(logger, "info", "api.scholars.image_customization_cleared", user_id=current_user.id, scholar_profile_id=updated.id)
+    structured_log(logger, "info", "api.scholars.image_cleared", user_id=current_user.id, scholar_profile_id=updated.id)
     return success_payload(
         request,
         data=_serialize_scholar(updated),
