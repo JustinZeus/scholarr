@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication, ScholarProfile, ScholarPublication
-from app.services.domains.ingestion.application import build_publication_url, normalize_title
 from app.services.domains.doi.normalize import normalize_doi
+from app.services.domains.ingestion.application import build_publication_url, normalize_title
 from app.services.domains.portability.normalize import (
     _normalize_citation_count,
     _normalize_optional_text,
@@ -22,9 +22,7 @@ async def _find_publication_by_cluster(
     *,
     cluster_id: str,
 ) -> Publication | None:
-    result = await db_session.execute(
-        select(Publication).where(Publication.cluster_id == cluster_id)
-    )
+    result = await db_session.execute(select(Publication).where(Publication.cluster_id == cluster_id))
     return result.scalar_one_or_none()
 
 
@@ -33,9 +31,7 @@ async def _find_publication_by_fingerprint(
     *,
     fingerprint_sha256: str,
 ) -> Publication | None:
-    result = await db_session.execute(
-        select(Publication).where(Publication.fingerprint_sha256 == fingerprint_sha256)
-    )
+    result = await db_session.execute(select(Publication).where(Publication.fingerprint_sha256 == fingerprint_sha256))
     return result.scalar_one_or_none()
 
 

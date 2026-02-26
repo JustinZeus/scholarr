@@ -5,13 +5,14 @@ import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_api_current_user
 from app.api.errors import ApiException
 from app.api.responses import success_payload
-from fastapi.responses import StreamingResponse
+from app.api.runtime_deps import get_ingestion_service
 from app.api.schemas import (
     ManualRunEnvelope,
     QueueClearEnvelope,
@@ -29,7 +30,6 @@ from app.services.domains.runs import application as run_service
 from app.services.domains.runs.events import event_generator
 from app.services.domains.settings import application as user_settings_service
 from app.settings import settings
-from app.api.runtime_deps import get_ingestion_service
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +77,7 @@ def _normalize_idempotency_key(raw_value: str | None) -> str | None:
         raise ApiException(
             status_code=400,
             code="invalid_idempotency_key",
-            message=(
-                "Invalid Idempotency-Key. Use 8-128 characters from: "
-                "A-Z a-z 0-9 . _ : -"
-            ),
+            message=("Invalid Idempotency-Key. Use 8-128 characters from: A-Z a-z 0-9 . _ : -"),
         )
     return candidate
 
@@ -130,11 +127,7 @@ def _normalize_attempt_log(value: Any) -> list[dict[str, Any]]:
                 "cstart": _int_value(item.get("cstart"), 0),
                 "state": _str_value(item.get("state")),
                 "state_reason": _str_value(item.get("state_reason")),
-                "status_code": (
-                    _int_value(item.get("status_code"))
-                    if item.get("status_code") is not None
-                    else None
-                ),
+                "status_code": (_int_value(item.get("status_code")) if item.get("status_code") is not None else None),
                 "fetch_error": _str_value(item.get("fetch_error")),
             }
         )
@@ -155,19 +148,12 @@ def _normalize_page_logs(value: Any) -> list[dict[str, Any]]:
                 "cstart": _int_value(item.get("cstart"), 0),
                 "state": _str_value(item.get("state")) or "unknown",
                 "state_reason": _str_value(item.get("state_reason")),
-                "status_code": (
-                    _int_value(item.get("status_code"))
-                    if item.get("status_code") is not None
-                    else None
-                ),
+                "status_code": (_int_value(item.get("status_code")) if item.get("status_code") is not None else None),
                 "publication_count": _int_value(item.get("publication_count"), 0),
                 "attempt_count": _int_value(item.get("attempt_count"), 0),
                 "has_show_more_button": _bool_value(item.get("has_show_more_button"), False),
                 "articles_range": _str_value(item.get("articles_range")),
-                "warning_codes": [
-                    str(code)
-                    for code in (warning_codes if isinstance(warning_codes, list) else [])
-                ],
+                "warning_codes": [str(code) for code in (warning_codes if isinstance(warning_codes, list) else [])],
             }
         )
     return normalized
@@ -179,19 +165,11 @@ def _normalize_debug(value: Any) -> dict[str, Any] | None:
     marker_counts = value.get("marker_counts_nonzero")
     warning_codes = value.get("warning_codes")
     return {
-        "status_code": (
-            _int_value(value.get("status_code"))
-            if value.get("status_code") is not None
-            else None
-        ),
+        "status_code": (_int_value(value.get("status_code")) if value.get("status_code") is not None else None),
         "final_url": _str_value(value.get("final_url")),
         "fetch_error": _str_value(value.get("fetch_error")),
         "body_sha256": _str_value(value.get("body_sha256")),
-        "body_length": (
-            _int_value(value.get("body_length"))
-            if value.get("body_length") is not None
-            else None
-        ),
+        "body_length": (_int_value(value.get("body_length")) if value.get("body_length") is not None else None),
         "has_show_more_button": (
             _bool_value(value.get("has_show_more_button"), False)
             if value.get("has_show_more_button") is not None
@@ -199,10 +177,7 @@ def _normalize_debug(value: Any) -> dict[str, Any] | None:
         ),
         "articles_range": _str_value(value.get("articles_range")),
         "state_reason": _str_value(value.get("state_reason")),
-        "warning_codes": [
-            str(code)
-            for code in (warning_codes if isinstance(warning_codes, list) else [])
-        ],
+        "warning_codes": [str(code) for code in (warning_codes if isinstance(warning_codes, list) else [])],
         "marker_counts_nonzero": {
             str(key): _int_value(count, 0)
             for key, count in (marker_counts.items() if isinstance(marker_counts, dict) else [])
@@ -241,9 +216,7 @@ def _normalize_scholar_result(value: Any) -> dict[str, Any]:
         "publication_count": _int_value(value.get("publication_count"), 0),
         "start_cstart": _int_value(value.get("start_cstart"), 0),
         "continuation_cstart": (
-            _int_value(value.get("continuation_cstart"))
-            if value.get("continuation_cstart") is not None
-            else None
+            _int_value(value.get("continuation_cstart")) if value.get("continuation_cstart") is not None else None
         ),
         "continuation_enqueued": _bool_value(value.get("continuation_enqueued"), False),
         "continuation_cleared": _bool_value(value.get("continuation_cleared"), False),
@@ -289,7 +262,9 @@ async def _load_safety_state(
         await db_session.commit()
         await db_session.refresh(user_settings)
         structured_log(
-            logger, "info", "api.runs.safety_cooldown_cleared",
+            logger,
+            "info",
+            "api.runs.safety_cooldown_cleared",
             user_id=user_id,
             reason=previous_safety_state.get("cooldown_reason"),
             cooldown_until=previous_safety_state.get("cooldown_until"),
@@ -299,7 +274,9 @@ async def _load_safety_state(
 
 def _raise_manual_runs_disabled(*, user_id: int, safety_state: dict[str, Any]) -> None:
     structured_log(
-        logger, "warning", "api.runs.manual_blocked_policy",
+        logger,
+        "warning",
+        "api.runs.manual_blocked_policy",
         user_id=user_id,
         policy={"manual_run_allowed": False},
         safety_state=safety_state,
@@ -463,7 +440,9 @@ async def _execute_manual_run(
 
 def _raise_manual_blocked_safety(*, exc, user_id: int) -> None:
     structured_log(
-        logger, "info", "api.runs.manual_blocked_safety",
+        logger,
+        "info",
+        "api.runs.manual_blocked_safety",
         user_id=user_id,
         reason=exc.safety_state.get("cooldown_reason"),
         cooldown_until=exc.safety_state.get("cooldown_until"),
@@ -613,12 +592,12 @@ async def cancel_run(
     scholar_results = error_log.get("scholar_results")
     if not isinstance(scholar_results, list):
         scholar_results = []
-        
+
     safety_state = await _load_safety_state(
         db_session,
         user_id=current_user.id,
     )
-    
+
     return success_payload(
         request,
         data={
@@ -657,7 +636,7 @@ async def run_manual(
 
     try:
         user_settings = await user_settings_service.get_or_create_settings(db_session, user_id=current_user.id)
-        
+
         # Initialize run (creates the record and performs safety checks)
         run, scholars, start_cstart_map = await ingest_service.initialize_run(
             db_session,
@@ -673,13 +652,14 @@ async def run_manual(
             alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
             alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
         )
-        
+
         await db_session.commit()
-        
+
         # Kick off background execution
-        from app.db.session import get_session_factory
         import asyncio
-        
+
+        from app.db.session import get_session_factory
+
         asyncio.create_task(
             ingest_service.execute_run(
                 session_factory=get_session_factory(),
@@ -700,7 +680,7 @@ async def run_manual(
                 idempotency_key=idempotency_key,
             )
         )
-        
+
         return success_payload(
             request,
             data={
@@ -714,7 +694,7 @@ async def run_manual(
                 "reused_existing_run": False,
                 "idempotency_key": idempotency_key,
                 "safety_state": await _load_safety_state(db_session, user_id=current_user.id),
-            }
+            },
         )
     except ingestion_service.RunBlockedBySafetyPolicyError as exc:
         await db_session.rollback()
@@ -738,7 +718,6 @@ async def run_manual(
     except Exception as exc:
         await db_session.rollback()
         _raise_manual_failed(exc=exc, user_id=current_user.id)
-
 
 
 @router.get(
@@ -891,7 +870,4 @@ async def stream_run_events(
             code="run_not_found",
             message="Run not found.",
         )
-    return StreamingResponse(
-        event_generator(run_id),
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(event_generator(run_id), media_type="text/event-stream")

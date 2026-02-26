@@ -24,9 +24,7 @@ def _summary_int_dict(summary: dict[str, Any], key: str) -> dict[str, int]:
     if not isinstance(value, dict):
         return {}
     return {
-        str(item_key): _safe_int(item_value, 0)
-        for item_key, item_value in value.items()
-        if isinstance(item_key, str)
+        str(item_key): _safe_int(item_value, 0) for item_key, item_value in value.items() if isinstance(item_key, str)
     }
 
 
@@ -34,11 +32,7 @@ def _summary_bool_dict(summary: dict[str, Any], key: str) -> dict[str, bool]:
     value = summary.get(key)
     if not isinstance(value, dict):
         return {}
-    return {
-        str(item_key): bool(item_value)
-        for item_key, item_value in value.items()
-        if isinstance(item_key, str)
-    }
+    return {str(item_key): bool(item_value) for item_key, item_value in value.items() if isinstance(item_key, str)}
 
 
 def _retry_counts(summary: dict[str, Any]) -> dict[str, int]:

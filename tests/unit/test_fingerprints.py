@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from app.services.domains.ingestion.fingerprints import (
     _dedupe_publication_candidates,
     canonical_title_for_dedup,
@@ -36,28 +34,40 @@ class TestFuzzyTitlesMatch:
         assert fuzzy_titles_match("Deep Learning for NLP", "deep learning for nlp") is True
 
     def test_minor_word_difference(self) -> None:
-        assert fuzzy_titles_match(
-            "A Survey on Deep Learning Methods for NLP",
-            "Survey on Deep Learning Methods for NLP",
-        ) is True
+        assert (
+            fuzzy_titles_match(
+                "A Survey on Deep Learning Methods for NLP",
+                "Survey on Deep Learning Methods for NLP",
+            )
+            is True
+        )
 
     def test_punctuation_difference(self) -> None:
-        assert fuzzy_titles_match(
-            "Attention Is All You Need",
-            "Attention Is All You Need.",
-        ) is True
+        assert (
+            fuzzy_titles_match(
+                "Attention Is All You Need",
+                "Attention Is All You Need.",
+            )
+            is True
+        )
 
     def test_colon_vs_dash_subtitle(self) -> None:
-        assert fuzzy_titles_match(
-            "Deep Learning: A Comprehensive Survey",
-            "Deep Learning - A Comprehensive Survey",
-        ) is True
+        assert (
+            fuzzy_titles_match(
+                "Deep Learning: A Comprehensive Survey",
+                "Deep Learning - A Comprehensive Survey",
+            )
+            is True
+        )
 
     def test_completely_different_titles(self) -> None:
-        assert fuzzy_titles_match(
-            "Deep Learning for NLP",
-            "Climate Change Impact on Agriculture",
-        ) is False
+        assert (
+            fuzzy_titles_match(
+                "Deep Learning for NLP",
+                "Climate Change Impact on Agriculture",
+            )
+            is False
+        )
 
     def test_short_title_no_false_positive(self) -> None:
         assert fuzzy_titles_match("On Trees", "On Forests") is False
@@ -67,16 +77,22 @@ class TestFuzzyTitlesMatch:
 
     def test_custom_threshold(self) -> None:
         # Lower threshold catches more distant matches
-        assert fuzzy_titles_match(
-            "A Survey on Deep Learning",
-            "Survey on Machine Learning Approaches",
-            threshold=0.3,
-        ) is True
+        assert (
+            fuzzy_titles_match(
+                "A Survey on Deep Learning",
+                "Survey on Machine Learning Approaches",
+                threshold=0.3,
+            )
+            is True
+        )
         # Default threshold rejects them
-        assert fuzzy_titles_match(
-            "A Survey on Deep Learning",
-            "Survey on Machine Learning Approaches",
-        ) is False
+        assert (
+            fuzzy_titles_match(
+                "A Survey on Deep Learning",
+                "Survey on Machine Learning Approaches",
+            )
+            is False
+        )
 
 
 class TestDedupePublicationCandidates:
@@ -203,27 +219,19 @@ class TestDedupePublicationCandidates:
 class TestCanonicalTitleForDedup:
     def test_strips_doi_suffix(self) -> None:
         title = "Adam: A Method for Stochastic Optimization. doi: 10.48550/arxiv.1412.6980"
-        assert canonical_title_for_dedup(title) == normalize_title(
-            "Adam: A Method for Stochastic Optimization"
-        )
+        assert canonical_title_for_dedup(title) == normalize_title("Adam: A Method for Stochastic Optimization")
 
     def test_strips_arxiv_metadata_suffix(self) -> None:
         title = "Adam: A Method for Stochastic Optimization. arXiv, Jan 29, 2017"
-        assert canonical_title_for_dedup(title) == normalize_title(
-            "Adam: A Method for Stochastic Optimization"
-        )
+        assert canonical_title_for_dedup(title) == normalize_title("Adam: A Method for Stochastic Optimization")
 
     def test_strips_preprint_parenthetical(self) -> None:
         title = "Adam: A method for stochastic optimization, preprint (2014)"
-        assert canonical_title_for_dedup(title) == normalize_title(
-            "Adam: A method for stochastic optimization"
-        )
+        assert canonical_title_for_dedup(title) == normalize_title("Adam: A method for stochastic optimization")
 
     def test_strips_venue_sentence_suffix(self) -> None:
         title = "Adam a method for stochastic optimization. Comput. Sci"
-        assert canonical_title_for_dedup(title) == normalize_title(
-            "Adam a method for stochastic optimization"
-        )
+        assert canonical_title_for_dedup(title) == normalize_title("Adam a method for stochastic optimization")
 
     def test_strips_trailing_year_in_parens(self) -> None:
         assert canonical_title_for_dedup("Deep Learning (2018)") == normalize_title("Deep Learning")
@@ -242,10 +250,7 @@ class TestCanonicalTitleForDedup:
         assert len(set(canonicals)) == 1, f"Expected one canonical, got: {canonicals}"
 
     def test_strips_mojibake_conference_suffix(self) -> None:
-        noisy = (
-            "â€ œAdam: A method for stochastic optimization, "
-            "â€ 3rd Int. Conf. Learn. Represent. ICLR 2015-Conf"
-        )
+        noisy = "â€ œAdam: A method for stochastic optimization, â€ 3rd Int. Conf. Learn. Represent. ICLR 2015-Conf"
         clean = "Adam: A method for stochastic optimization"
         assert canonical_title_for_dedup(noisy) == normalize_title(clean)
 

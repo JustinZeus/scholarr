@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Select, and_, func, literal, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from app.db.models import (
     User,
 )
 from app.db.session import get_session_factory
+from app.logging_utils import structured_log
 from app.services.domains.publication_identifiers import application as identifier_service
 from app.services.domains.publication_identifiers.types import DisplayIdentifier
 from app.services.domains.publications.pdf_resolution_pipeline import (
@@ -27,7 +28,6 @@ from app.services.domains.unpaywall.application import (
     FAILURE_RESOLUTION_EXCEPTION,
     OaResolutionOutcome,
 )
-from app.logging_utils import structured_log
 from app.settings import settings
 
 PDF_STATUS_UNTRACKED = "untracked"
@@ -85,7 +85,7 @@ class PdfQueuePage:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _publication_ids(rows: list[PublicationListItem]) -> list[int]:
@@ -472,7 +472,13 @@ async def _resolve_publication_row(
         # Propagate upward so the batch loop can stop immediately.
         raise
     except Exception as exc:  # pragma: no cover - defensive network boundary
-        structured_log(logger, "warning", "publications.pdf_queue.resolve_failed", publication_id=row.publication_id, error=str(exc))
+        structured_log(
+            logger,
+            "warning",
+            "publications.pdf_queue.resolve_failed",
+            publication_id=row.publication_id,
+            error=str(exc),
+        )
         outcome = _failed_outcome(row=row)
         arxiv_rate_limited = False
     await _persist_outcome(
@@ -514,9 +520,19 @@ async def _run_resolution_task(
             )
             if arxiv_rate_limited and arxiv_lookup_allowed:
                 arxiv_lookup_allowed = False
-                structured_log(logger, "warning", "pdf_queue.arxiv_batch_disabled", detail="arXiv temporarily disabled for remaining batch after rate limit")
+                structured_log(
+                    logger,
+                    "warning",
+                    "pdf_queue.arxiv_batch_disabled",
+                    detail="arXiv temporarily disabled for remaining batch after rate limit",
+                )
         except OpenAlexBudgetExhaustedError:
-            structured_log(logger, "warning", "pdf_queue.budget_exhausted", detail="Stopping PDF resolution batch — OpenAlex daily budget exhausted")
+            structured_log(
+                logger,
+                "warning",
+                "pdf_queue.budget_exhausted",
+                detail="Stopping PDF resolution batch — OpenAlex daily budget exhausted",
+            )
             break
 
 
@@ -679,7 +695,7 @@ async def _missing_pdf_candidates(
     limit: int,
 ) -> list[PublicationListItem]:
     bounded_limit = max(1, min(int(limit), 5000))
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cooldown_threshold = now - timedelta(days=7)
 
     result = await db_session.execute(
@@ -701,10 +717,7 @@ async def _missing_pdf_candidates(
         .order_by(Publication.updated_at.desc(), Publication.id.desc())
         .limit(bounded_limit)
     )
-    return [
-        _queue_candidate_from_publication(publication)
-        for publication in result.scalars()
-    ]
+    return [_queue_candidate_from_publication(publication) for publication in result.scalars()]
 
 
 async def enqueue_all_missing_pdf_jobs(
@@ -902,9 +915,7 @@ async def count_pdf_queue_items(
     if normalized_status == PDF_STATUS_UNTRACKED:
         result = await db_session.execute(_untracked_queue_count_select())
         return int(result.scalar_one() or 0)
-    tracked_result = await db_session.execute(
-        _tracked_queue_count_select(status=normalized_status)
-    )
+    tracked_result = await db_session.execute(_tracked_queue_count_select(status=normalized_status))
     tracked_count = int(tracked_result.scalar_one() or 0)
     if normalized_status is not None:
         return tracked_count
@@ -946,9 +957,7 @@ async def drain_ready_jobs(
     limit: int,
     max_attempts: int,
 ) -> int:
-    result = await db_session.execute(
-        select(User.id).where(User.is_active.is_(True)).order_by(User.id.asc()).limit(1)
-    )
+    result = await db_session.execute(select(User.id).where(User.is_active.is_(True)).order_by(User.id.asc()).limit(1))
     system_user_id = result.scalar_one_or_none()
     if system_user_id is None:
         return 0

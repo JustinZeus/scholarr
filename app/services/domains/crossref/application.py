@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 
 from crossref.restful import Etiquette, Works
 
-from app.services.domains.doi.normalize import normalize_doi
 from app.logging_utils import structured_log
+from app.services.domains.doi.normalize import normalize_doi
 from app.settings import settings
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ def _rate_limit_wait(min_interval_seconds: float) -> None:
 
 
 def _normalized_tokens(value: str) -> list[str]:
-    lowered = value.lower().replace("’", "'").replace("“", "\"").replace("”", "\"")
+    lowered = value.lower().replace("’", "'").replace("“", '"').replace("”", '"')
     lowered = NON_ALNUM_RE.sub(" ", lowered)
     return [token for token in TOKEN_RE.findall(lowered) if len(token) >= 3]
 

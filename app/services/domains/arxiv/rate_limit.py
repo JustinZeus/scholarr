@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-import logging
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy import select, text
@@ -47,13 +47,11 @@ async def run_with_global_arxiv_limit(
 
 
 async def get_arxiv_cooldown_status(*, now_utc: datetime | None = None) -> ArxivCooldownStatus:
-    timestamp = _normalize_datetime(now_utc) or datetime.now(timezone.utc)
+    timestamp = _normalize_datetime(now_utc) or datetime.now(UTC)
     session_factory = get_session_factory()
     async with session_factory() as db_session:
         result = await db_session.execute(
-            select(ArxivRuntimeState.cooldown_until).where(
-                ArxivRuntimeState.state_key == ARXIV_RUNTIME_STATE_KEY
-            )
+            select(ArxivRuntimeState.cooldown_until).where(ArxivRuntimeState.state_key == ARXIV_RUNTIME_STATE_KEY)
         )
     cooldown_until = _normalize_datetime(result.scalar_one_or_none())
     remaining_seconds = _cooldown_remaining_seconds(cooldown_until, now_utc=timestamp)
@@ -85,10 +83,14 @@ async def _run_serialized_fetch(
                 source_path=source_path,
             )
             structured_log(
-                logger, "info", "arxiv.request_completed",
+                logger,
+                "info",
+                "arxiv.request_completed",
                 status_code=int(response.status_code),
                 wait_seconds=wait_seconds,
-                cooldown_remaining_seconds=_cooldown_remaining_seconds(runtime_state.cooldown_until, now_utc=datetime.now(timezone.utc)),
+                cooldown_remaining_seconds=_cooldown_remaining_seconds(
+                    runtime_state.cooldown_until, now_utc=datetime.now(UTC)
+                ),
                 source_path=source_path,
             )
             return response, hit_rate_limit
@@ -106,9 +108,7 @@ async def _acquire_arxiv_lock(db_session: AsyncSession) -> None:
 
 async def _load_runtime_state_for_update(db_session: AsyncSession) -> ArxivRuntimeState:
     result = await db_session.execute(
-        select(ArxivRuntimeState)
-        .where(ArxivRuntimeState.state_key == ARXIV_RUNTIME_STATE_KEY)
-        .with_for_update()
+        select(ArxivRuntimeState).where(ArxivRuntimeState.state_key == ARXIV_RUNTIME_STATE_KEY).with_for_update()
     )
     state = result.scalar_one_or_none()
     if state is not None:
@@ -124,13 +124,27 @@ async def _wait_for_allowed_slot_or_raise(
     *,
     source_path: str,
 ) -> float:
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     cooldown_seconds = _cooldown_remaining_seconds(runtime_state.cooldown_until, now_utc=now_utc)
     if cooldown_seconds > 0:
-        structured_log(logger, "info", "arxiv.request_scheduled", wait_seconds=0.0, source_path=source_path, cooldown_remaining_seconds=cooldown_seconds)
+        structured_log(
+            logger,
+            "info",
+            "arxiv.request_scheduled",
+            wait_seconds=0.0,
+            source_path=source_path,
+            cooldown_remaining_seconds=cooldown_seconds,
+        )
         raise ArxivRateLimitError(f"arXiv global cooldown active ({cooldown_seconds:.0f}s remaining)")
     wait_seconds = _next_allowed_wait_seconds(runtime_state.next_allowed_at, now_utc=now_utc)
-    structured_log(logger, "info", "arxiv.request_scheduled", wait_seconds=wait_seconds, source_path=source_path, cooldown_remaining_seconds=0.0)
+    structured_log(
+        logger,
+        "info",
+        "arxiv.request_scheduled",
+        wait_seconds=wait_seconds,
+        source_path=source_path,
+        cooldown_remaining_seconds=0.0,
+    )
     if wait_seconds > 0:
         await asyncio.sleep(wait_seconds)
     return wait_seconds
@@ -142,13 +156,15 @@ def _record_post_response_state(
     response_status: int,
     source_path: str,
 ) -> bool:
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     runtime_state.next_allowed_at = now_utc + timedelta(seconds=_min_interval_seconds())
     if response_status == 429:
         cooldown_seconds = _cooldown_seconds()
         runtime_state.cooldown_until = now_utc + timedelta(seconds=cooldown_seconds)
         structured_log(
-            logger, "warning", "arxiv.cooldown_activated",
+            logger,
+            "warning",
+            "arxiv.cooldown_activated",
             cooldown_remaining_seconds=cooldown_seconds,
             source_path=source_path,
         )
@@ -176,7 +192,7 @@ def _normalize_datetime(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
+        return value.replace(tzinfo=UTC)
     return value
 
 
@@ -186,5 +202,3 @@ def _min_interval_seconds() -> float:
 
 def _cooldown_seconds() -> float:
     return max(float(settings.arxiv_rate_limit_cooldown_seconds), 0.0)
-
-

@@ -12,7 +12,6 @@ from app.services.domains.scholar.parser_types import PublicationCandidate
 from app.services.domains.scholar.parser_utils import (
     attr_class,
     attr_href,
-    attr_src,
     build_absolute_scholar_url,
     normalize_space,
     strip_tags,
@@ -260,7 +259,7 @@ def has_show_more_button(html: str) -> bool:
 
 def has_operation_error_banner(html: str) -> bool:
     lowered = html.lower()
-    if "id=\"gsc_a_err\"" not in lowered and "id='gsc_a_err'" not in lowered:
+    if 'id="gsc_a_err"' not in lowered and "id='gsc_a_err'" not in lowered:
         return False
     return "can't perform the operation now" in lowered or "cannot perform the operation now" in lowered
 

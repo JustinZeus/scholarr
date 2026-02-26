@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -115,7 +115,7 @@ async def upsert_job(
     run_id: int | None,
     delay_seconds: int,
 ) -> IngestionQueueItem:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     next_attempt_dt = now + timedelta(seconds=max(0, int(delay_seconds)))
     item = await _get_item_for_user_scholar(
         db_session,
@@ -171,9 +171,7 @@ async def delete_job_by_id(
     *,
     job_id: int,
 ) -> bool:
-    result = await db_session.execute(
-        select(IngestionQueueItem).where(IngestionQueueItem.id == job_id)
-    )
+    result = await db_session.execute(select(IngestionQueueItem).where(IngestionQueueItem.id == job_id))
     item = result.scalar_one_or_none()
     if item is None:
         return False
@@ -222,10 +220,8 @@ async def increment_attempt_count(
     *,
     job_id: int,
 ) -> IngestionQueueItem | None:
-    now = datetime.now(timezone.utc)
-    result = await db_session.execute(
-        select(IngestionQueueItem).where(IngestionQueueItem.id == job_id)
-    )
+    now = datetime.now(UTC)
+    result = await db_session.execute(select(IngestionQueueItem).where(IngestionQueueItem.id == job_id))
     item = result.scalar_one_or_none()
     if item is None:
         return None
@@ -239,10 +235,8 @@ async def reset_attempt_count(
     *,
     job_id: int,
 ) -> IngestionQueueItem | None:
-    now = datetime.now(timezone.utc)
-    result = await db_session.execute(
-        select(IngestionQueueItem).where(IngestionQueueItem.id == job_id)
-    )
+    now = datetime.now(UTC)
+    result = await db_session.execute(select(IngestionQueueItem).where(IngestionQueueItem.id == job_id))
     item = result.scalar_one_or_none()
     if item is None:
         return None
@@ -259,10 +253,8 @@ async def reschedule_job(
     reason: str,
     error: str | None = None,
 ) -> IngestionQueueItem | None:
-    now = datetime.now(timezone.utc)
-    result = await db_session.execute(
-        select(IngestionQueueItem).where(IngestionQueueItem.id == job_id)
-    )
+    now = datetime.now(UTC)
+    result = await db_session.execute(select(IngestionQueueItem).where(IngestionQueueItem.id == job_id))
     item = result.scalar_one_or_none()
     if item is None:
         return None
@@ -282,10 +274,8 @@ async def mark_retrying(
     job_id: int,
     reason: str | None = None,
 ) -> IngestionQueueItem | None:
-    now = datetime.now(timezone.utc)
-    result = await db_session.execute(
-        select(IngestionQueueItem).where(IngestionQueueItem.id == job_id)
-    )
+    now = datetime.now(UTC)
+    result = await db_session.execute(select(IngestionQueueItem).where(IngestionQueueItem.id == job_id))
     item = result.scalar_one_or_none()
     if item is None:
         return None
@@ -305,10 +295,8 @@ async def mark_dropped(
     reason: str,
     error: str | None = None,
 ) -> IngestionQueueItem | None:
-    now = datetime.now(timezone.utc)
-    result = await db_session.execute(
-        select(IngestionQueueItem).where(IngestionQueueItem.id == job_id)
-    )
+    now = datetime.now(UTC)
+    result = await db_session.execute(select(IngestionQueueItem).where(IngestionQueueItem.id == job_id))
     item = result.scalar_one_or_none()
     if item is None:
         return None
@@ -329,10 +317,8 @@ async def mark_queued_now(
     reason: str,
     reset_attempt_count: bool = False,
 ) -> IngestionQueueItem | None:
-    now = datetime.now(timezone.utc)
-    result = await db_session.execute(
-        select(IngestionQueueItem).where(IngestionQueueItem.id == job_id)
-    )
+    now = datetime.now(UTC)
+    result = await db_session.execute(select(IngestionQueueItem).where(IngestionQueueItem.id == job_id))
     item = result.scalar_one_or_none()
     if item is None:
         return None

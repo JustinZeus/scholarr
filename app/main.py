@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -12,9 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.api.errors import register_api_exception_handlers
 from app.api.media import router as media_router
 from app.api.router import router as api_router
-from app.api.runtime_deps import get_ingestion_service, get_scholar_source
-from app.db.session import check_database
-from app.db.session import close_engine
+from app.db.session import check_database, close_engine
 from app.http.middleware import (
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
@@ -54,19 +52,25 @@ scheduler_service = SchedulerService(
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     structured_log(
-        logger, "info", "app.startup_build_marker",
+        logger,
+        "info",
+        "app.startup_build_marker",
         build_marker=BUILD_MARKER,
         frontend_enabled=settings.frontend_enabled,
         scheduler_enabled=settings.scheduler_enabled,
         log_format=settings.log_format,
     )
-    
-    from app.db.session import get_session_factory
+
     from sqlalchemy import text
+
+    from app.db.session import get_session_factory
+
     try:
         session_factory = get_session_factory()
         async with session_factory() as session:
-            await session.execute(text("UPDATE crawl_runs SET status = 'failed' WHERE status::text IN ('running', 'resolving')"))
+            await session.execute(
+                text("UPDATE crawl_runs SET status = 'failed' WHERE status::text IN ('running', 'resolving')")
+            )
             await session.commit()
             structured_log(logger, "info", "app.startup_orphaned_runs_cleaned")
     except Exception as e:
@@ -107,9 +111,7 @@ app.add_middleware(
     content_security_policy_report_only=settings.security_csp_report_only,
     strict_transport_security_enabled=settings.security_strict_transport_security_enabled,
     strict_transport_security_max_age=settings.security_strict_transport_security_max_age,
-    strict_transport_security_include_subdomains=(
-        settings.security_strict_transport_security_include_subdomains
-    ),
+    strict_transport_security_include_subdomains=(settings.security_strict_transport_security_include_subdomains),
     strict_transport_security_preload=settings.security_strict_transport_security_preload,
 )
 app.include_router(api_router)

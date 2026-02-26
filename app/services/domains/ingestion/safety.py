@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.db.models import UserSetting
@@ -18,7 +18,7 @@ _COUNTER_LAST_EVALUATED_RUN_ID = "last_evaluated_run_id"
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -41,8 +41,8 @@ def _normalize_datetime(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _state_dict(settings: UserSetting) -> dict[str, Any]:
@@ -100,9 +100,7 @@ def _recommended_action(reason: str | None) -> str | None:
             "increase request delay, and avoid repeated manual retries."
         )
     if reason == COOLDOWN_REASON_NETWORK_FAILURE_THRESHOLD:
-        return (
-            "Network failures crossed the threshold. Verify connectivity and retry after cooldown."
-        )
+        return "Network failures crossed the threshold. Verify connectivity and retry after cooldown."
     return None
 
 
@@ -159,14 +157,10 @@ def _update_run_counters(
     counters[_COUNTER_LAST_NETWORK_FAILURE_COUNT] = bounded_network_failures
     counters[_COUNTER_LAST_EVALUATED_RUN_ID] = int(run_id)
     counters[_COUNTER_CONSECUTIVE_BLOCKED_RUNS] = (
-        int(counters[_COUNTER_CONSECUTIVE_BLOCKED_RUNS]) + 1
-        if bounded_blocked_failures > 0
-        else 0
+        int(counters[_COUNTER_CONSECUTIVE_BLOCKED_RUNS]) + 1 if bounded_blocked_failures > 0 else 0
     )
     counters[_COUNTER_CONSECUTIVE_NETWORK_RUNS] = (
-        int(counters[_COUNTER_CONSECUTIVE_NETWORK_RUNS]) + 1
-        if bounded_network_failures > 0
-        else 0
+        int(counters[_COUNTER_CONSECUTIVE_NETWORK_RUNS]) + 1 if bounded_network_failures > 0 else 0
     )
     return bounded_blocked_failures, bounded_network_failures
 

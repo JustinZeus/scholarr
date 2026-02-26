@@ -7,9 +7,9 @@ Create Date: 2026-02-25 09:10:00.000000
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "20260225_0021"
@@ -56,9 +56,7 @@ def upgrade() -> None:
             "crawl_runs",
             ["user_id"],
             unique=True,
-            postgresql_where=sa.text(
-                "status IN ('running'::run_status, 'resolving'::run_status)"
-            ),
+            postgresql_where=sa.text("status IN ('running'::run_status, 'resolving'::run_status)"),
         )
 
 

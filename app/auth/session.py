@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from starlette.requests import Request
 
-
 SESSION_USER_ID_KEY = "auth_user_id"
 SESSION_USER_EMAIL_KEY = "auth_user_email"
 SESSION_USER_IS_ADMIN_KEY = "auth_user_is_admin"

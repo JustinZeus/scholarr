@@ -1,14 +1,16 @@
 import asyncio
 import json
 import logging
-from typing import Any, AsyncGenerator, Dict, Set
+from collections.abc import AsyncGenerator
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
 
 class RunEventPublisher:
     def __init__(self) -> None:
         # Maps run_id to a set of subscriber queues
-        self._subscribers: Dict[int, Set[asyncio.Queue]] = {}
+        self._subscribers: dict[int, set[asyncio.Queue]] = {}
 
     def subscribe(self, run_id: int) -> asyncio.Queue:
         if run_id not in self._subscribers:
@@ -27,12 +29,9 @@ class RunEventPublisher:
     async def publish(self, run_id: int, event_type: str, data: dict[str, Any]) -> None:
         if run_id not in self._subscribers:
             return
-        
-        message = {
-            "type": event_type,
-            "data": data
-        }
-        
+
+        message = {"type": event_type, "data": data}
+
         # Fan-out to all active subscribers for this run
         for queue in list(self._subscribers[run_id]):
             try:
@@ -40,7 +39,9 @@ class RunEventPublisher:
             except asyncio.QueueFull:
                 logger.warning(f"Subscriber queue full for run {run_id}, dropping message")
 
+
 run_events = RunEventPublisher()
+
 
 async def event_generator(run_id: int) -> AsyncGenerator[str, None]:
     queue = run_events.subscribe(run_id)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -20,7 +20,7 @@ async def test_arxiv_rate_limit_respects_cooldown(db_session: AsyncSession) -> N
     db_session.add(
         ArxivRuntimeState(
             state_key=ARXIV_RUNTIME_STATE_KEY,
-            cooldown_until=datetime.now(timezone.utc) + timedelta(seconds=30),
+            cooldown_until=datetime.now(UTC) + timedelta(seconds=30),
         )
     )
     await db_session.commit()
@@ -43,6 +43,7 @@ async def test_arxiv_rate_limit_persists_cooldown_after_429(db_session: AsyncSes
     object.__setattr__(settings, "arxiv_min_interval_seconds", 0.0)
     object.__setattr__(settings, "arxiv_rate_limit_cooldown_seconds", 5.0)
     try:
+
         async def _fetch() -> httpx.Response:
             return httpx.Response(429, text="rate limited")
 
@@ -57,7 +58,7 @@ async def test_arxiv_rate_limit_persists_cooldown_after_429(db_session: AsyncSes
     )
     state = result.scalar_one()
     assert state.cooldown_until is not None
-    assert state.cooldown_until > datetime.now(timezone.utc)
+    assert state.cooldown_until > datetime.now(UTC)
 
 
 @pytest.mark.asyncio
@@ -120,6 +121,7 @@ async def test_arxiv_rate_limit_logs_cooldown_activation(
     object.__setattr__(settings, "arxiv_min_interval_seconds", 0.0)
     object.__setattr__(settings, "arxiv_rate_limit_cooldown_seconds", 5.0)
     try:
+
         async def _fetch() -> httpx.Response:
             return httpx.Response(429, text="rate limited")
 
@@ -133,9 +135,7 @@ async def test_arxiv_rate_limit_logs_cooldown_activation(
         object.__setattr__(settings, "arxiv_min_interval_seconds", previous_interval)
         object.__setattr__(settings, "arxiv_rate_limit_cooldown_seconds", previous_cooldown)
 
-    cooldown_events = [
-        entry for entry in logged_warning if entry.get("event") == "arxiv.cooldown_activated"
-    ]
+    cooldown_events = [entry for entry in logged_warning if entry.get("event") == "arxiv.cooldown_activated"]
     assert cooldown_events
     assert cooldown_events[0]["source_path"] == "lookup_ids"
     assert float(cooldown_events[0]["cooldown_remaining_seconds"]) > 0.0
@@ -143,7 +143,7 @@ async def test_arxiv_rate_limit_logs_cooldown_activation(
 
 @pytest.mark.asyncio
 async def test_get_arxiv_cooldown_status_reads_active_cooldown(db_session: AsyncSession) -> None:
-    now_utc = datetime(2026, 2, 26, 13, 0, tzinfo=timezone.utc)
+    now_utc = datetime(2026, 2, 26, 13, 0, tzinfo=UTC)
     existing = await db_session.get(ArxivRuntimeState, ARXIV_RUNTIME_STATE_KEY)
     if existing is None:
         db_session.add(

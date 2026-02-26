@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.security import PasswordService
 
+
 def login_user(client: TestClient, *, email: str, password: str) -> None:
     bootstrap_response = client.get("/api/v1/auth/csrf")
     assert bootstrap_response.status_code == 200

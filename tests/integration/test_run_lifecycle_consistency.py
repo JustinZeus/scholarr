@@ -338,8 +338,8 @@ async def test_partial_discovery_exception_keeps_new_pub_count_consistent(
 
     monkeypatch.setattr(service, "_resolve_publication", _resolve_publication_stub)
 
-    from app.services.domains.scholar.parser_types import PublicationCandidate
     from app.db.models import ScholarProfile
+    from app.services.domains.scholar.parser_types import PublicationCandidate
 
     scholar = await db_session.get(ScholarProfile, scholar_profile_id)
     assert scholar is not None
@@ -505,9 +505,7 @@ async def test_publications_pagination_snapshot_stays_stable_across_inserts(
     )
     assert first_page_again_response.status_code == 200
     first_page_again = first_page_again_response.json()["data"]
-    first_page_again_ids = [
-        int(item["publication_id"]) for item in first_page_again["publications"]
-    ]
+    first_page_again_ids = [int(item["publication_id"]) for item in first_page_again["publications"]]
 
     assert first_page_again_ids == first_page_ids
     assert not (set(first_page_ids) & set(second_page_ids))

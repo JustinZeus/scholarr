@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
 import logging
 import os
 import random
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy import delete, func, select, text
@@ -15,9 +13,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import AuthorSearchCacheEntry, AuthorSearchRuntimeState, ScholarProfile
+from app.logging_utils import structured_log
 from app.services.domains.scholar.parser import (
-    ParseState,
     ParsedAuthorSearchPage,
+    ParseState,
     ScholarParserError,
     parse_author_search_page,
     parse_profile_page,
@@ -34,33 +33,30 @@ from app.services.domains.scholars.constants import (
     DEFAULT_AUTHOR_SEARCH_COOLDOWN_REJECTION_ALERT_THRESHOLD,
     DEFAULT_AUTHOR_SEARCH_COOLDOWN_SECONDS,
     DEFAULT_AUTHOR_SEARCH_INTERVAL_JITTER_SECONDS,
-    MAX_AUTHOR_SEARCH_LIMIT,
     DEFAULT_AUTHOR_SEARCH_MIN_INTERVAL_SECONDS,
     DEFAULT_AUTHOR_SEARCH_RETRY_ALERT_THRESHOLD,
+    MAX_AUTHOR_SEARCH_LIMIT,
     SEARCH_CACHED_BLOCK_REASON,
     SEARCH_COOLDOWN_REASON,
     SEARCH_DISABLED_REASON,
 )
-from app.logging_utils import structured_log
 from app.services.domains.scholars.exceptions import ScholarServiceError
 from app.services.domains.scholars.search_hints import (
     _merge_warnings,
     _policy_blocked_author_search_result,
     _trim_author_search_result,
-    resolve_profile_image,
-    scrape_state_hint,
 )
 from app.services.domains.scholars.uploads import (
     _ensure_upload_root,
     _resolve_upload_path,
     _safe_remove_upload,
-    resolve_upload_file_path,
 )
 from app.services.domains.scholars.validators import (
     normalize_display_name,
     normalize_profile_image_url,
     validate_scholar_id,
 )
+
 logger = logging.getLogger(__name__)
 
 
@@ -247,7 +243,7 @@ async def _cache_get_author_search_result(
         return None
     expires_at = entry.expires_at
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        expires_at = expires_at.replace(tzinfo=UTC)
     if expires_at <= now_utc:
         await db_session.delete(entry)
         return None
@@ -305,27 +301,19 @@ async def _prune_author_search_cache(
     now_utc: datetime,
     max_entries: int,
 ) -> None:
-    await db_session.execute(
-        delete(AuthorSearchCacheEntry).where(AuthorSearchCacheEntry.expires_at <= now_utc)
-    )
+    await db_session.execute(delete(AuthorSearchCacheEntry).where(AuthorSearchCacheEntry.expires_at <= now_utc))
     bounded_max_entries = max(1, int(max_entries))
-    count_result = await db_session.execute(
-        select(func.count()).select_from(AuthorSearchCacheEntry)
-    )
+    count_result = await db_session.execute(select(func.count()).select_from(AuthorSearchCacheEntry))
     entry_count = int(count_result.scalar_one() or 0)
     overflow = max(0, entry_count - bounded_max_entries)
     if overflow <= 0:
         return
     stale_keys_result = await db_session.execute(
-        select(AuthorSearchCacheEntry.query_key)
-        .order_by(AuthorSearchCacheEntry.cached_at.asc())
-        .limit(overflow)
+        select(AuthorSearchCacheEntry.query_key).order_by(AuthorSearchCacheEntry.cached_at.asc()).limit(overflow)
     )
     stale_keys = [str(row[0]) for row in stale_keys_result.all()]
     if stale_keys:
-        await db_session.execute(
-            delete(AuthorSearchCacheEntry).where(AuthorSearchCacheEntry.query_key.in_(stale_keys))
-        )
+        await db_session.execute(delete(AuthorSearchCacheEntry).where(AuthorSearchCacheEntry.query_key.in_(stale_keys)))
 
 
 def _is_author_search_block_state(parsed: ParsedAuthorSearchPage) -> bool:
@@ -340,7 +328,7 @@ def _author_search_cooldown_remaining_seconds(
     if cooldown_until is None:
         return 0
     if cooldown_until.tzinfo is None:
-        cooldown_until = cooldown_until.replace(tzinfo=timezone.utc)
+        cooldown_until = cooldown_until.replace(tzinfo=UTC)
     remaining_seconds = int((cooldown_until - now_utc).total_seconds())
     return max(0, remaining_seconds)
 
@@ -432,7 +420,9 @@ def _normalize_author_search_inputs(query: str, limit: int) -> tuple[str, int, s
 
 def _disabled_search_result(*, normalized_query: str, bounded_limit: int) -> ParsedAuthorSearchPage:
     structured_log(
-        logger, "warning", "scholar_search.disabled_by_configuration",
+        logger,
+        "warning",
+        "scholar_search.disabled_by_configuration",
         query=normalized_query,
     )
     return _policy_blocked_author_search_result(
@@ -452,13 +442,15 @@ def _normalize_runtime_cooldown_state(
     cooldown_until = runtime_state.cooldown_until
     updated = False
     if cooldown_until.tzinfo is None:
-        cooldown_until = cooldown_until.replace(tzinfo=timezone.utc)
+        cooldown_until = cooldown_until.replace(tzinfo=UTC)
         runtime_state.cooldown_until = cooldown_until
         updated = True
     if now_utc < cooldown_until:
         return updated
     structured_log(
-        logger, "info", "scholar_search.cooldown_expired",
+        logger,
+        "info",
+        "scholar_search.cooldown_expired",
         cooldown_until_utc=cooldown_until.isoformat(),
     )
     runtime_state.cooldown_until = None
@@ -494,7 +486,9 @@ def _emit_cooldown_threshold_alert(
     if bool(runtime_state.cooldown_alert_emitted):
         return True
     structured_log(
-        logger, "error", "scholar_search.cooldown_rejection_threshold_exceeded",
+        logger,
+        "error",
+        "scholar_search.cooldown_rejection_threshold_exceeded",
         query=normalized_query,
         cooldown_rejection_count=int(runtime_state.cooldown_rejection_count),
         threshold=threshold,
@@ -518,7 +512,9 @@ def _cooldown_block_result(
         cooldown_rejection_alert_threshold=cooldown_rejection_alert_threshold,
     )
     structured_log(
-        logger, "warning", "scholar_search.cooldown_active",
+        logger,
+        "warning",
+        "scholar_search.cooldown_active",
         query=normalized_query,
         cooldown_remaining_seconds=cooldown_remaining_seconds,
         cooldown_until_utc=runtime_state.cooldown_until.isoformat() if runtime_state.cooldown_until else None,
@@ -549,7 +545,9 @@ async def _cache_hit_result(
     if cached is None:
         return None
     structured_log(
-        logger, "info", "scholar_search.cache_hit",
+        logger,
+        "info",
+        "scholar_search.cache_hit",
         query=normalized_query,
         state=cached.state.value,
         state_reason=cached.state_reason,
@@ -576,7 +574,7 @@ def _throttle_sleep_seconds(
     else:
         last_live_request_at = runtime_state.last_live_request_at
         if last_live_request_at.tzinfo is None:
-            last_live_request_at = last_live_request_at.replace(tzinfo=timezone.utc)
+            last_live_request_at = last_live_request_at.replace(tzinfo=UTC)
             runtime_state.last_live_request_at = last_live_request_at
             updated = True
         enforced_wait_seconds = (
@@ -603,7 +601,9 @@ async def _wait_for_author_search_throttle(
     if sleep_seconds <= 0.0:
         return updated
     structured_log(
-        logger, "info", "scholar_search.throttle_wait",
+        logger,
+        "info",
+        "scholar_search.throttle_wait",
         query=normalized_query,
         sleep_seconds=round(sleep_seconds, 3),
     )
@@ -659,7 +659,9 @@ def _with_retry_warnings(
     if retry_scheduled_count < threshold:
         return merged
     structured_log(
-        logger, "warning", "scholar_search.retry_threshold_exceeded",
+        logger,
+        "warning",
+        "scholar_search.retry_threshold_exceeded",
         query=normalized_query,
         retry_scheduled_count=retry_scheduled_count,
         threshold=threshold,
@@ -688,19 +690,23 @@ def _apply_block_circuit_breaker(
         return merged_parsed
     runtime_state.consecutive_blocked_count = int(runtime_state.consecutive_blocked_count) + 1
     structured_log(
-        logger, "warning", "scholar_search.block_detected",
+        logger,
+        "warning",
+        "scholar_search.block_detected",
         query=normalized_query,
         state_reason=merged_parsed.state_reason,
         consecutive_blocked_count=int(runtime_state.consecutive_blocked_count),
     )
     if int(runtime_state.consecutive_blocked_count) < max(1, int(cooldown_block_threshold)):
         return merged_parsed
-    runtime_state.cooldown_until = datetime.now(timezone.utc) + timedelta(seconds=max(60, int(cooldown_seconds)))
+    runtime_state.cooldown_until = datetime.now(UTC) + timedelta(seconds=max(60, int(cooldown_seconds)))
     runtime_state.consecutive_blocked_count = 0
     runtime_state.cooldown_rejection_count = 0
     runtime_state.cooldown_alert_emitted = False
     structured_log(
-        logger, "error", "scholar_search.cooldown_activated",
+        logger,
+        "error",
+        "scholar_search.cooldown_activated",
         query=normalized_query,
         cooldown_until_utc=runtime_state.cooldown_until.isoformat() if runtime_state.cooldown_until else None,
     )
@@ -739,11 +745,11 @@ async def _cooldown_or_cache_result(
 ) -> tuple[ParsedAuthorSearchPage | None, bool]:
     runtime_state_updated = _normalize_runtime_cooldown_state(
         runtime_state,
-        now_utc=datetime.now(timezone.utc),
+        now_utc=datetime.now(UTC),
     )
     cooldown_remaining_seconds = _author_search_cooldown_remaining_seconds(
         runtime_state,
-        datetime.now(timezone.utc),
+        datetime.now(UTC),
     )
     if cooldown_remaining_seconds > 0:
         return (
@@ -759,18 +765,35 @@ async def _cooldown_or_cache_result(
     cached_result = await _cache_hit_result(
         db_session,
         query_key=query_key,
-        now_utc=datetime.now(timezone.utc),
+        now_utc=datetime.now(UTC),
         normalized_query=normalized_query,
         bounded_limit=bounded_limit,
     )
     return cached_result, runtime_state_updated
 
 
-async def _perform_live_author_search(db_session: AsyncSession, *, source: ScholarSource, runtime_state: AuthorSearchRuntimeState, normalized_query: str, query_key: str, network_error_retries: int, retry_backoff_seconds: float, min_interval_seconds: float, interval_jitter_seconds: float, retry_alert_threshold: int, cooldown_block_threshold: int, cooldown_seconds: int, blocked_cache_ttl_seconds: int, cache_ttl_seconds: int, cache_max_entries: int) -> tuple[ParsedAuthorSearchPage, bool]:
+async def _perform_live_author_search(
+    db_session: AsyncSession,
+    *,
+    source: ScholarSource,
+    runtime_state: AuthorSearchRuntimeState,
+    normalized_query: str,
+    query_key: str,
+    network_error_retries: int,
+    retry_backoff_seconds: float,
+    min_interval_seconds: float,
+    interval_jitter_seconds: float,
+    retry_alert_threshold: int,
+    cooldown_block_threshold: int,
+    cooldown_seconds: int,
+    blocked_cache_ttl_seconds: int,
+    cache_ttl_seconds: int,
+    cache_max_entries: int,
+) -> tuple[ParsedAuthorSearchPage, bool]:
     runtime_state_updated = await _wait_for_author_search_throttle(
         runtime_state=runtime_state,
         normalized_query=normalized_query,
-        now_utc=datetime.now(timezone.utc),
+        now_utc=datetime.now(UTC),
         min_interval_seconds=min_interval_seconds,
         interval_jitter_seconds=interval_jitter_seconds,
     )
@@ -780,7 +803,7 @@ async def _perform_live_author_search(db_session: AsyncSession, *, source: Schol
         network_error_retries=network_error_retries,
         retry_backoff_seconds=retry_backoff_seconds,
     )
-    runtime_state.last_live_request_at = datetime.now(timezone.utc)
+    runtime_state.last_live_request_at = datetime.now(UTC)
     merged = _with_retry_warnings(
         parsed,
         retry_warnings=retry_warnings,
@@ -806,12 +829,30 @@ async def _perform_live_author_search(db_session: AsyncSession, *, source: Schol
         parsed=merged,
         ttl_seconds=float(ttl_seconds),
         max_entries=cache_max_entries,
-        now_utc=datetime.now(timezone.utc),
+        now_utc=datetime.now(UTC),
     )
     return merged, True
 
 
-async def search_author_candidates(*, source: ScholarSource, db_session: AsyncSession, query: str, limit: int, network_error_retries: int = 1, retry_backoff_seconds: float = 1.0, search_enabled: bool = True, cache_ttl_seconds: int = 21_600, blocked_cache_ttl_seconds: int = DEFAULT_AUTHOR_SEARCH_BLOCKED_CACHE_TTL_SECONDS, cache_max_entries: int = DEFAULT_AUTHOR_SEARCH_CACHE_MAX_ENTRIES, min_interval_seconds: float = DEFAULT_AUTHOR_SEARCH_MIN_INTERVAL_SECONDS, interval_jitter_seconds: float = DEFAULT_AUTHOR_SEARCH_INTERVAL_JITTER_SECONDS, cooldown_block_threshold: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_BLOCK_THRESHOLD, cooldown_seconds: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_SECONDS, retry_alert_threshold: int = DEFAULT_AUTHOR_SEARCH_RETRY_ALERT_THRESHOLD, cooldown_rejection_alert_threshold: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_REJECTION_ALERT_THRESHOLD) -> ParsedAuthorSearchPage:
+async def search_author_candidates(
+    *,
+    source: ScholarSource,
+    db_session: AsyncSession,
+    query: str,
+    limit: int,
+    network_error_retries: int = 1,
+    retry_backoff_seconds: float = 1.0,
+    search_enabled: bool = True,
+    cache_ttl_seconds: int = 21_600,
+    blocked_cache_ttl_seconds: int = DEFAULT_AUTHOR_SEARCH_BLOCKED_CACHE_TTL_SECONDS,
+    cache_max_entries: int = DEFAULT_AUTHOR_SEARCH_CACHE_MAX_ENTRIES,
+    min_interval_seconds: float = DEFAULT_AUTHOR_SEARCH_MIN_INTERVAL_SECONDS,
+    interval_jitter_seconds: float = DEFAULT_AUTHOR_SEARCH_INTERVAL_JITTER_SECONDS,
+    cooldown_block_threshold: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_BLOCK_THRESHOLD,
+    cooldown_seconds: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_SECONDS,
+    retry_alert_threshold: int = DEFAULT_AUTHOR_SEARCH_RETRY_ALERT_THRESHOLD,
+    cooldown_rejection_alert_threshold: int = DEFAULT_AUTHOR_SEARCH_COOLDOWN_REJECTION_ALERT_THRESHOLD,
+) -> ParsedAuthorSearchPage:
     normalized_query, bounded_limit, query_key = _normalize_author_search_inputs(query, limit)
     if not search_enabled:
         return _disabled_search_result(
@@ -924,17 +965,13 @@ async def set_profile_image_upload(
     normalized_content_type = (content_type or "").strip().lower()
     extension = ALLOWED_IMAGE_UPLOAD_CONTENT_TYPES.get(normalized_content_type)
     if extension is None:
-        raise ScholarServiceError(
-            "Unsupported image type. Use JPEG, PNG, WEBP, or GIF."
-        )
+        raise ScholarServiceError("Unsupported image type. Use JPEG, PNG, WEBP, or GIF.")
 
     if not image_bytes:
         raise ScholarServiceError("Uploaded image file is empty.")
 
     if len(image_bytes) > max_upload_bytes:
-        raise ScholarServiceError(
-            f"Uploaded image exceeds {max_upload_bytes} bytes."
-        )
+        raise ScholarServiceError(f"Uploaded image exceeds {max_upload_bytes} bytes.")
 
     upload_root = _ensure_upload_root(upload_dir, create=True)
     user_dir = upload_root / str(profile.user_id)

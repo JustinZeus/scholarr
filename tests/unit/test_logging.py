@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
+from app.http.middleware import REQUEST_ID_HEADER, parse_skip_paths
 from app.logging_config import ConsoleLogFormatter, JsonLogFormatter, parse_redact_fields
 from app.logging_utils import structured_log
 from app.main import app
-from app.http.middleware import REQUEST_ID_HEADER, parse_skip_paths
 
 
 def test_json_log_formatter_redacts_sensitive_fields() -> None:

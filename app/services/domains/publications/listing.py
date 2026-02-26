@@ -51,10 +51,7 @@ async def list_for_user(
             snapshot_before=snapshot_before,
         )
     )
-    rows = [
-        publication_list_item_from_row(row, latest_run_id=latest_run_id)
-        for row in result.all()
-    ]
+    rows = [publication_list_item_from_row(row, latest_run_id=latest_run_id) for row in result.all()]
     return await identifier_service.overlay_publication_items_with_display_identifiers(
         db_session,
         items=rows,

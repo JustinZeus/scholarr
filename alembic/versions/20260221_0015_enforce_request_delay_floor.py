@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "20260221_0015"
@@ -30,11 +30,7 @@ LEGACY_CHECK_NAME_MIN_2 = "ck_user_settings_request_delay_seconds_min_2"
 def _check_constraints() -> set[str]:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
-    return {
-        str(item.get("name"))
-        for item in inspector.get_check_constraints(TABLE_NAME)
-        if item.get("name")
-    }
+    return {str(item.get("name")) for item in inspector.get_check_constraints(TABLE_NAME) if item.get("name")}
 
 
 def _drop_check_if_exists(name: str) -> None:
@@ -48,12 +44,7 @@ def _drop_check_if_exists(name: str) -> None:
 
 
 def upgrade() -> None:
-    op.execute(
-        sa.text(
-            "UPDATE user_settings SET request_delay_seconds = 2 "
-            "WHERE request_delay_seconds < 2"
-        )
-    )
+    op.execute(sa.text("UPDATE user_settings SET request_delay_seconds = 2 WHERE request_delay_seconds < 2"))
 
     _drop_check_if_exists(CHECK_NAME_MIN_1)
     _drop_check_if_exists(LEGACY_CHECK_NAME_MIN_1)

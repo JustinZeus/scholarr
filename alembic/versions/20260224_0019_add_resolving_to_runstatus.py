@@ -5,14 +5,14 @@ Revises: 20260224_0018
 Create Date: 2026-02-24 22:20:00.000000
 
 """
+
 from collections.abc import Sequence
 
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
-revision: str = '20260224_0019'
-down_revision: str | Sequence[str] | None = '20260224_0018'
+revision: str = "20260224_0019"
+down_revision: str | Sequence[str] | None = "20260224_0018"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

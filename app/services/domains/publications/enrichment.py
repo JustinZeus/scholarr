@@ -4,12 +4,12 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.logging_utils import structured_log
 from app.services.domains.publications.pdf_queue import (
     enqueue_missing_pdf_jobs,
     enqueue_retry_pdf_job,
     overlay_pdf_job_state,
 )
-from app.logging_utils import structured_log
 from app.services.domains.publications.types import PublicationListItem
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,9 @@ async def schedule_missing_pdf_enrichment_for_user(
         rows=items,
         max_items=max_items,
     )
-    structured_log(logger, "info", "publications.enrichment.scheduled", user_id=user_id, publication_count=len(queued_ids))
+    structured_log(
+        logger, "info", "publications.enrichment.scheduled", user_id=user_id, publication_count=len(queued_ids)
+    )
     return len(queued_ids)
 
 
@@ -47,7 +49,14 @@ async def schedule_retry_pdf_enrichment_for_row(
         request_email=request_email,
         row=item,
     )
-    structured_log(logger, "info", "publications.enrichment.retry_scheduled", user_id=user_id, publication_id=item.publication_id, queued=queued)
+    structured_log(
+        logger,
+        "info",
+        "publications.enrichment.retry_scheduled",
+        user_id=user_id,
+        publication_id=item.publication_id,
+        queued=queued,
+    )
     return queued
 
 

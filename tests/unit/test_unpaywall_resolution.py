@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
-from app.services.domains.publications.types import PublicationListItem
 from app.services.domains.publication_identifiers.types import DisplayIdentifier
+from app.services.domains.publications.types import PublicationListItem
 from app.services.domains.unpaywall import application as unpaywall_app
 
 
@@ -35,7 +35,7 @@ def _item(publication_id: int) -> PublicationListItem:
         display_identifier=None,
         pdf_url=None,
         is_read=False,
-        first_seen_at=datetime.now(timezone.utc),
+        first_seen_at=datetime.now(UTC),
         is_new_in_latest_run=True,
     )
 

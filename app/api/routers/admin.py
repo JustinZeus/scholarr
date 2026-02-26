@@ -86,7 +86,14 @@ async def create_user(
             message=str(exc),
         ) from exc
 
-    structured_log(logger, "info", "api.admin.user_created", admin_user_id=int(admin_user.id), target_user_id=int(created_user.id), target_is_admin=bool(created_user.is_admin))
+    structured_log(
+        logger,
+        "info",
+        "api.admin.user_created",
+        admin_user_id=int(admin_user.id),
+        target_user_id=int(created_user.id),
+        target_is_admin=bool(created_user.is_admin),
+    )
     return success_payload(
         request,
         data=_serialize_user(created_user),
@@ -111,11 +118,7 @@ async def set_user_active(
             code="user_not_found",
             message="User not found.",
         )
-    if (
-        int(target_user.id) == int(admin_user.id)
-        and bool(target_user.is_active)
-        and not bool(payload.is_active)
-    ):
+    if int(target_user.id) == int(admin_user.id) and bool(target_user.is_active) and not bool(payload.is_active):
         raise ApiException(
             status_code=400,
             code="cannot_deactivate_self",
@@ -126,7 +129,14 @@ async def set_user_active(
         user=target_user,
         is_active=bool(payload.is_active),
     )
-    structured_log(logger, "info", "api.admin.user_active_updated", admin_user_id=int(admin_user.id), target_user_id=int(updated_user.id), is_active=bool(updated_user.is_active))
+    structured_log(
+        logger,
+        "info",
+        "api.admin.user_active_updated",
+        admin_user_id=int(admin_user.id),
+        target_user_id=int(updated_user.id),
+        is_active=bool(updated_user.is_active),
+    )
     return success_payload(
         request,
         data=_serialize_user(updated_user),
@@ -166,7 +176,13 @@ async def reset_user_password(
         user=target_user,
         password_hash=auth_service.hash_password(validated_password),
     )
-    structured_log(logger, "info", "api.admin.user_password_reset", admin_user_id=int(admin_user.id), target_user_id=int(target_user.id))
+    structured_log(
+        logger,
+        "info",
+        "api.admin.user_password_reset",
+        admin_user_id=int(admin_user.id),
+        target_user_id=int(target_user.id),
+    )
     return success_payload(
         request,
         data={"message": f"Password reset: {target_user.email}"},

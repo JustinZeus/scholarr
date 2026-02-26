@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import asdict
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, func, select
@@ -33,15 +33,12 @@ async def get_cached_feed(
 ) -> ArxivFeed | None:
     timestamp = _as_utc(now_utc)
     session_factory = get_session_factory()
-    async with session_factory() as db_session:
-        async with db_session.begin():
-            result = await db_session.execute(
-                select(ArxivQueryCacheEntry).where(
-                    ArxivQueryCacheEntry.query_fingerprint == query_fingerprint
-                )
-            )
-            entry = result.scalar_one_or_none()
-            return await _validate_cached_entry(db_session, entry=entry, now_utc=timestamp)
+    async with session_factory() as db_session, db_session.begin():
+        result = await db_session.execute(
+            select(ArxivQueryCacheEntry).where(ArxivQueryCacheEntry.query_fingerprint == query_fingerprint)
+        )
+        entry = result.scalar_one_or_none()
+        return await _validate_cached_entry(db_session, entry=entry, now_utc=timestamp)
 
 
 async def set_cached_feed(
@@ -54,16 +51,15 @@ async def set_cached_feed(
 ) -> None:
     timestamp = _as_utc(now_utc)
     session_factory = get_session_factory()
-    async with session_factory() as db_session:
-        async with db_session.begin():
-            await _write_cached_entry(
-                db_session,
-                query_fingerprint=query_fingerprint,
-                feed=feed,
-                ttl_seconds=ttl_seconds,
-                max_entries=max_entries,
-                now_utc=timestamp,
-            )
+    async with session_factory() as db_session, db_session.begin():
+        await _write_cached_entry(
+            db_session,
+            query_fingerprint=query_fingerprint,
+            feed=feed,
+            ttl_seconds=ttl_seconds,
+            max_entries=max_entries,
+            now_utc=timestamp,
+        )
 
 
 async def run_with_inflight_dedupe(
@@ -142,9 +138,7 @@ async def _write_cached_entry(
 ) -> None:
     ttl = max(float(ttl_seconds), 0.0)
     result = await db_session.execute(
-        select(ArxivQueryCacheEntry).where(
-            ArxivQueryCacheEntry.query_fingerprint == query_fingerprint
-        )
+        select(ArxivQueryCacheEntry).where(ArxivQueryCacheEntry.query_fingerprint == query_fingerprint)
     )
     existing = result.scalar_one_or_none()
     if ttl <= 0.0:
@@ -177,30 +171,22 @@ async def _prune_cache_entries(
     now_utc: datetime,
     max_entries: int,
 ) -> None:
-    await db_session.execute(
-        delete(ArxivQueryCacheEntry).where(ArxivQueryCacheEntry.expires_at <= now_utc)
-    )
+    await db_session.execute(delete(ArxivQueryCacheEntry).where(ArxivQueryCacheEntry.expires_at <= now_utc))
     bounded_max_entries = int(max_entries)
     if bounded_max_entries <= 0:
         return
-    count_result = await db_session.execute(
-        select(func.count()).select_from(ArxivQueryCacheEntry)
-    )
+    count_result = await db_session.execute(select(func.count()).select_from(ArxivQueryCacheEntry))
     entry_count = int(count_result.scalar_one() or 0)
     overflow = max(0, entry_count - bounded_max_entries)
     if overflow <= 0:
         return
     stale_result = await db_session.execute(
-        select(ArxivQueryCacheEntry.query_fingerprint)
-        .order_by(ArxivQueryCacheEntry.cached_at.asc())
-        .limit(overflow)
+        select(ArxivQueryCacheEntry.query_fingerprint).order_by(ArxivQueryCacheEntry.cached_at.asc()).limit(overflow)
     )
     stale_keys = [str(row[0]) for row in stale_result.all()]
     if stale_keys:
         await db_session.execute(
-            delete(ArxivQueryCacheEntry).where(
-                ArxivQueryCacheEntry.query_fingerprint.in_(stale_keys)
-            )
+            delete(ArxivQueryCacheEntry).where(ArxivQueryCacheEntry.query_fingerprint.in_(stale_keys))
         )
 
 
@@ -275,9 +261,9 @@ def _as_string_list(value: object) -> list[str]:
 
 def _as_utc(value: datetime | None) -> datetime:
     if value is None:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
+        return value.replace(tzinfo=UTC)
     return value
 
 

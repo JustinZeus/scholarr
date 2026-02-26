@@ -228,9 +228,7 @@ def publication_list_item_from_row(
         is_read=bool(is_read),
         is_favorite=bool(is_favorite),
         first_seen_at=created_at,
-        is_new_in_latest_run=(
-            latest_run_id is not None and int(first_seen_run_id or 0) == latest_run_id
-        ),
+        is_new_in_latest_run=(latest_run_id is not None and int(first_seen_run_id or 0) == latest_run_id),
     )
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import gc
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -59,7 +59,7 @@ def test_build_query_fingerprint_normalizes_search_and_id_params() -> None:
 @pytest.mark.asyncio
 async def test_cache_entry_expires_and_is_deleted(db_session: AsyncSession) -> None:
     query_fingerprint = build_query_fingerprint(params={"search_query": "ti:test", "start": 0})
-    now_utc = datetime(2026, 2, 26, 12, 0, tzinfo=timezone.utc)
+    now_utc = datetime(2026, 2, 26, 12, 0, tzinfo=UTC)
 
     await set_cached_feed(
         query_fingerprint=query_fingerprint,
@@ -79,9 +79,7 @@ async def test_cache_entry_expires_and_is_deleted(db_session: AsyncSession) -> N
     )
 
     result = await db_session.execute(
-        select(ArxivQueryCacheEntry).where(
-            ArxivQueryCacheEntry.query_fingerprint == query_fingerprint
-        )
+        select(ArxivQueryCacheEntry).where(ArxivQueryCacheEntry.query_fingerprint == query_fingerprint)
     )
     assert hit is not None
     assert miss is None
@@ -118,6 +116,7 @@ async def test_inflight_owner_failure_without_joiner_has_no_unretrieved_exceptio
 
     loop.set_exception_handler(_capture_exception)
     try:
+
         async def _failing_fetch() -> ArxivFeed:
             raise RuntimeError("owner_failed")
 

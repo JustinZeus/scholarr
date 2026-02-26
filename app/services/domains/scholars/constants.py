@@ -32,39 +32,25 @@ SEARCH_CACHED_BLOCK_REASON = "search_temporarily_disabled_from_cached_blocked_re
 
 STATE_REASON_HINTS: dict[str, str] = {
     SEARCH_DISABLED_REASON: (
-        "Scholar name search is currently disabled by service policy. "
-        "Add scholars by profile URL or Scholar ID."
+        "Scholar name search is currently disabled by service policy. Add scholars by profile URL or Scholar ID."
     ),
     SEARCH_COOLDOWN_REASON: (
         "Scholar name search is temporarily paused after repeated block responses. "
         "Use Scholar URL/ID adds until cooldown expires."
     ),
     SEARCH_CACHED_BLOCK_REASON: (
-        "A recent blocked response was cached to reduce traffic. "
-        "Retry later or add by Scholar URL/ID."
+        "A recent blocked response was cached to reduce traffic. Retry later or add by Scholar URL/ID."
     ),
     "network_dns_resolution_failed": (
-        "DNS resolution failed while reaching scholar.google.com. "
-        "Verify container DNS/network and retry."
+        "DNS resolution failed while reaching scholar.google.com. Verify container DNS/network and retry."
     ),
-    "network_timeout": (
-        "Request timed out before Google Scholar responded. "
-        "Increase delay/backoff and retry."
-    ),
-    "network_tls_error": (
-        "TLS handshake/certificate validation failed. "
-        "Verify outbound TLS/network configuration."
-    ),
-    "blocked_http_429_rate_limited": (
-        "Google Scholar rate-limited the request. "
-        "Slow request cadence and retry later."
-    ),
+    "network_timeout": ("Request timed out before Google Scholar responded. Increase delay/backoff and retry."),
+    "network_tls_error": ("TLS handshake/certificate validation failed. Verify outbound TLS/network configuration."),
+    "blocked_http_429_rate_limited": ("Google Scholar rate-limited the request. Slow request cadence and retry later."),
     "blocked_unusual_traffic_detected": (
-        "Google Scholar flagged traffic as unusual. "
-        "Increase delay/jitter and reduce concurrent scraping."
+        "Google Scholar flagged traffic as unusual. Increase delay/jitter and reduce concurrent scraping."
     ),
     "blocked_accounts_redirect": (
-        "Request was redirected to Google Account sign-in. "
-        "Treat as access block and retry later."
+        "Request was redirected to Google Account sign-in. Treat as access block and retry later."
     ),
 }

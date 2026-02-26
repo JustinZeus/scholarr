@@ -39,9 +39,7 @@ async def get_user_by_id(db_session: AsyncSession, user_id: int) -> User | None:
 
 
 async def get_user_by_email(db_session: AsyncSession, email: str) -> User | None:
-    result = await db_session.execute(
-        select(User).where(User.email == normalize_email(email))
-    )
+    result = await db_session.execute(select(User).where(User.email == normalize_email(email)))
     return result.scalar_one_or_none()
 
 
@@ -95,4 +93,3 @@ async def set_user_password_hash(
     await db_session.commit()
     await db_session.refresh(user)
     return user
-

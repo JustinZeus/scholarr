@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.runtime_deps import get_scholar_source
 from app.main import app
 from app.services.domains.publications.types import PublicationListItem
-from app.services.domains.settings import application as user_settings_service
 from app.services.domains.scholar.source import FetchResult
+from app.services.domains.settings import application as user_settings_service
 from app.settings import settings
 from tests.integration.helpers import insert_user, login_user
 
@@ -412,10 +412,7 @@ async def test_api_admin_dbops_integrity_and_repair_flow(db_session: AsyncSessio
     assert integrity_response.status_code == 200
     integrity_payload = integrity_response.json()["data"]
     assert integrity_payload["status"] in {"ok", "warning", "failed"}
-    assert any(
-        check["name"] == "missing_pdf_url"
-        for check in integrity_payload["checks"]
-    )
+    assert any(check["name"] == "missing_pdf_url" for check in integrity_payload["checks"])
 
     repair_response = client.post(
         "/api/v1/admin/db/repairs/publication-links",
@@ -450,10 +447,7 @@ async def test_api_admin_dbops_integrity_and_repair_flow(db_session: AsyncSessio
     assert page_two_payload["has_prev"] is True
     untracked_response = client.get("/api/v1/admin/db/pdf-queue?limit=20&status=untracked")
     assert untracked_response.status_code == 200
-    assert any(
-        item["status"] == "untracked"
-        for item in untracked_response.json()["data"]["items"]
-    )
+    assert any(item["status"] == "untracked" for item in untracked_response.json()["data"]["items"])
 
     link_count_result = await db_session.execute(
         text("SELECT count(*) FROM scholar_publications WHERE publication_id = :publication_id"),
@@ -1272,9 +1266,9 @@ async def test_api_settings_get_and_update(db_session: AsyncSession) -> None:
     assert settings_payload["policy"]["min_run_interval_minutes"] == user_settings_service.resolve_run_interval_minimum(
         settings.ingestion_min_run_interval_minutes
     )
-    assert settings_payload["policy"]["min_request_delay_seconds"] == user_settings_service.resolve_request_delay_minimum(
-        settings.ingestion_min_request_delay_seconds
-    )
+    assert settings_payload["policy"][
+        "min_request_delay_seconds"
+    ] == user_settings_service.resolve_request_delay_minimum(settings.ingestion_min_request_delay_seconds)
     assert settings_payload["policy"]["automation_allowed"] is settings.ingestion_automation_allowed
     assert settings_payload["policy"]["manual_run_allowed"] is settings.ingestion_manual_run_allowed
     assert settings_payload["policy"]["blocked_failure_threshold"] == max(
@@ -1482,10 +1476,7 @@ async def test_api_runs_manual_and_queue_actions(db_session: AsyncSession) -> No
 
     queue_list_response = client.get("/api/v1/runs/queue/items")
     assert queue_list_response.status_code == 200
-    assert any(
-        int(item["id"]) == queue_item_id
-        for item in queue_list_response.json()["data"]["queue_items"]
-    )
+    assert any(int(item["id"]) == queue_item_id for item in queue_list_response.json()["data"]["queue_items"])
 
     retry_response = client.post(f"/api/v1/runs/queue/{queue_item_id}/retry", headers=headers)
     assert retry_response.status_code == 200
@@ -1766,7 +1757,7 @@ async def test_api_settings_clears_expired_scrape_safety_cooldown(
     )
     user_settings.scrape_safety_state = {"blocked_start_count": 2}
     user_settings.scrape_cooldown_reason = "blocked_failure_threshold_exceeded"
-    user_settings.scrape_cooldown_until = datetime.now(timezone.utc) - timedelta(seconds=15)
+    user_settings.scrape_cooldown_until = datetime.now(UTC) - timedelta(seconds=15)
     await db_session.commit()
 
     client = TestClient(app)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -11,7 +11,7 @@ from app.services.domains.portability.constants import EXPORT_SCHEMA_VERSION
 
 
 def _exported_at_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _serialize_export_scholar(profile: ScholarProfile) -> dict[str, Any]:
@@ -58,9 +58,7 @@ async def export_user_data(
     user_id: int,
 ) -> dict[str, Any]:
     scholars_result = await db_session.execute(
-        select(ScholarProfile)
-        .where(ScholarProfile.user_id == user_id)
-        .order_by(ScholarProfile.id.asc())
+        select(ScholarProfile).where(ScholarProfile.user_id == user_id).order_by(ScholarProfile.id.asc())
     )
     publication_result = await db_session.execute(
         select(

@@ -103,9 +103,7 @@ def main() -> int:
             print(f"- {method} {route}")
         return 1
 
-    print(
-        f"Frontend API contract check passed: {len(frontend_routes)} frontend routes match backend definitions."
-    )
+    print(f"Frontend API contract check passed: {len(frontend_routes)} frontend routes match backend definitions.")
     return 0
 
 

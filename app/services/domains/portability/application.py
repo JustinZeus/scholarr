@@ -18,7 +18,7 @@ from app.services.domains.portability.publication_import import (
     _upsert_imported_publication,
 )
 from app.services.domains.portability.scholar_import import _upsert_imported_scholars
-from app.services.domains.portability.types import ImportExportError, ImportedPublicationInput
+from app.services.domains.portability.types import ImportedPublicationInput, ImportExportError
 
 
 async def import_user_data(
@@ -58,8 +58,8 @@ async def import_user_data(
 
 __all__ = [
     "EXPORT_SCHEMA_VERSION",
-    "MAX_IMPORT_SCHOLARS",
     "MAX_IMPORT_PUBLICATIONS",
+    "MAX_IMPORT_SCHOLARS",
     "ImportExportError",
     "ImportedPublicationInput",
     "export_user_data",

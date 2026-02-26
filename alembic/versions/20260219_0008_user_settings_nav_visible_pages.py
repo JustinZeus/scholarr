@@ -7,10 +7,10 @@ Create Date: 2026-02-19 14:58:00.000000
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "20260219_0008"
@@ -21,7 +21,7 @@ depends_on: str | Sequence[str] | None = None
 
 TABLE_NAME = "user_settings"
 DEFAULT_NAV_VISIBLE_PAGES_SQL = (
-    "'[\"dashboard\",\"scholars\",\"publications\",\"settings\",\"style-guide\",\"runs\",\"users\"]'::jsonb"
+    '\'["dashboard","scholars","publications","settings","style-guide","runs","users"]\'::jsonb'
 )
 
 

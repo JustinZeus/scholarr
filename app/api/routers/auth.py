@@ -5,8 +5,8 @@ import logging
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.errors import ApiException
 from app.api.deps import get_api_current_user
+from app.api.errors import ApiException
 from app.api.responses import success_payload
 from app.api.schemas import (
     AuthMeEnvelope,
@@ -16,14 +16,14 @@ from app.api.schemas import (
     LoginRequest,
     MessageEnvelope,
 )
-from app.auth.deps import get_auth_service, get_login_rate_limiter
-from app.logging_utils import structured_log
-from app.auth.rate_limit import SlidingWindowRateLimiter
 from app.auth import runtime as auth_runtime
+from app.auth.deps import get_auth_service, get_login_rate_limiter
+from app.auth.rate_limit import SlidingWindowRateLimiter
 from app.auth.service import AuthService
 from app.auth.session import set_session_user
 from app.db.models import User
 from app.db.session import get_db_session
+from app.logging_utils import structured_log
 from app.security.csrf import ensure_csrf_token
 from app.services.domains.users import application as user_service
 
@@ -37,7 +37,13 @@ def _login_limiter_key_and_email(request: Request, payload: LoginRequest) -> tup
 
 
 def _raise_rate_limited(normalized_email: str, retry_after_seconds: int) -> None:
-    structured_log(logger, "warning", "api.auth.login_rate_limited", email=normalized_email, retry_after_seconds=retry_after_seconds)
+    structured_log(
+        logger,
+        "warning",
+        "api.auth.login_rate_limited",
+        email=normalized_email,
+        retry_after_seconds=retry_after_seconds,
+    )
     raise ApiException(
         status_code=429,
         code="rate_limited",
@@ -200,7 +206,9 @@ async def logout(
 ):
     current_user = await auth_runtime.get_authenticated_user(request, db_session)
     auth_runtime.invalidate_session(request)
-    structured_log(logger, "info", "api.auth.logout", user_id=int(current_user.id) if current_user is not None else None)
+    structured_log(
+        logger, "info", "api.auth.logout", user_id=int(current_user.id) if current_user is not None else None
+    )
     return success_payload(
         request,
         data={

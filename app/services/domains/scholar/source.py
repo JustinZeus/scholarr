@@ -17,18 +17,12 @@ SCHOLAR_PROFILE_URL = "https://scholar.google.com/citations"
 DEFAULT_PAGE_SIZE = 100
 
 DEFAULT_USER_AGENTS = [
-    (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-    ),
+    ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"),
     (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 "
         "(KHTML, like Gecko) Version/18.1 Safari/605.1.15"
     ),
-    (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) "
-        "Gecko/20100101 Firefox/131.0"
-    ),
+    ("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0"),
 ]
 
 logger = logging.getLogger(__name__)
@@ -44,8 +38,7 @@ class FetchResult:
 
 
 class ScholarSource(Protocol):
-    async def fetch_profile_html(self, scholar_id: str) -> FetchResult:
-        ...
+    async def fetch_profile_html(self, scholar_id: str) -> FetchResult: ...
 
     async def fetch_profile_page_html(
         self,
@@ -53,16 +46,14 @@ class ScholarSource(Protocol):
         *,
         cstart: int,
         pagesize: int,
-    ) -> FetchResult:
-        ...
+    ) -> FetchResult: ...
 
     async def fetch_author_search_html(
         self,
         query: str,
         *,
         start: int,
-    ) -> FetchResult:
-        ...
+    ) -> FetchResult: ...
 
 
 class LiveScholarSource:
@@ -145,7 +136,9 @@ class LiveScholarSource:
     @staticmethod
     def _network_error_result(requested_url: str, exc: URLError) -> FetchResult:
         structured_log(
-            logger, "warning", "scholar_source.fetch_network_error",
+            logger,
+            "warning",
+            "scholar_source.fetch_network_error",
             requested_url=requested_url,
         )
         return FetchResult(
@@ -159,7 +152,9 @@ class LiveScholarSource:
     @staticmethod
     def _http_error_result(requested_url: str, exc: HTTPError) -> FetchResult:
         structured_log(
-            logger, "warning", "scholar_source.fetch_http_error",
+            logger,
+            "warning",
+            "scholar_source.fetch_http_error",
             requested_url=requested_url,
             status_code=exc.code,
         )
@@ -176,7 +171,9 @@ class LiveScholarSource:
         body = response.read().decode("utf-8", errors="replace")
         status_code = getattr(response, "status", 200)
         structured_log(
-            logger, "debug", "scholar_source.fetch_succeeded",
+            logger,
+            "debug",
+            "scholar_source.fetch_succeeded",
             requested_url=requested_url,
             status_code=status_code,
         )

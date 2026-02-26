@@ -1,5 +1,5 @@
-import pytest
 from app.services.domains.openalex.types import OpenAlexWork
+
 
 def test_parse_openalex_work_from_api_dict() -> None:
     raw_api_response = {
@@ -13,28 +13,19 @@ def test_parse_openalex_work_from_api_dict() -> None:
             "doi": "https://doi.org/10.1038/s41586-020-0315-z",
             "mag": "2741809807",
             "pmid": "https://pubmed.ncbi.nlm.nih.gov/32040050",
-            "pmcid": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7325852"
+            "pmcid": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7325852",
         },
-        "open_access": {
-            "is_oa": True,
-            "oa_url": "https://example.com/pdf"
-        },
+        "open_access": {"is_oa": True, "oa_url": "https://example.com/pdf"},
         "authorships": [
             {
                 "author_position": "first",
-                "author": {
-                    "id": "https://openalex.org/A1969205032",
-                    "display_name": "Giuseppe Carleo"
-                }
+                "author": {"id": "https://openalex.org/A1969205032", "display_name": "Giuseppe Carleo"},
             },
             {
                 "author_position": "middle",
-                "author": {
-                    "id": "https://openalex.org/A4356881717",
-                    "display_name": "Ignacio Cirac"
-                }
-            }
-        ]
+                "author": {"id": "https://openalex.org/A4356881717", "display_name": "Ignacio Cirac"},
+            },
+        ],
     }
 
     work = OpenAlexWork.from_api_dict(raw_api_response)
@@ -51,6 +42,7 @@ def test_parse_openalex_work_from_api_dict() -> None:
     assert len(work.authors) == 2
     assert work.authors[0].display_name == "Giuseppe Carleo"
     assert work.authors[1].display_name == "Ignacio Cirac"
+
 
 def test_parse_openalex_work_empty() -> None:
     work = OpenAlexWork.from_api_dict({"id": "W123"})

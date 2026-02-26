@@ -671,7 +671,7 @@ class AdminRepairPublicationLinksRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
-    def validate_scope(self) -> "AdminRepairPublicationLinksRequest":
+    def validate_scope(self) -> AdminRepairPublicationLinksRequest:
         if self.scope_mode == "single_user" and self.user_id is None:
             raise ValueError("user_id is required when scope_mode=single_user.")
         if self.scope_mode == "all_users" and self.user_id is not None:
@@ -680,10 +680,7 @@ class AdminRepairPublicationLinksRequest(BaseModel):
             expected = "REPAIR ALL USERS"
             provided = (self.confirmation_text or "").strip()
             if provided != expected:
-                raise ValueError(
-                    "confirmation_text must equal 'REPAIR ALL USERS' "
-                    "when applying a repair to all users."
-                )
+                raise ValueError("confirmation_text must equal 'REPAIR ALL USERS' when applying a repair to all users.")
         return self
 
 
@@ -735,7 +732,7 @@ class AdminRepairPublicationNearDuplicatesRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
-    def validate_apply_mode(self) -> "AdminRepairPublicationNearDuplicatesRequest":
+    def validate_apply_mode(self) -> AdminRepairPublicationNearDuplicatesRequest:
         if self.dry_run:
             return self
         if not self.selected_cluster_keys:
@@ -744,8 +741,7 @@ class AdminRepairPublicationNearDuplicatesRequest(BaseModel):
         provided = (self.confirmation_text or "").strip()
         if provided != expected:
             raise ValueError(
-                "confirmation_text must equal 'MERGE SELECTED DUPLICATES' "
-                "when applying near-duplicate merges."
+                "confirmation_text must equal 'MERGE SELECTED DUPLICATES' when applying near-duplicate merges."
             )
         return self
 
@@ -787,7 +783,7 @@ class SettingsData(BaseModel):
     nav_visible_pages: list[str]
     policy: SettingsPolicyData
     safety_state: ScrapeSafetyStateData
-    
+
     openalex_api_key: str | None = None
     crossref_api_token: str | None = None
     crossref_api_mailto: str | None = None

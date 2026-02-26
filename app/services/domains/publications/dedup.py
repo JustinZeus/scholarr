@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import logging
-from typing import Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,9 +113,7 @@ async def _load_publication(
     *,
     publication_id: int,
 ) -> Publication | None:
-    result = await db_session.execute(
-        select(Publication).where(Publication.id == publication_id)
-    )
+    result = await db_session.execute(select(Publication).where(Publication.id == publication_id))
     return result.scalar_one_or_none()
 
 
@@ -160,9 +158,7 @@ async def _migrate_scholar_links(
     dup_links = dup_links_result.scalars().all()
 
     winner_profiles_result = await db_session.execute(
-        select(ScholarPublication.scholar_profile_id).where(
-            ScholarPublication.publication_id == winner_id
-        )
+        select(ScholarPublication.scholar_profile_id).where(ScholarPublication.publication_id == winner_id)
     )
     winner_profiles: set[int] = {row for (row,) in winner_profiles_result}
 
@@ -346,11 +342,7 @@ def _candidate_from_row(
 
 
 def _normalized_tokens(tokens: Iterable[str]) -> set[str]:
-    return {
-        token
-        for token in tokens
-        if len(token) >= NEAR_DUP_MIN_TOKEN_LENGTH and token not in NEAR_DUP_STOPWORDS
-    }
+    return {token for token in tokens if len(token) >= NEAR_DUP_MIN_TOKEN_LENGTH and token not in NEAR_DUP_STOPWORDS}
 
 
 def _cluster_candidate_groups(

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Mapping
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -28,24 +28,24 @@ class OpenAlexWork:
     @classmethod
     def from_api_dict(cls, data: Mapping[str, Any]) -> OpenAlexWork:
         ids = data.get("ids") or {}
-        
+
         # Extract DOI without the https://doi.org/ prefix
         doi = ids.get("doi")
         if doi and doi.startswith("https://doi.org/"):
             doi = doi[16:]
-            
+
         # Extract PMID without the url prefix
         pmid = ids.get("pmid")
         if pmid and pmid.startswith("https://pubmed.ncbi.nlm.nih.gov/"):
             pmid = pmid[32:]
-            
+
         # Extract PMCID without the url prefix
         pmcid = ids.get("pmcid")
         if pmcid and pmcid.startswith("https://www.ncbi.nlm.nih.gov/pmc/articles/"):
             pmcid = pmcid[42:]
 
         open_access = data.get("open_access") or {}
-        
+
         authors = []
         for authorship in data.get("authorships") or []:
             author_data = authorship.get("author") or {}

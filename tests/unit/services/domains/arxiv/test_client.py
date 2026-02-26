@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +36,9 @@ async def test_client_search_builds_query_and_sort_params() -> None:
         captured["params"] = params
         captured["request_email"] = request_email
         captured["timeout_seconds"] = timeout_seconds
-        return httpx.Response(200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query"))
+        return httpx.Response(
+            200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query")
+        )
 
     client = ArxivClient(request_fn=_request_fn)
     feed = await client.search(
@@ -66,7 +69,9 @@ async def test_client_lookup_ids_builds_id_list_param() -> None:
 
     async def _request_fn(*, params, request_email, timeout_seconds):
         captured["params"] = params
-        return httpx.Response(200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query"))
+        return httpx.Response(
+            200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query")
+        )
 
     client = ArxivClient(request_fn=_request_fn)
     await client.lookup_ids(id_list=["1234.5678", " 9999.0001 "], start=0, max_results=2)
@@ -76,7 +81,9 @@ async def test_client_lookup_ids_builds_id_list_param() -> None:
 @pytest.mark.asyncio
 async def test_client_search_rejects_invalid_sort_by() -> None:
     async def _unused_request_fn(*, params, request_email, timeout_seconds):
-        return httpx.Response(200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query"))
+        return httpx.Response(
+            200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query")
+        )
 
     client = ArxivClient(request_fn=_unused_request_fn)
     with pytest.raises(ArxivClientValidationError):
@@ -86,7 +93,9 @@ async def test_client_search_rejects_invalid_sort_by() -> None:
 @pytest.mark.asyncio
 async def test_client_lookup_ids_rejects_empty_list() -> None:
     async def _unused_request_fn(*, params, request_email, timeout_seconds):
-        return httpx.Response(200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query"))
+        return httpx.Response(
+            200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query")
+        )
 
     client = ArxivClient(request_fn=_unused_request_fn)
     with pytest.raises(ArxivClientValidationError):
@@ -96,7 +105,9 @@ async def test_client_lookup_ids_rejects_empty_list() -> None:
 @pytest.mark.asyncio
 async def test_client_search_rejects_negative_start() -> None:
     async def _unused_request_fn(*, params, request_email, timeout_seconds):
-        return httpx.Response(200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query"))
+        return httpx.Response(
+            200, text=_CLIENT_FEED_XML, request=httpx.Request("GET", "https://export.arxiv.org/api/query")
+        )
 
     client = ArxivClient(request_fn=_unused_request_fn)
     with pytest.raises(ArxivClientValidationError):
@@ -172,7 +183,7 @@ async def test_request_feed_skips_live_call_when_global_cooldown_is_active(
         return ArxivCooldownStatus(
             is_active=True,
             remaining_seconds=61.0,
-            cooldown_until=datetime(2026, 2, 26, 12, 1, tzinfo=timezone.utc),
+            cooldown_until=datetime(2026, 2, 26, 12, 1, tzinfo=UTC),
         )
 
     async def _unexpected_limit_call(*, fetch, source_path):  # pragma: no cover - defensive

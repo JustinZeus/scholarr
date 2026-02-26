@@ -27,9 +27,7 @@ def normalize_profile_image_url(value: str | None) -> str | None:
         return None
 
     if len(candidate) > MAX_IMAGE_URL_LENGTH:
-        raise ScholarServiceError(
-            f"Image URL must be {MAX_IMAGE_URL_LENGTH} characters or fewer."
-        )
+        raise ScholarServiceError(f"Image URL must be {MAX_IMAGE_URL_LENGTH} characters or fewer.")
 
     parsed = urlparse(candidate)
     if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:

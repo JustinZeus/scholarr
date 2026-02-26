@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
+from app.logging_utils import structured_log
 from app.services.domains.crossref.application import discover_doi_for_publication
 from app.services.domains.doi.normalize import normalize_doi
 from app.services.domains.unpaywall.pdf_discovery import (
@@ -13,7 +14,6 @@ from app.services.domains.unpaywall.pdf_discovery import (
     resolve_pdf_from_landing_page,
 )
 from app.services.domains.unpaywall.rate_limit import wait_for_unpaywall_slot
-from app.logging_utils import structured_log
 from app.settings import settings
 
 if TYPE_CHECKING:
@@ -67,11 +67,8 @@ def _publication_doi(item: PublicationListItem | UnreadPublicationItem) -> str |
     stored = None
     if getattr(item, "display_identifier", None) and item.display_identifier.kind == "doi":
         stored = normalize_doi(item.display_identifier.value)
-    
-    explicit_doi = (
-        _extract_explicit_doi(item.pub_url)
-        or _extract_explicit_doi(item.venue_text)
-    )
+
+    explicit_doi = _extract_explicit_doi(item.pub_url) or _extract_explicit_doi(item.venue_text)
     if explicit_doi:
         return explicit_doi
     pub_url_doi = _extract_doi_candidate(item.pub_url)
@@ -289,10 +286,7 @@ def _resolved_pdf_count(outcomes: dict[int, OaResolutionOutcome]) -> int:
 
 
 def _outcome_metadata(outcomes: dict[int, OaResolutionOutcome]) -> dict[int, tuple[str | None, str | None]]:
-    return {
-        publication_id: (outcome.doi, outcome.pdf_url)
-        for publication_id, outcome in outcomes.items()
-    }
+    return {publication_id: (outcome.doi, outcome.pdf_url) for publication_id, outcome in outcomes.items()}
 
 
 async def _resolve_outcome_for_item(
@@ -347,7 +341,9 @@ async def _safe_outcome_for_item(
             allow_crossref=allow_crossref,
         )
     except Exception as exc:  # pragma: no cover - defensive network boundary
-        structured_log(logger, "warning", "unpaywall.resolve_item_failed", publication_id=item.publication_id, error=str(exc))
+        structured_log(
+            logger, "warning", "unpaywall.resolve_item_failed", publication_id=item.publication_id, error=str(exc)
+        )
         return _outcome_with_failure(
             item=item,
             failure_reason=FAILURE_RESOLUTION_EXCEPTION,
@@ -410,7 +406,9 @@ async def resolve_publication_oa_outcomes(
             email=email,
         )
     structured_log(
-        logger, "info", "unpaywall.resolve_completed",
+        logger,
+        "info",
+        "unpaywall.resolve_completed",
         publication_count=len(items),
         doi_input_count=_doi_input_count(items),
         search_attempt_count=_search_attempt_count(targets=targets),

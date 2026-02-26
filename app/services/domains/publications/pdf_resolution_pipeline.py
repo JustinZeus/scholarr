@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Any
 
+from app.logging_utils import structured_log
 from app.services.domains.arxiv.application import ArxivRateLimitError
 from app.services.domains.arxiv.guards import arxiv_skip_reason_for_item
 from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
 from app.services.domains.publications.types import PublicationListItem
 from app.services.domains.unpaywall.application import OaResolutionOutcome, resolve_publication_oa_outcomes
-from app.logging_utils import structured_log
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,7 @@ async def _openalex_outcome(
         return None
 
     import re
+
     safe_title = re.sub(r"[^\w\s]", " ", row.title)
     safe_title = " ".join(safe_title.split())
     if not safe_title:
@@ -107,12 +108,24 @@ async def _arxiv_outcome(
     from app.services.domains.arxiv.application import discover_arxiv_id_for_publication
 
     if not allow_lookup:
-        structured_log(logger, "info", "pdf_resolution.arxiv_skipped", publication_id=int(row.publication_id), skip_reason="batch_arxiv_cooldown_active")
+        structured_log(
+            logger,
+            "info",
+            "pdf_resolution.arxiv_skipped",
+            publication_id=int(row.publication_id),
+            skip_reason="batch_arxiv_cooldown_active",
+        )
         return None
 
     skip_reason = arxiv_skip_reason_for_item(item=row)
     if skip_reason is not None:
-        structured_log(logger, "info", "pdf_resolution.arxiv_skipped", publication_id=int(row.publication_id), skip_reason=skip_reason)
+        structured_log(
+            logger,
+            "info",
+            "pdf_resolution.arxiv_skipped",
+            publication_id=int(row.publication_id),
+            skip_reason=skip_reason,
+        )
         return None
 
     try:
@@ -132,7 +145,6 @@ async def _arxiv_outcome(
     except Exception as exc:
         structured_log(logger, "warning", "pdf_resolution.arxiv_failed", error=str(exc))
     return None
-
 
 
 async def _oa_outcome(

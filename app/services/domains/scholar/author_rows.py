@@ -79,9 +79,7 @@ class ScholarAuthorSearchParser(HTMLParser):
             return
 
         affiliation = normalize_space("".join(self._candidate["aff_parts"])) or None
-        email_domain = _extract_verified_email_domain(
-            normalize_space("".join(self._candidate["eml_parts"])) or None
-        )
+        email_domain = _extract_verified_email_domain(normalize_space("".join(self._candidate["eml_parts"])) or None)
         cited_by_text = normalize_space("".join(self._candidate["cby_parts"]))
         cited_by_match = re.search(r"\d+", cited_by_text)
         cited_by_count = int(cited_by_match.group(0)) if cited_by_match else None
@@ -97,10 +95,7 @@ class ScholarAuthorSearchParser(HTMLParser):
 
         profile_url = build_absolute_scholar_url(self._candidate["name_href"])
         if not profile_url:
-            profile_url = (
-                "https://scholar.google.com/citations"
-                f"?hl=en&user={scholar_id}"
-            )
+            profile_url = f"https://scholar.google.com/citations?hl=en&user={scholar_id}"
 
         self.candidates.append(
             ScholarSearchCandidate(

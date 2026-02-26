@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from app.services.domains.ingestion.application import ScholarIngestionService
 from app.services.domains.ingestion import scheduler as scheduler_module
+from app.services.domains.ingestion.application import ScholarIngestionService
 from app.settings import settings
 
 
@@ -37,7 +37,7 @@ def test_scheduler_candidate_row_clamps_request_delay() -> None:
     try:
         candidate = scheduler_module.SchedulerService._candidate_from_row(
             (1, 15, 1, None, None),
-            now_utc=datetime(2026, 2, 21, tzinfo=timezone.utc),
+            now_utc=datetime(2026, 2, 21, tzinfo=UTC),
         )
         assert candidate is not None
         assert candidate.request_delay_seconds == 6

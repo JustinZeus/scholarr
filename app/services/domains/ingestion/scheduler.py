@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,24 +17,22 @@ from app.db.models import (
     UserSetting,
 )
 from app.db.session import get_session_factory
+from app.logging_utils import structured_log
 from app.services.domains.ingestion import queue as queue_service
 from app.services.domains.ingestion.application import (
     RunAlreadyInProgressError,
     RunBlockedBySafetyPolicyError,
     ScholarIngestionService,
 )
-from app.logging_utils import structured_log
-from app.services.domains.settings import application as user_settings_service
 from app.services.domains.scholar.source import LiveScholarSource
+from app.services.domains.settings import application as user_settings_service
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
 
 def _request_delay_floor_seconds() -> int:
-    return user_settings_service.resolve_request_delay_minimum(
-        settings.ingestion_min_request_delay_seconds
-    )
+    return user_settings_service.resolve_request_delay_minimum(settings.ingestion_min_request_delay_seconds)
 
 
 def _effective_request_delay_seconds(value: int | None) -> int:
@@ -96,7 +94,9 @@ class SchedulerService:
             return
         self._task = asyncio.create_task(self._run_loop(), name="scholarr-scheduler")
         structured_log(
-            logger, "info", "scheduler.started",
+            logger,
+            "info",
+            "scheduler.started",
             tick_seconds=self._tick_seconds,
             network_error_retries=self._network_error_retries,
             retry_backoff_seconds=self._retry_backoff_seconds,
@@ -137,13 +137,13 @@ class SchedulerService:
     async def _tick_once(self) -> None:
         if self._continuation_queue_enabled:
             await self._drain_continuation_queue()
-        
+
         await self._drain_pdf_queue()
 
         candidates = await self._load_candidates()
         if not candidates:
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for candidate in candidates:
             if not await self._is_due(candidate, now=now):
                 continue
@@ -170,10 +170,12 @@ class SchedulerService:
     def _candidate_from_row(row: tuple, *, now_utc: datetime) -> _AutoRunCandidate | None:
         user_id, run_interval_minutes, request_delay_seconds, cooldown_until, cooldown_reason = row
         if cooldown_until is not None and cooldown_until.tzinfo is None:
-            cooldown_until = cooldown_until.replace(tzinfo=timezone.utc)
+            cooldown_until = cooldown_until.replace(tzinfo=UTC)
         if cooldown_until is not None and cooldown_until > now_utc:
             structured_log(
-                logger, "info", "scheduler.run_skipped_safety_cooldown_precheck",
+                logger,
+                "info",
+                "scheduler.run_skipped_safety_cooldown_precheck",
                 user_id=int(user_id),
                 reason=cooldown_reason,
                 cooldown_until=cooldown_until,
@@ -192,7 +194,7 @@ class SchedulerService:
         if not settings.ingestion_automation_allowed:
             return []
         rows = await self._load_candidate_rows()
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         candidates: list[_AutoRunCandidate] = []
         for row in rows:
             candidate = self._candidate_from_row(row, now_utc=now_utc)
@@ -216,9 +218,7 @@ class SchedulerService:
         if last_run is None:
             return True
 
-        next_due_dt = last_run + timedelta(
-            minutes=candidate.run_interval_minutes
-        )
+        next_due_dt = last_run + timedelta(minutes=candidate.run_interval_minutes)
         return now >= next_due_dt
 
     async def _run_candidate_ingestion(
@@ -252,7 +252,9 @@ class SchedulerService:
             except RunBlockedBySafetyPolicyError as exc:
                 await session.rollback()
                 structured_log(
-                    logger, "info", "scheduler.run_skipped_safety_cooldown",
+                    logger,
+                    "info",
+                    "scheduler.run_skipped_safety_cooldown",
                     user_id=candidate.user_id,
                     reason=exc.safety_state.get("cooldown_reason"),
                     cooldown_until=exc.safety_state.get("cooldown_until"),
@@ -269,7 +271,9 @@ class SchedulerService:
         if run_summary is None:
             return
         structured_log(
-            logger, "info", "scheduler.run_completed",
+            logger,
+            "info",
+            "scheduler.run_completed",
             user_id=candidate.user_id,
             run_id=run_summary.crawl_run_id,
             status=run_summary.status.value,
@@ -278,7 +282,7 @@ class SchedulerService:
         )
 
     async def _drain_continuation_queue(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         session_factory = get_session_factory()
         async with session_factory() as session:
             jobs = await queue_service.list_due_jobs(
@@ -305,7 +309,9 @@ class SchedulerService:
             await session.commit()
         if dropped is not None:
             structured_log(
-                logger, "warning", "scheduler.queue_item_dropped_max_attempts",
+                logger,
+                "warning",
+                "scheduler.queue_item_dropped_max_attempts",
                 queue_item_id=job.id,
                 user_id=job.user_id,
                 scholar_profile_id=job.scholar_profile_id,
@@ -352,7 +358,9 @@ class SchedulerService:
             await session.commit()
         if dropped is not None:
             structured_log(
-                logger, "info", "scheduler.queue_item_dropped_scholar_unavailable",
+                logger,
+                "info",
+                "scheduler.queue_item_dropped_scholar_unavailable",
                 queue_item_id=job.id,
                 user_id=job.user_id,
                 scholar_profile_id=job.scholar_profile_id,
@@ -371,8 +379,11 @@ class SchedulerService:
             )
             await recovery_session.commit()
         structured_log(
-            logger, "info", "scheduler.queue_item_deferred_lock",
-            queue_item_id=job.id, user_id=job.user_id,
+            logger,
+            "info",
+            "scheduler.queue_item_deferred_lock",
+            queue_item_id=job.id,
+            user_id=job.user_id,
         )
 
     async def _reschedule_queue_job_safety_cooldown(
@@ -395,7 +406,9 @@ class SchedulerService:
             )
             await recovery_session.commit()
         structured_log(
-            logger, "info", "scheduler.queue_item_deferred_safety_cooldown",
+            logger,
+            "info",
+            "scheduler.queue_item_deferred_safety_cooldown",
             queue_item_id=job.id,
             user_id=job.user_id,
             reason=exc.safety_state.get("cooldown_reason"),
@@ -423,8 +436,12 @@ class SchedulerService:
                 )
                 await recovery_session.commit()
                 structured_log(
-                    logger, "warning", "scheduler.queue_item_dropped_after_exception",
-                    queue_item_id=job.id, user_id=job.user_id, attempt_count=queue_item.attempt_count,
+                    logger,
+                    "warning",
+                    "scheduler.queue_item_dropped_after_exception",
+                    queue_item_id=job.id,
+                    user_id=job.user_id,
+                    attempt_count=queue_item.attempt_count,
                 )
                 return
             delay_seconds = queue_service.compute_backoff_seconds(
@@ -489,15 +506,23 @@ class SchedulerService:
                 await session.commit()
                 if queue_item is None:
                     structured_log(
-                        logger, "info", "scheduler.queue_item_resolved",
-                        queue_item_id=job.id, user_id=job.user_id,
-                        run_id=run_summary.crawl_run_id, status=run_summary.status.value,
+                        logger,
+                        "info",
+                        "scheduler.queue_item_resolved",
+                        queue_item_id=job.id,
+                        user_id=job.user_id,
+                        run_id=run_summary.crawl_run_id,
+                        status=run_summary.status.value,
                     )
                     return
                 structured_log(
-                    logger, "info", "scheduler.queue_item_progressed",
-                    queue_item_id=job.id, user_id=job.user_id,
-                    run_id=run_summary.crawl_run_id, status=run_summary.status.value,
+                    logger,
+                    "info",
+                    "scheduler.queue_item_progressed",
+                    queue_item_id=job.id,
+                    user_id=job.user_id,
+                    run_id=run_summary.crawl_run_id,
+                    status=run_summary.status.value,
                     attempt_count=int(queue_item.attempt_count),
                 )
                 return
@@ -505,28 +530,50 @@ class SchedulerService:
             if queue_item is None:
                 await session.commit()
                 structured_log(
-                    logger, "info", "scheduler.queue_item_resolved",
-                    queue_item_id=job.id, user_id=job.user_id,
-                    run_id=run_summary.crawl_run_id, status=run_summary.status.value,
+                    logger,
+                    "info",
+                    "scheduler.queue_item_resolved",
+                    queue_item_id=job.id,
+                    user_id=job.user_id,
+                    run_id=run_summary.crawl_run_id,
+                    status=run_summary.status.value,
                 )
                 return
             if int(queue_item.attempt_count) >= self._continuation_max_attempts:
                 await queue_service.mark_dropped(session, job_id=job.id, reason="max_attempts_after_run")
                 await session.commit()
                 structured_log(
-                    logger, "warning", "scheduler.queue_item_dropped_max_attempts_after_run",
-                    queue_item_id=job.id, user_id=job.user_id,
+                    logger,
+                    "warning",
+                    "scheduler.queue_item_dropped_max_attempts_after_run",
+                    queue_item_id=job.id,
+                    user_id=job.user_id,
                     attempt_count=queue_item.attempt_count,
-                    run_id=run_summary.crawl_run_id, status=run_summary.status.value,
+                    run_id=run_summary.crawl_run_id,
+                    status=run_summary.status.value,
                 )
                 return
-            delay_seconds = queue_service.compute_backoff_seconds(base_seconds=self._continuation_base_delay_seconds, attempt_count=int(queue_item.attempt_count), max_seconds=self._continuation_max_delay_seconds)
-            await queue_service.reschedule_job(session, job_id=job.id, delay_seconds=delay_seconds, reason=queue_item.reason, error=queue_item.last_error)
+            delay_seconds = queue_service.compute_backoff_seconds(
+                base_seconds=self._continuation_base_delay_seconds,
+                attempt_count=int(queue_item.attempt_count),
+                max_seconds=self._continuation_max_delay_seconds,
+            )
+            await queue_service.reschedule_job(
+                session,
+                job_id=job.id,
+                delay_seconds=delay_seconds,
+                reason=queue_item.reason,
+                error=queue_item.last_error,
+            )
             await session.commit()
         structured_log(
-            logger, "info", "scheduler.queue_item_rescheduled_failed",
-            queue_item_id=job.id, user_id=job.user_id,
-            run_id=run_summary.crawl_run_id, status=run_summary.status.value,
+            logger,
+            "info",
+            "scheduler.queue_item_rescheduled_failed",
+            queue_item_id=job.id,
+            user_id=job.user_id,
+            run_id=run_summary.crawl_run_id,
+            status=run_summary.status.value,
             attempt_count=int(queue_item.attempt_count),
             delay_seconds=delay_seconds,
         )
@@ -545,7 +592,7 @@ class SchedulerService:
 
     async def _drain_pdf_queue(self) -> None:
         from app.services.domains.publications.pdf_queue import drain_ready_jobs
-        
+
         session_factory = get_session_factory()
         async with session_factory() as session:
             try:
@@ -556,7 +603,9 @@ class SchedulerService:
                 )
                 if processed > 0:
                     structured_log(
-                        logger, "info", "scheduler.pdf_queue_drain_completed",
+                        logger,
+                        "info",
+                        "scheduler.pdf_queue_drain_completed",
                         processed_count=processed,
                     )
             except Exception:

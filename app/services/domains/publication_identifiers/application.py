@@ -55,7 +55,9 @@ def _fallback_candidates_from_values(
     if doi:
         normalized_doi = normalize_doi(doi)
         if normalized_doi:
-            candidates.append(_candidate(IdentifierKind.DOI, doi, normalized_doi, "legacy_doi", CONFIDENCE_HIGH, pub_url))
+            candidates.append(
+                _candidate(IdentifierKind.DOI, doi, normalized_doi, "legacy_doi", CONFIDENCE_HIGH, pub_url)
+            )
     candidates.extend(_url_identifier_candidates(values=values, source="legacy_urls"))
     return _dedup_candidates(candidates)
 
@@ -332,10 +334,13 @@ async def _existing_identifier_by_kind(
     kind: str,
 ) -> PublicationIdentifier | None:
     result = await db_session.execute(
-        select(PublicationIdentifier).where(
+        select(PublicationIdentifier)
+        .where(
             PublicationIdentifier.publication_id == publication_id,
             PublicationIdentifier.kind == kind,
-        ).order_by(PublicationIdentifier.confidence_score.desc()).limit(1)
+        )
+        .order_by(PublicationIdentifier.confidence_score.desc())
+        .limit(1)
     )
     return result.scalar_one_or_none()
 
@@ -380,7 +385,9 @@ def _overlay_publication_item(
     item: PublicationListItem,
     display_identifier: DisplayIdentifier | None,
 ) -> PublicationListItem:
-    fallback = display_identifier or derive_display_identifier_from_values(doi=None, pub_url=item.pub_url, pdf_url=item.pdf_url)
+    fallback = display_identifier or derive_display_identifier_from_values(
+        doi=None, pub_url=item.pub_url, pdf_url=item.pdf_url
+    )
     return replace(item, display_identifier=fallback)
 
 
@@ -447,8 +454,7 @@ def _best_display_identifier_map(rows: list[PublicationIdentifier]) -> dict[int,
     return {
         publication_id: display
         for publication_id, display in (
-            (publication_id, _best_display_identifier(candidates))
-            for publication_id, candidates in grouped.items()
+            (publication_id, _best_display_identifier(candidates)) for publication_id, candidates in grouped.items()
         )
         if display is not None
     }

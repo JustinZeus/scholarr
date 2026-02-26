@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.domains.scholars import application as scholar_service
 from app.services.domains.scholar.parser import ParseState
 from app.services.domains.scholar.source import FetchResult
+from app.services.domains.scholars import application as scholar_service
 
 pytestmark = [pytest.mark.integration, pytest.mark.db]
 
@@ -51,8 +51,7 @@ def _blocked_author_search_fetch() -> FetchResult:
         requested_url="https://scholar.google.com/citations?hl=en&view_op=search_authors&mauthors=ada",
         status_code=200,
         final_url=(
-            "https://accounts.google.com/v3/signin/identifier"
-            "?continue=https%3A%2F%2Fscholar.google.com%2Fcitations"
+            "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fscholar.google.com%2Fcitations"
         ),
         body="<html><body>Sign in</body></html>",
         error=None,

@@ -15,9 +15,7 @@ async def _load_user_scholar_map(
     *,
     user_id: int,
 ) -> dict[str, ScholarProfile]:
-    result = await db_session.execute(
-        select(ScholarProfile).where(ScholarProfile.user_id == user_id)
-    )
+    result = await db_session.execute(select(ScholarProfile).where(ScholarProfile.user_id == user_id))
     profiles = list(result.scalars().all())
     return {profile.scholar_id: profile for profile in profiles}
 
@@ -70,9 +68,7 @@ async def _upsert_imported_scholars(
     for item in scholars:
         try:
             scholar_id = scholar_service.validate_scholar_id(str(item["scholar_id"]))
-            display_name = scholar_service.normalize_display_name(
-                str(item.get("display_name") or "")
-            )
+            display_name = scholar_service.normalize_display_name(str(item.get("display_name") or ""))
             override_url = scholar_service.normalize_profile_image_url(
                 _normalize_optional_text(item.get("profile_image_override_url"))
             )

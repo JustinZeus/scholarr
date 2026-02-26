@@ -1,6 +1,6 @@
-from collections.abc import AsyncIterator
 import logging
 import os
+from collections.abc import AsyncIterator
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -32,7 +32,9 @@ def _normalized_pool_mode(raw_mode: str) -> str:
     if mode in {"null", "queue"}:
         return mode
     structured_log(
-        logger, "warning", "db.invalid_pool_mode_fallback",
+        logger,
+        "warning",
+        "db.invalid_pool_mode_fallback",
         database_pool_mode=raw_mode,
         fallback_mode="queue",
     )
@@ -55,7 +57,9 @@ def get_engine() -> AsyncEngine:
 
         _engine = create_async_engine(settings.database_url, **engine_kwargs)
         structured_log(
-            logger, "info", "db.engine_initialized",
+            logger,
+            "info",
+            "db.engine_initialized",
             pool_mode=pool_mode,
         )
     return _engine

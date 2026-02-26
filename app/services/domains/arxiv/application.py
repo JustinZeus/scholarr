@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+
 from app.services.domains.arxiv.gateway import (
     build_arxiv_query,
     get_arxiv_gateway,
 )
-from app.services.domains.arxiv.errors import ArxivRateLimitError
 
 if TYPE_CHECKING:
     from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem

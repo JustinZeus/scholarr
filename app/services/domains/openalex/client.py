@@ -1,6 +1,4 @@
-import asyncio
 import logging
-from typing import Any, Mapping
 
 import httpx
 from tenacity import (
@@ -23,11 +21,13 @@ class OpenAlexClientError(Exception):
 
 class OpenAlexRateLimitError(OpenAlexClientError):
     """Transient rate limit (too many requests per second)."""
+
     pass
 
 
 class OpenAlexBudgetExhaustedError(OpenAlexClientError):
     """Daily API budget exhausted — retrying is futile until midnight UTC."""
+
     pass
 
 
@@ -64,7 +64,7 @@ class OpenAlexClient:
             return None
 
         url = f"{OPENALEX_BASE_URL}/works/{clean_doi}"
-        
+
         headers = {}
         if self.mailto:
             headers["User-Agent"] = f"scholar-scraper/1.0 (mailto:{self.mailto})"
@@ -79,9 +79,7 @@ class OpenAlexClient:
         if response.status_code == 429:
             remaining = response.headers.get("X-RateLimit-Remaining-USD", "")
             if remaining == "0" or remaining.startswith("-"):
-                raise OpenAlexBudgetExhaustedError(
-                    "Daily API budget exhausted; retrying won't help until midnight UTC"
-                )
+                raise OpenAlexBudgetExhaustedError("Daily API budget exhausted; retrying won't help until midnight UTC")
             raise OpenAlexRateLimitError("Rate limit exceeded fetching OpenAlex work by DOI")
         if response.status_code >= 400:
             logger.warning("OpenAlex API error: %s %s", response.status_code, response.text[:500])
@@ -110,13 +108,13 @@ class OpenAlexClient:
 
         # Example: {"doi": "10.foo|10.bar", "title.search": "query"}
         filter_str = ",".join(f"{k}:{v}" for k, v in filters.items())
-        
+
         params = self._base_params.copy()
         params["filter"] = filter_str
         params["per-page"] = str(limit)
 
         url = f"{OPENALEX_BASE_URL}/works"
-        
+
         headers = {}
         if self.mailto:
             headers["User-Agent"] = f"scholar-scraper/1.0 (mailto:{self.mailto})"
@@ -129,9 +127,7 @@ class OpenAlexClient:
         if response.status_code == 429:
             remaining = response.headers.get("X-RateLimit-Remaining-USD", "")
             if remaining == "0" or remaining.startswith("-"):
-                raise OpenAlexBudgetExhaustedError(
-                    "Daily API budget exhausted; retrying won't help until midnight UTC"
-                )
+                raise OpenAlexBudgetExhaustedError("Daily API budget exhausted; retrying won't help until midnight UTC")
             raise OpenAlexRateLimitError("Rate limit exceeded fetching OpenAlex works list")
         if response.status_code >= 400:
             logger.warning("OpenAlex API error (filters=%s): %s %s", filters, response.status_code, response.text[:500])
@@ -139,7 +135,7 @@ class OpenAlexClient:
 
         data = response.json()
         results = data.get("results") or []
-        
+
         parsed_works = []
         for raw_work in results:
             try:

@@ -3,8 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Any
 import unicodedata
+from typing import Any
 from urllib.parse import urljoin
 
 from app.services.domains.ingestion.constants import (
@@ -14,7 +14,7 @@ from app.services.domains.ingestion.constants import (
     TITLE_ALNUM_RE,
     WORD_RE,
 )
-from app.services.domains.scholar.parser import ParseState, ParsedProfilePage, PublicationCandidate
+from app.services.domains.scholar.parser import ParsedProfilePage, ParseState, PublicationCandidate
 
 # Scholar-specific noise patterns stripped before canonical comparison.
 # Applied in order; each targets a different Scholar metadata injection style.
@@ -381,4 +381,4 @@ def _build_body_excerpt(body: str, *, max_chars: int = 220) -> str | None:
         return None
     if len(flattened) <= max_chars:
         return flattened
-    return f"{flattened[:max_chars - 1]}..."
+    return f"{flattened[: max_chars - 1]}..."

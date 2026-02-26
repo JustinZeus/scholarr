@@ -104,6 +104,4 @@ def _validate_import_sizes(
     if len(scholars) > MAX_IMPORT_SCHOLARS:
         raise ImportExportError(f"Import exceeds max scholars ({MAX_IMPORT_SCHOLARS}).")
     if len(publications) > MAX_IMPORT_PUBLICATIONS:
-        raise ImportExportError(
-            f"Import exceeds max publications ({MAX_IMPORT_PUBLICATIONS})."
-        )
+        raise ImportExportError(f"Import exceeds max publications ({MAX_IMPORT_PUBLICATIONS}).")

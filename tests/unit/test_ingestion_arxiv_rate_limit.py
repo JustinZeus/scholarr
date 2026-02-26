@@ -31,6 +31,7 @@ async def test_discover_identifiers_for_enrichment_disables_arxiv_on_rate_limit(
         _raise_rate_limit,
     )
     monkeypatch.setattr(identifier_service, "sync_identifiers_for_publication_fields", _sync_fields)
+
     async def _publish_noop(*args, **kwargs) -> None:
         _ = (args, kwargs)
 

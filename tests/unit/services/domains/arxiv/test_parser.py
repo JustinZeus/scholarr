@@ -50,6 +50,8 @@ def test_parse_arxiv_feed_raises_on_invalid_xml() -> None:
 
 
 def test_parse_arxiv_feed_raises_on_invalid_opensearch_integer() -> None:
-    payload = _VALID_FEED_XML.replace("<opensearch:totalResults>2</opensearch:totalResults>", "<opensearch:totalResults>x</opensearch:totalResults>")
+    payload = _VALID_FEED_XML.replace(
+        "<opensearch:totalResults>2</opensearch:totalResults>", "<opensearch:totalResults>x</opensearch:totalResults>"
+    )
     with pytest.raises(ArxivParseError):
         parse_arxiv_feed(payload)

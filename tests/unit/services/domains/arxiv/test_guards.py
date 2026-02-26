@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.services.domains.arxiv.guards import arxiv_skip_reason_for_item
 from app.services.domains.publication_identifiers.types import DisplayIdentifier
@@ -25,7 +25,7 @@ def _item(
         pub_url=pub_url,
         pdf_url=pdf_url,
         is_read=False,
-        first_seen_at=datetime.now(timezone.utc),
+        first_seen_at=datetime.now(UTC),
         is_new_in_latest_run=True,
         display_identifier=display_identifier,
     )

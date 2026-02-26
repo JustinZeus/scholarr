@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import delete, exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import DataRepairJob, IngestionQueueItem, Publication, ScholarProfile, ScholarPublication
-
 
 REPAIR_STATUS_PLANNED = "planned"
 REPAIR_STATUS_RUNNING = "running"
@@ -18,7 +17,7 @@ SCOPE_MODE_ALL_USERS = "all_users"
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _normalize_scope_mode(scope_mode: str) -> str:
@@ -105,11 +104,7 @@ async def _count_orphan_publications(db_session: AsyncSession) -> int:
     stmt = (
         select(func.count())
         .select_from(Publication)
-        .where(
-            ~exists(
-                select(1).where(ScholarPublication.publication_id == Publication.id)
-            )
-        )
+        .where(~exists(select(1).where(ScholarPublication.publication_id == Publication.id)))
     )
     result = await db_session.execute(stmt)
     return int(result.scalar_one() or 0)
@@ -158,9 +153,7 @@ def _job_summary(
 
 async def _delete_links_for_targets(db_session: AsyncSession, *, target_scholar_profile_ids: list[int]) -> int:
     result = await db_session.execute(
-        delete(ScholarPublication).where(
-            ScholarPublication.scholar_profile_id.in_(target_scholar_profile_ids)
-        )
+        delete(ScholarPublication).where(ScholarPublication.scholar_profile_id.in_(target_scholar_profile_ids))
     )
     return int(result.rowcount or 0)
 
@@ -171,9 +164,7 @@ async def _delete_queue_for_targets(
     user_id: int | None,
     target_scholar_profile_ids: list[int],
 ) -> int:
-    stmt = delete(IngestionQueueItem).where(
-        IngestionQueueItem.scholar_profile_id.in_(target_scholar_profile_ids)
-    )
+    stmt = delete(IngestionQueueItem).where(IngestionQueueItem.scholar_profile_id.in_(target_scholar_profile_ids))
     if user_id is not None:
         stmt = stmt.where(IngestionQueueItem.user_id == user_id)
     result = await db_session.execute(stmt)
@@ -203,9 +194,7 @@ async def _reset_scholar_tracking_state(
 
 async def _delete_orphan_publications(db_session: AsyncSession) -> int:
     result = await db_session.execute(
-        delete(Publication).where(
-            ~exists(select(1).where(ScholarPublication.publication_id == Publication.id))
-        )
+        delete(Publication).where(~exists(select(1).where(ScholarPublication.publication_id == Publication.id)))
     )
     return int(result.rowcount or 0)
 

@@ -41,9 +41,7 @@ async def get_queue_item_for_user(
     queue_item_id: int,
 ) -> QueueListItem | None:
     result = await db_session.execute(
-        queue_item_select(user_id=user_id)
-        .where(IngestionQueueItem.id == queue_item_id)
-        .limit(1)
+        queue_item_select(user_id=user_id).where(IngestionQueueItem.id == queue_item_id).limit(1)
     )
     row = result.one_or_none()
     if row is None:

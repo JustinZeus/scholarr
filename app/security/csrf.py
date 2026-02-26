@@ -38,7 +38,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         session_token = request.session.get(CSRF_SESSION_KEY)
         if not session_token:
             structured_log(
-                logger, "warning", "csrf.missing_session_token",
+                logger,
+                "warning",
+                "csrf.missing_session_token",
                 method=request.method,
                 path=request.url.path,
             )
@@ -56,7 +58,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         if not request_token or not compare_digest(str(session_token), str(request_token)):
             structured_log(
-                logger, "warning", "csrf.invalid_token",
+                logger,
+                "warning",
+                "csrf.invalid_token",
                 method=request.method,
                 path=request.url.path,
             )

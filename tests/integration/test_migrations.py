@@ -29,9 +29,7 @@ EXPECTED_REVISION = "20260226_0024"
 @pytest.mark.migrations
 @pytest.mark.asyncio
 async def test_migration_creates_expected_tables(db_session: AsyncSession) -> None:
-    result = await db_session.execute(
-        text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
-    )
+    result = await db_session.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'"))
     table_names = {row[0] for row in result}
     assert EXPECTED_TABLES.issubset(table_names)
 

@@ -34,8 +34,7 @@ def _blocked_fetch(*, scholar_id: str, body: str) -> FetchResult:
         requested_url=f"https://scholar.google.com/citations?hl=en&user={scholar_id}",
         status_code=200,
         final_url=(
-            "https://accounts.google.com/v3/signin/identifier"
-            "?continue=https%3A%2F%2Fscholar.google.com%2Fcitations"
+            "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fscholar.google.com%2Fcitations"
         ),
         body=body,
         error=None,

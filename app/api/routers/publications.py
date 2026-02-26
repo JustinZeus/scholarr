@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Request
@@ -183,7 +183,7 @@ def _resolve_publications_snapshot(
     snapshot: str | None,
 ) -> tuple[datetime, str]:
     if snapshot is None:
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         return now_utc, now_utc.isoformat()
     try:
         parsed = datetime.fromisoformat(snapshot)
@@ -194,8 +194,8 @@ def _resolve_publications_snapshot(
             message="Invalid publications snapshot cursor.",
         ) from exc
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    normalized = parsed.astimezone(timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
+    normalized = parsed.astimezone(UTC)
     return normalized, normalized.isoformat()
 
 
@@ -420,7 +420,9 @@ async def mark_all_publications_read(
         db_session,
         user_id=current_user.id,
     )
-    structured_log(logger, "info", "api.publications.mark_all_read", user_id=current_user.id, updated_count=updated_count)
+    structured_log(
+        logger, "info", "api.publications.mark_all_read", user_id=current_user.id, updated_count=updated_count
+    )
     return success_payload(
         request,
         data={
@@ -440,18 +442,20 @@ async def mark_selected_publications_read(
     db_session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_api_current_user),
 ):
-    selection_pairs = sorted(
-        {
-            (int(item.scholar_profile_id), int(item.publication_id))
-            for item in payload.selections
-        }
-    )
+    selection_pairs = sorted({(int(item.scholar_profile_id), int(item.publication_id)) for item in payload.selections})
     updated_count = await publication_service.mark_selected_as_read_for_user(
         db_session,
         user_id=current_user.id,
         selections=selection_pairs,
     )
-    structured_log(logger, "info", "api.publications.mark_selected_read", user_id=current_user.id, requested_count=len(selection_pairs), updated_count=updated_count)
+    structured_log(
+        logger,
+        "info",
+        "api.publications.mark_selected_read",
+        user_id=current_user.id,
+        requested_count=len(selection_pairs),
+        updated_count=updated_count,
+    )
     return success_payload(
         request,
         data={
@@ -486,7 +490,9 @@ async def retry_publication_pdf(
         pdf_status=current.pdf_status,
     )
     structured_log(
-        logger, "info", "api.publications.retry_pdf",
+        logger,
+        "info",
+        "api.publications.retry_pdf",
         user_id=current_user.id,
         scholar_profile_id=payload.scholar_profile_id,
         publication_id=publication_id,
@@ -523,7 +529,15 @@ async def toggle_publication_favorite(
         publication_id=publication_id,
         is_favorite=payload.is_favorite,
     )
-    structured_log(logger, "info", "api.publications.favorite", user_id=current_user.id, scholar_profile_id=payload.scholar_profile_id, publication_id=publication_id, is_favorite=bool(payload.is_favorite))
+    structured_log(
+        logger,
+        "info",
+        "api.publications.favorite",
+        user_id=current_user.id,
+        scholar_profile_id=payload.scholar_profile_id,
+        publication_id=publication_id,
+        is_favorite=bool(payload.is_favorite),
+    )
     return success_payload(
         request,
         data={

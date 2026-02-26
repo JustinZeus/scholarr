@@ -3,40 +3,29 @@ from __future__ import annotations
 from app.services.domains.scholar.author_rows import (
     ScholarAuthorSearchParser,
     count_author_search_markers,
-    parse_scholar_id_from_href,
 )
 from app.services.domains.scholar.parser_constants import SCRIPT_STYLE_RE
 from app.services.domains.scholar.parser_types import (
-    ParseState,
     ParsedAuthorSearchPage,
     ParsedProfilePage,
     PublicationCandidate,
     ScholarDomInvariantError,
     ScholarMalformedDataError,
-    ScholarParserError,
-    ScholarSearchCandidate,
 )
 from app.services.domains.scholar.parser_utils import (
     strip_tags,
 )
 from app.services.domains.scholar.profile_rows import (
-    ScholarRowParser,
     count_markers,
     extract_articles_range,
     extract_profile_image_url,
     extract_profile_name,
-    extract_rows,
     has_operation_error_banner,
     has_show_more_button,
-    parse_citation_count,
-    parse_cluster_id_from_href,
     parse_publications,
-    parse_year,
 )
 from app.services.domains.scholar.source import FetchResult
 from app.services.domains.scholar.state_detection import (
-    classify_block_or_captcha_reason,
-    classify_network_error_reason,
     detect_author_search_state,
     detect_state,
 )

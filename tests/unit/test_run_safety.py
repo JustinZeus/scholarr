@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.db.models import UserSetting
 from app.services.domains.ingestion import safety as run_safety
@@ -8,7 +8,7 @@ from app.services.domains.ingestion import safety as run_safety
 
 def test_apply_run_safety_outcome_triggers_blocked_cooldown() -> None:
     settings = UserSetting(user_id=1, scrape_safety_state={})
-    now = datetime(2026, 2, 19, 20, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 2, 19, 20, 0, tzinfo=UTC)
 
     safety_state, reason = run_safety.apply_run_safety_outcome(
         settings,
@@ -32,7 +32,7 @@ def test_apply_run_safety_outcome_triggers_blocked_cooldown() -> None:
 
 
 def test_clear_expired_cooldown() -> None:
-    now = datetime(2026, 2, 19, 20, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 2, 19, 20, 0, tzinfo=UTC)
     settings = UserSetting(
         user_id=1,
         scrape_safety_state={"blocked_start_count": 3},
@@ -51,7 +51,7 @@ def test_clear_expired_cooldown() -> None:
 
 def test_apply_run_safety_outcome_triggers_network_cooldown() -> None:
     settings = UserSetting(user_id=1, scrape_safety_state={})
-    now = datetime(2026, 2, 19, 20, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 2, 19, 20, 0, tzinfo=UTC)
 
     safety_state, reason = run_safety.apply_run_safety_outcome(
         settings,
@@ -75,7 +75,7 @@ def test_apply_run_safety_outcome_triggers_network_cooldown() -> None:
 
 
 def test_register_cooldown_blocked_start_increments_counter() -> None:
-    now = datetime(2026, 2, 19, 20, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 2, 19, 20, 0, tzinfo=UTC)
     settings = UserSetting(
         user_id=1,
         scrape_safety_state={"blocked_start_count": 1},
@@ -91,7 +91,7 @@ def test_register_cooldown_blocked_start_increments_counter() -> None:
 
 
 def test_get_safety_event_context_contains_structured_fields() -> None:
-    now = datetime(2026, 2, 19, 20, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 2, 19, 20, 0, tzinfo=UTC)
     settings = UserSetting(
         user_id=1,
         scrape_safety_state={"cooldown_entry_count": 4},

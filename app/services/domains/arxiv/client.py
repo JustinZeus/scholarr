@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 import logging
+from collections.abc import Awaitable, Callable
 
 import httpx
 
@@ -103,9 +103,13 @@ class ArxivClient:
         if self._cache_enabled:
             cached = await get_cached_feed(query_fingerprint=query_fingerprint)
             if cached is not None:
-                structured_log(logger, "info", "arxiv.cache_hit", query_fingerprint=query_fingerprint, source_path=source_path)
+                structured_log(
+                    logger, "info", "arxiv.cache_hit", query_fingerprint=query_fingerprint, source_path=source_path
+                )
                 return cached
-            structured_log(logger, "info", "arxiv.cache_miss", query_fingerprint=query_fingerprint, source_path=source_path)
+            structured_log(
+                logger, "info", "arxiv.cache_miss", query_fingerprint=query_fingerprint, source_path=source_path
+            )
         return await run_with_inflight_dedupe(
             query_fingerprint=query_fingerprint,
             fetch_feed=lambda: self._fetch_live_feed(
@@ -216,13 +220,13 @@ async def _request_arxiv_feed(
     cooldown_status = await get_arxiv_cooldown_status()
     if cooldown_status.is_active:
         structured_log(
-            logger, "warning", "arxiv.request_skipped_cooldown",
+            logger,
+            "warning",
+            "arxiv.request_skipped_cooldown",
             source_path=source_path,
             cooldown_remaining_seconds=float(cooldown_status.remaining_seconds),
         )
-        raise ArxivRateLimitError(
-            f"arXiv global cooldown active ({cooldown_status.remaining_seconds:.0f}s remaining)"
-        )
+        raise ArxivRateLimitError(f"arXiv global cooldown active ({cooldown_status.remaining_seconds:.0f}s remaining)")
 
     async def _fetch() -> httpx.Response:
         timeout_value = _timeout_seconds(timeout_seconds)
@@ -272,5 +276,3 @@ def _source_path_from_params(params: dict[str, object]) -> str:
     if "id_list" in params:
         return ARXIV_SOURCE_PATH_LOOKUP_IDS
     return ARXIV_SOURCE_PATH_UNKNOWN
-
-

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select, text
@@ -168,7 +168,7 @@ async def collect_integrity_report(db_session: AsyncSession) -> dict[str, Any]:
 
     return {
         "status": _status_from_issues(failures=failures, warnings=warnings),
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(UTC).isoformat(),
         "failures": failures,
         "warnings": warnings,
         "checks": checks,

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 
 DEFAULT_SECURITY_PERMISSIONS_POLICY = (
     "accelerometer=(), autoplay=(), camera=(), display-capture=(), "
@@ -266,7 +266,7 @@ class Settings:
     crossref_timeout_seconds: float = _env_float("CROSSREF_TIMEOUT_SECONDS", 8.0)
     crossref_min_interval_seconds: float = _env_float("CROSSREF_MIN_INTERVAL_SECONDS", 0.6)
     crossref_max_lookups_per_request: int = _env_int("CROSSREF_MAX_LOOKUPS_PER_REQUEST", 8)
-    
+
     openalex_api_key: str | None = os.getenv("OPENALEX_API_KEY")
     crossref_api_token: str | None = os.getenv("CROSSREF_API_TOKEN")
     crossref_api_mailto: str | None = os.getenv("CROSSREF_API_MAILTO")

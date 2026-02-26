@@ -60,9 +60,7 @@ def parse_run_interval_minutes(value: str, *, minimum: int = HARD_MIN_RUN_INTERV
         raise UserSettingsServiceError("Check interval must be a whole number.") from exc
     effective_minimum = resolve_run_interval_minimum(minimum)
     if parsed < effective_minimum:
-        raise UserSettingsServiceError(
-            f"Check interval must be at least {effective_minimum} minutes."
-        )
+        raise UserSettingsServiceError(f"Check interval must be at least {effective_minimum} minutes.")
     return parsed
 
 
@@ -73,9 +71,7 @@ def parse_request_delay_seconds(value: str, *, minimum: int = HARD_MIN_REQUEST_D
         raise UserSettingsServiceError("Request delay must be a whole number.") from exc
     effective_minimum = resolve_request_delay_minimum(minimum)
     if parsed < effective_minimum:
-        raise UserSettingsServiceError(
-            f"Request delay must be at least {effective_minimum} seconds."
-        )
+        raise UserSettingsServiceError(f"Request delay must be at least {effective_minimum} seconds.")
     return parsed
 
 
@@ -102,23 +98,20 @@ def parse_nav_visible_pages(value: object) -> list[str]:
 
     missing_required = [page for page in REQUIRED_NAV_PAGES if page not in seen]
     if missing_required:
-        raise UserSettingsServiceError(
-            "Dashboard, Scholars, and Settings must remain visible."
-        )
+        raise UserSettingsServiceError("Dashboard, Scholars, and Settings must remain visible.")
 
     return deduped
 
 
 from app.settings import settings as app_settings
 
+
 async def get_or_create_settings(
     db_session: AsyncSession,
     *,
     user_id: int,
 ) -> UserSetting:
-    result = await db_session.execute(
-        select(UserSetting).where(UserSetting.user_id == user_id)
-    )
+    result = await db_session.execute(select(UserSetting).where(UserSetting.user_id == user_id))
     settings = result.scalar_one_or_none()
     if settings is not None:
         return settings

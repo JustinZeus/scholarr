@@ -17,11 +17,7 @@ def _normalized_selection_pairs(selections: list[tuple[int, int]]) -> set[tuple[
 
 
 def _scoped_scholar_ids_query(*, user_id: int):
-    return (
-        select(ScholarProfile.id)
-        .where(ScholarProfile.user_id == user_id)
-        .scalar_subquery()
-    )
+    return select(ScholarProfile.id).where(ScholarProfile.user_id == user_id).scalar_subquery()
 
 
 async def mark_all_unread_as_read_for_user(

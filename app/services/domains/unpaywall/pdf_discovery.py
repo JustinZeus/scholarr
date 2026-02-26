@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from html.parser import HTMLParser
 import re
+from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 from app.services.domains.unpaywall.rate_limit import wait_for_unpaywall_slot

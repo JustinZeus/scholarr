@@ -85,7 +85,9 @@ async def _clear_expired_cooldown_with_log(
     await db_session.commit()
     await db_session.refresh(user_settings)
     structured_log(
-        logger, "info", "api.settings.safety_cooldown_cleared",
+        logger,
+        "info",
+        "api.settings.safety_cooldown_cleared",
         user_id=user_id,
         reason=previous_safety_state.get("cooldown_reason"),
         cooldown_until=previous_safety_state.get("cooldown_until"),
@@ -164,7 +166,9 @@ async def update_settings(
         user_settings=updated,
     )
     structured_log(
-        logger, "info", "api.settings.updated",
+        logger,
+        "info",
+        "api.settings.updated",
         user_id=current_user.id,
         auto_run_enabled=updated.auto_run_enabled,
         run_interval_minutes=updated.run_interval_minutes,

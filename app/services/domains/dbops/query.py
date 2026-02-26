@@ -16,7 +16,5 @@ async def list_repair_jobs(
     limit: int = 50,
 ) -> list[DataRepairJob]:
     bounded = _bounded_limit(limit)
-    result = await db_session.execute(
-        select(DataRepairJob).order_by(DataRepairJob.created_at.desc()).limit(bounded)
-    )
+    result = await db_session.execute(select(DataRepairJob).order_by(DataRepairJob.created_at.desc()).limit(bounded))
     return list(result.scalars())

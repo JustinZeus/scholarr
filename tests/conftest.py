@@ -6,12 +6,12 @@ import re
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
-from alembic import command
 from alembic.config import Config
-from sqlalchemy.engine import make_url
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from alembic import command
 from app.auth.deps import get_login_rate_limiter
 from app.db.session import close_engine
 from app.settings import settings
@@ -52,9 +52,7 @@ def _resolve_test_database_url() -> str | None:
     parsed = make_url(base)
     if not parsed.database:
         return None
-    derived_database = (
-        parsed.database if parsed.database.endswith("_test") else f"{parsed.database}_test"
-    )
+    derived_database = parsed.database if parsed.database.endswith("_test") else f"{parsed.database}_test"
     return parsed.set(database=derived_database).render_as_string(hide_password=False)
 
 
@@ -85,9 +83,7 @@ def ensure_test_database_exists(database_url: str) -> Iterator[None]:
     if not database_name:
         raise RuntimeError("TEST_DATABASE_URL must include a database name.")
     if not DB_NAME_SAFE_RE.fullmatch(database_name):
-        raise RuntimeError(
-            "TEST_DATABASE_URL database name must match [A-Za-z0-9_]+ for safe auto-provisioning."
-        )
+        raise RuntimeError("TEST_DATABASE_URL database name must match [A-Za-z0-9_]+ for safe auto-provisioning.")
 
     admin_name = "postgres" if database_name != "postgres" else "template1"
     admin_url = parsed.set(database=admin_name)

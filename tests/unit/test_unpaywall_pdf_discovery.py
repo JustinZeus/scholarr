@@ -61,7 +61,7 @@ class _FakeClient:
     def __init__(self, pages: dict[str, _FakeResponse]) -> None:
         self._pages = pages
 
-    async def get(self, url: str, follow_redirects: bool = True):  # noqa: ARG002
+    async def get(self, url: str, follow_redirects: bool = True):
         return self._pages[url]
 
 
@@ -69,7 +69,7 @@ class _FakeClient:
 async def test_resolve_pdf_from_landing_page_follows_one_hop_html_candidate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _skip_wait(*args, **kwargs):  # noqa: ARG001, ANN002
+    async def _skip_wait(*args, **kwargs):
         return None
 
     monkeypatch.setattr(pdf_discovery, "wait_for_unpaywall_slot", _skip_wait)
@@ -81,7 +81,7 @@ async def test_resolve_pdf_from_landing_page_follows_one_hop_html_candidate(
             landing_url: _FakeResponse(
                 status_code=200,
                 content_type="text/html",
-                text=f"<html><body><a href=\"{hop_url}\">View article</a></body></html>",
+                text=f'<html><body><a href="{hop_url}">View article</a></body></html>',
             ),
             hop_url: _FakeResponse(
                 status_code=200,

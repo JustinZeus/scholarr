@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.db.models import ScholarProfile
-from app.services.domains.scholar.parser import ParseState, ParsedAuthorSearchPage
+from app.services.domains.scholar.parser import ParsedAuthorSearchPage, ParseState
 from app.services.domains.scholars.constants import (
     MAX_AUTHOR_SEARCH_LIMIT,
     STATE_REASON_HINTS,

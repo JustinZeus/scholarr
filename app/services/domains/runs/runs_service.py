@@ -35,9 +35,7 @@ async def list_runs_for_user(
         .limit(limit)
     )
     if failed_only:
-        stmt = stmt.where(
-            CrawlRun.status.in_([RunStatus.FAILED, RunStatus.PARTIAL_FAILURE])
-        )
+        stmt = stmt.where(CrawlRun.status.in_([RunStatus.FAILED, RunStatus.PARTIAL_FAILURE]))
     result = await db_session.execute(stmt)
     return list(result.scalars().all())
 

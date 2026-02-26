@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
 
 from app.services.domains.arxiv.errors import ArxivRateLimitError
-from app.services.domains.publications import pdf_resolution_pipeline as pipeline
 from app.services.domains.publication_identifiers.types import DisplayIdentifier
+from app.services.domains.publications import pdf_resolution_pipeline as pipeline
 from app.services.domains.unpaywall.application import OaResolutionOutcome
 
 
@@ -25,7 +25,7 @@ def _row(*, display_identifier: DisplayIdentifier | None = None) -> SimpleNamesp
         pdf_url=None,
         is_read=False,
         is_favorite=False,
-        first_seen_at=datetime(2026, 2, 22, 12, 0, tzinfo=timezone.utc),
+        first_seen_at=datetime(2026, 2, 22, 12, 0, tzinfo=UTC),
         is_new_in_latest_run=True,
     )
 
@@ -61,7 +61,7 @@ async def test_pipeline_prefers_openalex_before_arxiv(monkeypatch: pytest.Monkey
 
     async def _fail_arxiv(row, *, request_email: str | None = None, allow_lookup: bool = True):
         _ = (row, request_email, allow_lookup)
-        raise AssertionError(f"arXiv should not run when OpenAlex candidate exists.")
+        raise AssertionError("arXiv should not run when OpenAlex candidate exists.")
 
     monkeypatch.setattr(pipeline, "_openalex_outcome", _fake_openalex)
     monkeypatch.setattr(pipeline, "_arxiv_outcome", _fail_arxiv)

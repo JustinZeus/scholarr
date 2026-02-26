@@ -110,12 +110,14 @@ async def test_merge_duplicate_publication_migrates_links_and_identifiers() -> N
 async def test_merge_duplicate_publication_rejects_missing_publications() -> None:
     session = AsyncMock()
 
-    with patch(
-        "app.services.domains.publications.dedup._load_publication",
-        new=AsyncMock(side_effect=[None, None]),
+    with (
+        patch(
+            "app.services.domains.publications.dedup._load_publication",
+            new=AsyncMock(side_effect=[None, None]),
+        ),
+        pytest.raises(ValueError),
     ):
-        with pytest.raises(ValueError):
-            await merge_duplicate_publication(session, winner_id=1, dup_id=2)
+        await merge_duplicate_publication(session, winner_id=1, dup_id=2)
 
 
 @pytest.mark.asyncio

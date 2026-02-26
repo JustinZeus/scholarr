@@ -16,4 +16,3 @@ class PasswordService:
             return bool(self._hasher.verify(password_hash, password))
         except (InvalidHashError, VerificationError):
             return False
-
