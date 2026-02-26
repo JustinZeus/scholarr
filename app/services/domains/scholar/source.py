@@ -9,6 +9,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from app.services.domains.scholar import rate_limit as scholar_rate_limit
+from app.settings import settings
+
 SCHOLAR_PROFILE_URL = "https://scholar.google.com/citations"
 DEFAULT_PAGE_SIZE = 100
 
@@ -66,9 +69,16 @@ class LiveScholarSource:
         self,
         *,
         timeout_seconds: float = 25.0,
+        min_interval_seconds: float | None = None,
         user_agents: list[str] | None = None,
     ) -> None:
         self._timeout_seconds = timeout_seconds
+        configured_interval = (
+            float(settings.ingestion_min_request_delay_seconds)
+            if min_interval_seconds is None
+            else float(min_interval_seconds)
+        )
+        self._min_interval_seconds = max(configured_interval, 0.0)
         self._user_agents = user_agents or DEFAULT_USER_AGENTS
 
     async def fetch_profile_html(self, scholar_id: str) -> FetchResult:
@@ -100,7 +110,7 @@ class LiveScholarSource:
                 "pagesize": pagesize,
             },
         )
-        return await asyncio.to_thread(self._fetch_sync, requested_url)
+        return await self._fetch_with_global_throttle(requested_url)
 
     async def fetch_author_search_html(
         self,
@@ -121,7 +131,7 @@ class LiveScholarSource:
                 "start": start,
             },
         )
-        return await asyncio.to_thread(self._fetch_sync, requested_url)
+        return await self._fetch_with_global_throttle(requested_url)
 
     async def fetch_publication_html(self, publication_url: str) -> FetchResult:
         logger.debug(
@@ -131,7 +141,13 @@ class LiveScholarSource:
                 "requested_url": publication_url,
             },
         )
-        return await asyncio.to_thread(self._fetch_sync, publication_url)
+        return await self._fetch_with_global_throttle(publication_url)
+
+    async def _fetch_with_global_throttle(self, requested_url: str) -> FetchResult:
+        await scholar_rate_limit.wait_for_scholar_slot(
+            min_interval_seconds=self._min_interval_seconds,
+        )
+        return await asyncio.to_thread(self._fetch_sync, requested_url)
 
     def _build_request(self, requested_url: str) -> Request:
         return Request(

@@ -540,6 +540,44 @@ class AuthorSearchRuntimeState(Base):
     )
 
 
+class ArxivRuntimeState(Base):
+    __tablename__ = "arxiv_runtime_state"
+
+    state_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    next_allowed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ArxivQueryCacheEntry(Base):
+    __tablename__ = "arxiv_query_cache_entries"
+    __table_args__ = (
+        Index("ix_arxiv_query_cache_expires_at", "expires_at"),
+        Index("ix_arxiv_query_cache_cached_at", "cached_at"),
+    )
+
+    query_fingerprint: Mapped[str] = mapped_column(String(64), primary_key=True)
+    payload: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class AuthorSearchCacheEntry(Base):
     __tablename__ = "author_search_cache_entries"
     __table_args__ = (

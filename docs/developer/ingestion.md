@@ -24,3 +24,15 @@ Once a publication is built, the `gather_identifiers_for_publication` module iso
   - `crossref.restful` APIs (Queries by Title and Author strings).
 
 These identifiers are accumulated in `publication_identifiers` instead of being bound as hard-coded properties, maximizing matching resilience in the automated Unpaywall PDF acquisition stage.
+
+## arXiv Request Controls
+- **Global throttle state**: arXiv calls share `arxiv_runtime_state` so all workers respect one cooldown/interval clock.
+- **Query cache**: identical request parameters map to a stable fingerprint and are stored in `arxiv_query_cache_entries`.
+- **In-flight coalescing**: duplicate concurrent misses join one outbound request instead of fan-out.
+- **Caller load-shedding**: arXiv lookups are skipped when high-confidence DOI/arXiv evidence already exists, or when title quality is below threshold.
+
+## arXiv Observability Events
+- `arxiv.request_scheduled`: emitted before a gated request; includes `wait_seconds`, `cooldown_remaining_seconds`, `source_path`.
+- `arxiv.request_completed`: emitted after response; includes `status_code`, `wait_seconds`, `cooldown_remaining_seconds`, `source_path`.
+- `arxiv.cooldown_activated`: emitted when status `429` triggers cooldown.
+- `arxiv.cache_hit` / `arxiv.cache_miss`: emitted on query cache lookup with `source_path`.

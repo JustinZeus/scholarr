@@ -7,6 +7,7 @@ from app.services.domains.doi.normalize import normalize_doi
 from app.services.domains.publication_identifiers.types import IdentifierKind
 
 ARXIV_ABS_RE = re.compile(r"\barxiv:\s*([a-z-]+/\d{7}|\d{4}\.\d{4,5})(v\d+)?\b", re.I)
+ARXIV_RAW_RE = re.compile(r"^([a-z-]+/\d{7}|\d{4}\.\d{4,5})(v\d+)?$", re.I)
 ARXIV_PATH_RE = re.compile(r"^/(?:abs|pdf|html|ps|format)/([a-z-]+/\d{7}|\d{4}\.\d{4,5})(v\d+)?(?:\.pdf)?/?$", re.I)
 PMCID_RE = re.compile(r"\b(PMC\d+)\b", re.I)
 PUBMED_PATH_RE = re.compile(r"^/(\d+)/?$")
@@ -31,6 +32,10 @@ def normalize_arxiv_id(value: str | None) -> str | None:
     parsed = urlparse(text)
     if parsed.scheme in {"http", "https"} and "arxiv.org" in parsed.netloc.lower():
         return _arxiv_from_path(parsed.path)
+    raw_match = ARXIV_RAW_RE.match(text)
+    if raw_match:
+        version = (raw_match.group(2) or "").lower()
+        return f"{raw_match.group(1).lower()}{version}"
     match = ARXIV_ABS_RE.search(text)
     if not match:
         return None

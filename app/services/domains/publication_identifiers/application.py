@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication, PublicationIdentifier
+from app.services.domains.arxiv.guards import arxiv_skip_reason_for_item
 from app.services.domains.doi.normalize import normalize_doi
 from app.services.domains.publication_identifiers.normalize import (
     normalize_arxiv_id,
@@ -124,19 +125,45 @@ async def discover_and_sync_identifiers_for_publication(
     scholar_label: str,
 ) -> None:
     await sync_identifiers_for_publication_fields(db_session, publication=publication)
-    
-    existing_doi = await _existing_identifier_by_kind(
+
+    publication_id = int(publication.id)
+    if await _has_confident_identifier(
         db_session,
-        publication_id=int(publication.id),
+        publication_id=publication_id,
         kind=IdentifierKind.DOI.value,
-    )
-    if existing_doi is not None:
+        confidence_floor=0.0,
+    ):
         return
 
-    from app.services.domains.crossref import application as crossref_service
+    item = _identifier_lookup_item(publication=publication, scholar_label=scholar_label)
+    has_strong_doi = await _discover_crossref_doi(
+        db_session,
+        publication_id=publication_id,
+        item=item,
+    )
+    existing_arxiv = await _existing_identifier_by_kind(
+        db_session,
+        publication_id=publication_id,
+        kind=IdentifierKind.ARXIV.value,
+    )
+    skip_reason = arxiv_skip_reason_for_item(
+        item=item,
+        has_strong_doi=has_strong_doi,
+        has_existing_arxiv=existing_arxiv is not None,
+    )
+    if skip_reason is not None:
+        return
+    await _discover_arxiv_identifier(db_session, publication_id=publication_id, item=item)
+
+
+def _identifier_lookup_item(
+    *,
+    publication: Publication,
+    scholar_label: str,
+) -> UnreadPublicationItem:
     from app.services.domains.publications.types import UnreadPublicationItem
-    
-    item = UnreadPublicationItem(
+
+    return UnreadPublicationItem(
         publication_id=int(publication.id),
         scholar_profile_id=0,
         scholar_label=scholar_label,
@@ -147,41 +174,78 @@ async def discover_and_sync_identifiers_for_publication(
         pub_url=publication.pub_url,
         pdf_url=publication.pdf_url,
     )
-    
-    discovered_doi = await crossref_service.discover_doi_for_publication(item=item)
-    if discovered_doi:
-        normalized_doi = normalize_doi(discovered_doi)
-        if normalized_doi:
-            candidate = _candidate(
-                IdentifierKind.DOI,
-                discovered_doi,
-                normalized_doi,
-                "crossref_api",
-                CONFIDENCE_MEDIUM,
-                None,
-            )
-            await _upsert_publication_candidate(db_session, publication_id=int(publication.id), candidate=candidate)
 
-    existing_arxiv = await _existing_identifier_by_kind(
-        db_session,
-        publication_id=int(publication.id),
-        kind=IdentifierKind.ARXIV.value,
+
+async def _discover_crossref_doi(
+    db_session: AsyncSession,
+    *,
+    publication_id: int,
+    item: UnreadPublicationItem,
+) -> bool:
+    from app.services.domains.crossref import application as crossref_service
+
+    discovered_doi = await crossref_service.discover_doi_for_publication(item=item)
+    normalized_doi = normalize_doi(discovered_doi)
+    if normalized_doi is None:
+        return False
+    candidate = _candidate(
+        IdentifierKind.DOI,
+        discovered_doi,
+        normalized_doi,
+        "crossref_api",
+        CONFIDENCE_MEDIUM,
+        None,
     )
-    if existing_arxiv is None:
-        from app.services.domains.arxiv import application as arxiv_service
-        discovered_arxiv = await arxiv_service.discover_arxiv_id_for_publication(item=item)
-        if discovered_arxiv:
-            normalized_arxiv = normalize_arxiv_id(discovered_arxiv)
-            if normalized_arxiv:
-                candidate = _candidate(
-                    IdentifierKind.ARXIV,
-                    discovered_arxiv,
-                    normalized_arxiv,
-                    "arxiv_api",
-                    CONFIDENCE_MEDIUM,
-                    None,
-                )
-                await _upsert_publication_candidate(db_session, publication_id=int(publication.id), candidate=candidate)
+    await _upsert_publication_candidate(
+        db_session,
+        publication_id=publication_id,
+        candidate=candidate,
+    )
+    return candidate.confidence_score >= CONFIDENCE_MEDIUM
+
+
+async def _discover_arxiv_identifier(
+    db_session: AsyncSession,
+    *,
+    publication_id: int,
+    item: UnreadPublicationItem,
+) -> None:
+    from app.services.domains.arxiv import application as arxiv_service
+
+    discovered_arxiv = await arxiv_service.discover_arxiv_id_for_publication(item=item)
+    normalized_arxiv = normalize_arxiv_id(discovered_arxiv)
+    if normalized_arxiv is None:
+        return
+    candidate = _candidate(
+        IdentifierKind.ARXIV,
+        discovered_arxiv,
+        normalized_arxiv,
+        "arxiv_api",
+        CONFIDENCE_MEDIUM,
+        None,
+    )
+    await _upsert_publication_candidate(
+        db_session,
+        publication_id=publication_id,
+        candidate=candidate,
+    )
+
+
+async def _has_confident_identifier(
+    db_session: AsyncSession,
+    *,
+    publication_id: int,
+    kind: str,
+    confidence_floor: float,
+) -> bool:
+    existing = await _existing_identifier_by_kind(
+        db_session,
+        publication_id=publication_id,
+        kind=kind,
+    )
+    if existing is None:
+        return False
+    return float(existing.confidence_score) >= float(confidence_floor)
 
 
 def _publication_field_candidates(publication: Publication) -> list[IdentifierCandidate]:
@@ -337,6 +401,28 @@ def _overlay_queue_item(
 ) -> PdfQueueListItem:
     fallback = display_identifier or derive_display_identifier_from_values(doi=None, pdf_url=item.pdf_url)
     return replace(item, display_identifier=fallback)
+
+
+async def display_identifier_for_publication_id(
+    db_session: AsyncSession,
+    *,
+    publication_id: int,
+) -> DisplayIdentifier | None:
+    normalized_id = int(publication_id)
+    if normalized_id <= 0:
+        raise ValueError("publication_id must be positive.")
+    mapping = await _display_identifier_map(db_session, publication_ids=[normalized_id])
+    display = mapping.get(normalized_id)
+    if display is not None:
+        return display
+    publication = await db_session.get(Publication, normalized_id)
+    if publication is None:
+        return None
+    return derive_display_identifier_from_values(
+        doi=None,
+        pub_url=publication.pub_url,
+        pdf_url=publication.pdf_url,
+    )
 
 
 async def _display_identifier_map(

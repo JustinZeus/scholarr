@@ -23,7 +23,9 @@ from app.api.schemas import (
 )
 from app.db.models import User
 from app.db.session import get_db_session
+from app.services.domains.ingestion import queue as ingestion_queue_service
 from app.services.domains.portability import application as import_export_service
+from app.services.domains.scholar import rate_limit as scholar_rate_limit
 from app.services.domains.scholars import application as scholar_service
 from app.services.domains.scholar.source import ScholarSource
 from app.settings import settings
@@ -31,6 +33,73 @@ from app.settings import settings
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/scholars", tags=["api-scholars"])
+CREATE_METADATA_HYDRATION_TIMEOUT_SECONDS = 5.0
+INITIAL_SCHOLAR_SCRAPE_QUEUE_DELAY_SECONDS = 0
+INITIAL_SCHOLAR_SCRAPE_QUEUE_REASON = "scholar_added_initial_scrape"
+
+
+def _needs_metadata_hydration(profile) -> bool:
+    if not profile.profile_image_url:
+        return True
+    return not (profile.display_name or "").strip()
+
+
+def _is_create_hydration_rate_limited() -> tuple[bool, float]:
+    remaining_seconds = scholar_rate_limit.remaining_scholar_slot_seconds(
+        min_interval_seconds=float(settings.ingestion_min_request_delay_seconds),
+    )
+    return remaining_seconds > 0, remaining_seconds
+
+
+def _auto_enqueue_new_scholar_enabled() -> bool:
+    if not settings.scheduler_enabled:
+        return False
+    if not settings.ingestion_automation_allowed:
+        return False
+    return bool(settings.ingestion_continuation_queue_enabled)
+
+
+async def _enqueue_initial_scrape_job_for_scholar(
+    db_session: AsyncSession,
+    *,
+    profile,
+    user_id: int,
+) -> bool:
+    if not _auto_enqueue_new_scholar_enabled():
+        return False
+    try:
+        await ingestion_queue_service.upsert_job(
+            db_session,
+            user_id=user_id,
+            scholar_profile_id=int(profile.id),
+            resume_cstart=0,
+            reason=INITIAL_SCHOLAR_SCRAPE_QUEUE_REASON,
+            run_id=None,
+            delay_seconds=INITIAL_SCHOLAR_SCRAPE_QUEUE_DELAY_SECONDS,
+        )
+        await db_session.commit()
+    except Exception:
+        await db_session.rollback()
+        logger.warning(
+            "api.scholars.initial_scrape_enqueue_failed",
+            extra={
+                "event": "api.scholars.initial_scrape_enqueue_failed",
+                "user_id": user_id,
+                "scholar_profile_id": profile.id,
+            },
+        )
+        return False
+
+    logger.info(
+        "api.scholars.initial_scrape_enqueued",
+        extra={
+            "event": "api.scholars.initial_scrape_enqueued",
+            "user_id": user_id,
+            "scholar_profile_id": profile.id,
+            "reason": INITIAL_SCHOLAR_SCRAPE_QUEUE_REASON,
+        },
+    )
+    return True
 
 
 def _uploaded_image_media_path(scholar_profile_id: int) -> str:
@@ -69,16 +138,42 @@ async def _hydrate_scholar_metadata_if_needed(
     source: ScholarSource,
     user_id: int,
 ):
+    if not _needs_metadata_hydration(profile):
+        return profile
+
+    should_skip, remaining_seconds = _is_create_hydration_rate_limited()
+    if should_skip:
+        logger.info(
+            "api.scholars.create_metadata_hydration_skipped",
+            extra={
+                "event": "api.scholars.create_metadata_hydration_skipped",
+                "reason": "scholar_request_throttle_active",
+                "user_id": user_id,
+                "scholar_profile_id": profile.id,
+                "retry_after_seconds": round(remaining_seconds, 3),
+            },
+        )
+        return profile
+
     try:
-        if not profile.profile_image_url or not (profile.display_name or "").strip():
-            return await asyncio.wait_for(
-                scholar_service.hydrate_profile_metadata(
-                    db_session,
-                    profile=profile,
-                    source=source,
-                ),
-                timeout=5.0,
-            )
+        return await asyncio.wait_for(
+            scholar_service.hydrate_profile_metadata(
+                db_session,
+                profile=profile,
+                source=source,
+            ),
+            timeout=CREATE_METADATA_HYDRATION_TIMEOUT_SECONDS,
+        )
+    except TimeoutError:
+        logger.info(
+            "api.scholars.create_metadata_hydration_skipped",
+            extra={
+                "event": "api.scholars.create_metadata_hydration_skipped",
+                "reason": "create_timeout",
+                "user_id": user_id,
+                "scholar_profile_id": profile.id,
+            },
+        )
     except Exception:
         logger.warning(
             "api.scholars.create_metadata_hydration_failed",
@@ -280,12 +375,18 @@ async def create_scholar(
             "scholar_profile_id": created.id,
         },
     )
-    created = await _hydrate_scholar_metadata_if_needed(
+    did_queue_initial_scrape = await _enqueue_initial_scrape_job_for_scholar(
         db_session,
         profile=created,
-        source=source,
         user_id=current_user.id,
     )
+    if not did_queue_initial_scrape:
+        created = await _hydrate_scholar_metadata_if_needed(
+            db_session,
+            profile=created,
+            source=source,
+            user_id=current_user.id,
+        )
 
     return success_payload(
         request,
@@ -554,4 +655,3 @@ async def clear_scholar_image_customization(
         request,
         data=_serialize_scholar(updated),
     )
-

@@ -1,6 +1,13 @@
 import { apiRequest } from "@/lib/api/client";
 
 export type PublicationMode = "all" | "unread" | "latest";
+export type PublicationSortBy =
+  | "first_seen"
+  | "title"
+  | "year"
+  | "citations"
+  | "scholar"
+  | "pdf_status";
 
 export interface DisplayIdentifier {
   kind: string;
@@ -54,7 +61,7 @@ export interface PublicationsQuery {
   favoriteOnly?: boolean;
   scholarProfileId?: number;
   search?: string;
-  sortBy?: string;
+  sortBy?: PublicationSortBy;
   sortDir?: "asc" | "desc";
   page?: number;
   pageSize?: number;

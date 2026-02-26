@@ -14,6 +14,8 @@ from app.api.schemas import (
     AdminPdfQueueRequeueEnvelope,
     AdminPdfQueueEnvelope,
     AdminDbRepairJobsEnvelope,
+    AdminRepairPublicationNearDuplicatesEnvelope,
+    AdminRepairPublicationNearDuplicatesRequest,
     AdminRepairPublicationLinksEnvelope,
     AdminRepairPublicationLinksRequest,
 )
@@ -22,6 +24,7 @@ from app.db.session import get_db_session
 from app.services.domains.dbops import (
     collect_integrity_report,
     list_repair_jobs,
+    run_publication_near_duplicate_repair,
     run_publication_link_repair,
 )
 from app.services.domains.publications import application as publication_service
@@ -48,7 +51,7 @@ def _serialize_repair_job(job: DataRepairJob) -> dict[str, object]:
     }
 
 
-def _requested_by_value(*, payload: AdminRepairPublicationLinksRequest, admin_user: User) -> str:
+def _requested_by_value(*, payload, admin_user: User) -> str:
     from_payload = (payload.requested_by or "").strip()
     return from_payload or admin_user.email
 
@@ -342,6 +345,47 @@ async def trigger_publication_link_repair(
             "target_user_id": int(payload.user_id) if payload.user_id is not None else None,
             "dry_run": bool(payload.dry_run),
             "gc_orphan_publications": bool(payload.gc_orphan_publications),
+            "job_id": int(result["job_id"]),
+            "status": result["status"],
+        },
+    )
+    return success_payload(request, data=result)
+
+
+@router.post(
+    "/repairs/publication-near-duplicates",
+    response_model=AdminRepairPublicationNearDuplicatesEnvelope,
+)
+async def trigger_publication_near_duplicate_repair(
+    payload: AdminRepairPublicationNearDuplicatesRequest,
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    admin_user: User = Depends(get_api_admin_user),
+):
+    try:
+        result = await run_publication_near_duplicate_repair(
+            db_session,
+            dry_run=bool(payload.dry_run),
+            similarity_threshold=float(payload.similarity_threshold),
+            min_shared_tokens=int(payload.min_shared_tokens),
+            max_year_delta=int(payload.max_year_delta),
+            max_clusters=int(payload.max_clusters),
+            selected_cluster_keys=list(payload.selected_cluster_keys),
+            requested_by=_requested_by_value(payload=payload, admin_user=admin_user),
+        )
+    except ValueError as exc:
+        raise ApiException(
+            status_code=400,
+            code="invalid_near_duplicate_repair_request",
+            message=str(exc),
+        ) from exc
+    logger.info(
+        "api.admin.db.publication_near_duplicate_repair_triggered",
+        extra={
+            "event": "api.admin.db.publication_near_duplicate_repair_triggered",
+            "admin_user_id": int(admin_user.id),
+            "dry_run": bool(payload.dry_run),
+            "selected_cluster_count": len(payload.selected_cluster_keys),
             "job_id": int(result["job_id"]),
             "status": result["status"],
         },

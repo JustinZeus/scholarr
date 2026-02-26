@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import AppPage from "@/components/layout/AppPage.vue";
@@ -33,7 +33,8 @@ type PublicationSortKey =
   | "scholar"
   | "year"
   | "citations"
-  | "first_seen";
+  | "first_seen"
+  | "pdf_status";
 
 type BulkAction =
   | "mark_selected_read"
@@ -70,6 +71,8 @@ const router = useRouter();
 const textCollator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
 const runStatus = useRunStatusStore();
 const userSettings = useUserSettingsStore();
+const PUBLICATIONS_RUN_STATUS_SYNC_INTERVAL_MS = 5000;
+let runStatusSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 function normalizeScholarFilterQuery(value: unknown): string {
   if (Array.isArray(value)) {
@@ -179,6 +182,26 @@ function publicationIdentifierLabel(item: PublicationItem): string | null {
   return item.display_identifier?.label ?? null;
 }
 
+function startRunStatusSyncLoop(): void {
+  if (runStatusSyncTimer !== null) {
+    return;
+  }
+  runStatusSyncTimer = setInterval(() => {
+    if (runStatus.isRunActive) {
+      return;
+    }
+    void runStatus.syncLatest();
+  }, PUBLICATIONS_RUN_STATUS_SYNC_INTERVAL_MS);
+}
+
+function stopRunStatusSyncLoop(): void {
+  if (runStatusSyncTimer === null) {
+    return;
+  }
+  clearInterval(runStatusSyncTimer);
+  runStatusSyncTimer = null;
+}
+
 const selectedScholarName = computed(() => {
   const selectedId = Number(selectedScholarFilter.value);
   if (!Number.isInteger(selectedId) || selectedId <= 0) {
@@ -203,11 +226,12 @@ const filteredPublications = computed(() => {
 
   const base = listState.value?.publications ?? [];
   const merged = [...stream, ...base];
-  const seenIds = new Set();
+  const seenKeys = new Set<string>();
   const deduped: typeof base = [];
   for (const item of merged) {
-    if (!seenIds.has(item.publication_id)) {
-      seenIds.add(item.publication_id);
+    const key = publicationKey(item);
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
       deduped.push(item);
     }
   }
@@ -234,14 +258,41 @@ function publicationSortValue(item: PublicationItem, key: PublicationSortKey): n
   if (key === "citations") {
     return item.citation_count;
   }
+  if (key === "pdf_status") {
+    if (item.pdf_url || item.pdf_status === "resolved") {
+      return 4;
+    }
+    if (item.pdf_status === "running") {
+      return 3;
+    }
+    if (item.pdf_status === "queued") {
+      return 2;
+    }
+    if (item.pdf_status === "failed") {
+      return 0;
+    }
+    return 1;
+  }
   const timestamp = Date.parse(item.first_seen_at);
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
 const sortedPublications = computed(() => {
-  // Server already returns data in the correct sort order.
-  // We just pass through the filtered/merged list without client-side re-sorting.
-  return filteredPublications.value;
+  const direction = sortDirection.value === "asc" ? 1 : -1;
+  return [...filteredPublications.value].sort((left, right) => {
+    const leftValue = publicationSortValue(left, sortKey.value);
+    const rightValue = publicationSortValue(right, sortKey.value);
+    let comparison = 0;
+    if (typeof leftValue === "string" && typeof rightValue === "string") {
+      comparison = textCollator.compare(leftValue, rightValue);
+    } else {
+      comparison = Number(leftValue) - Number(rightValue);
+    }
+    if (comparison !== 0) {
+      return comparison * direction;
+    }
+    return right.publication_id - left.publication_id;
+  });
 });
 
 const visibleUnreadKeys = computed(() => {
@@ -271,6 +322,7 @@ const totalPages = computed(() => {
 });
 
 const selectedCount = computed(() => selectedPublicationKeys.value.size);
+const totalCount = computed(() => listState.value?.total_count ?? 0);
 const visibleCount = computed(() => sortedPublications.value.length);
 const visibleUnreadCount = computed(() => visibleUnreadKeys.value.size);
 const visibleFavoriteCount = computed(
@@ -432,7 +484,7 @@ async function toggleSort(nextKey: PublicationSortKey): Promise<void> {
     sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
   } else {
     sortKey.value = nextKey;
-    sortDirection.value = nextKey === "first_seen" ? "desc" : "asc";
+    sortDirection.value = nextKey === "first_seen" || nextKey === "pdf_status" ? "desc" : "asc";
   }
   currentPage.value = 1;
   publicationSnapshot.value = null;
@@ -800,8 +852,31 @@ watch(searchQuery, () => {
 
 onMounted(() => {
   syncFiltersFromRoute();
+  startRunStatusSyncLoop();
   void Promise.all([loadScholarFilters(), loadPublications(), runStatus.syncLatest()]);
 });
+
+onUnmounted(() => {
+  stopRunStatusSyncLoop();
+});
+
+watch(
+  () => runStatus.latestRun,
+  async (nextRun, previousRun) => {
+    const nextRunId = nextRun && (nextRun.status === "running" || nextRun.status === "resolving")
+      ? nextRun.id
+      : null;
+    const previousRunId = previousRun && (previousRun.status === "running" || previousRun.status === "resolving")
+      ? previousRun.id
+      : null;
+    if (nextRunId === null || nextRunId === previousRunId) {
+      return;
+    }
+    publicationSnapshot.value = null;
+    currentPage.value = 1;
+    await loadPublications();
+  },
+);
 
 watch(
   () => [route.query.scholar, route.query.favorite, route.query.page],
@@ -1008,7 +1083,11 @@ watch(
                   Scholar <span aria-hidden="true" class="sort-marker">{{ sortMarker('scholar') }}</span>
                 </button>
               </th>
-              <th scope="col" class="w-[8.5rem] whitespace-nowrap text-left font-semibold text-ink-primary">PDF</th>
+              <th scope="col" class="w-[8.5rem] whitespace-nowrap">
+                <button type="button" class="table-sort" @click="toggleSort('pdf_status')">
+                  PDF <span aria-hidden="true" class="sort-marker">{{ sortMarker('pdf_status') }}</span>
+                </button>
+              </th>
               <th scope="col" class="w-16 whitespace-nowrap">
                 <button type="button" class="table-sort" @click="toggleSort('year')">
                   Year <span aria-hidden="true" class="sort-marker">{{ sortMarker('year') }}</span>
@@ -1135,7 +1214,7 @@ watch(
 
       <div class="flex flex-wrap items-center justify-between gap-2 border-t border-stroke-default pt-2 text-xs text-secondary">
         <span>
-          visible {{ visibleCount }} · unread {{ visibleUnreadCount }} · favorites {{ visibleFavoriteCount }}
+          total {{ totalCount }} · visible {{ visibleCount }} · unread {{ visibleUnreadCount }} · favorites {{ visibleFavoriteCount }}
           · selected {{ selectedCount }}
         </span>
         <div class="flex items-center gap-2">

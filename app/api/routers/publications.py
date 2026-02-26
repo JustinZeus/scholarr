@@ -94,6 +94,7 @@ async def _publication_counts(
     user_id: int,
     selected_scholar_id: int | None,
     favorite_only: bool,
+    search: str | None,
     snapshot_before: datetime | None,
 ) -> tuple[int, int, int, int]:
     unread_count = await publication_service.count_unread_for_user(
@@ -122,6 +123,7 @@ async def _publication_counts(
         mode=publication_service.MODE_ALL,
         scholar_profile_id=selected_scholar_id,
         favorite_only=favorite_only,
+        search=search,
         snapshot_before=snapshot_before,
     )
     return unread_count, favorites_count, latest_count, total_count
@@ -372,7 +374,7 @@ async def list_publications(
     favorite_only: bool = Query(default=False),
     scholar_profile_id: int | None = Query(default=None, ge=1),
     search: str | None = Query(default=None, min_length=1, max_length=200),
-    sort_by: Literal["first_seen", "title", "year", "citations", "scholar"] = Query(default="first_seen"),
+    sort_by: Literal["first_seen", "title", "year", "citations", "scholar", "pdf_status"] = Query(default="first_seen"),
     sort_dir: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=1, le=500),
@@ -408,6 +410,7 @@ async def list_publications(
         user_id=current_user.id,
         selected_scholar_id=selected_scholar_id,
         favorite_only=favorite_only,
+        search=normalized_search,
         snapshot_before=snapshot_before,
     )
     data = _publications_list_data(

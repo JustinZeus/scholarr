@@ -19,6 +19,8 @@ from app.settings import settings
 RESET_SQL = text(
     """
     TRUNCATE TABLE
+      arxiv_query_cache_entries,
+      arxiv_runtime_state,
       author_search_cache_entries,
       author_search_runtime_state,
       data_repair_jobs,

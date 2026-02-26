@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { fetchDashboardSnapshot, type DashboardSnapshot } from "@/features/dashboard";
 import { ApiRequestError } from "@/lib/api/errors";
@@ -26,6 +26,8 @@ const refreshingAfterCompletion = ref(false);
 const auth = useAuthStore();
 const runStatus = useRunStatusStore();
 const userSettings = useUserSettingsStore();
+const DASHBOARD_RUN_STATUS_SYNC_INTERVAL_MS = 5000;
+let runStatusSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 const isStartBlocked = computed(
   () =>
@@ -145,13 +147,35 @@ function shouldRefreshAfterRunChange(
   if (!nextRun || !previousRun) {
     return false;
   }
-  if (nextRun.status === "running") {
-    return false;
-  }
   if (nextRun.id !== previousRun.id) {
     return true;
   }
-  return previousRun.status === "running";
+  if (nextRun.status === previousRun.status) {
+    return false;
+  }
+  const nextActive = nextRun.status === "running" || nextRun.status === "resolving";
+  const previousActive = previousRun.status === "running" || previousRun.status === "resolving";
+  return nextActive || previousActive;
+}
+
+function startRunStatusSyncLoop(): void {
+  if (runStatusSyncTimer !== null) {
+    return;
+  }
+  runStatusSyncTimer = setInterval(() => {
+    if (runStatus.isRunActive) {
+      return;
+    }
+    void runStatus.syncLatest();
+  }, DASHBOARD_RUN_STATUS_SYNC_INTERVAL_MS);
+}
+
+function stopRunStatusSyncLoop(): void {
+  if (runStatusSyncTimer === null) {
+    return;
+  }
+  clearInterval(runStatusSyncTimer);
+  runStatusSyncTimer = null;
 }
 
 async function loadSnapshot(): Promise<void> {
@@ -228,8 +252,13 @@ async function onCancelRun(): Promise<void> {
 }
 
 onMounted(() => {
+  startRunStatusSyncLoop();
   void loadSnapshot();
   void runStatus.syncLatest();
+});
+
+onUnmounted(() => {
+  stopRunStatusSyncLoop();
 });
 
 watch(
@@ -372,7 +401,7 @@ watch(
                       <AppButton
                         v-if="auth.isAdmin && runStatus.isLikelyRunning"
                         variant="danger"
-                        :disabled="!activeRunId || isCancelAnimating.value"
+                        :disabled="!activeRunId || isCancelAnimating"
                         @click="onCancelRun"
                       >
                         <span class="inline-flex items-center gap-2">

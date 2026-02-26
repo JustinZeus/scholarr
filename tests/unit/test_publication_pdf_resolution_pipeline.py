@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.services.domains.arxiv.errors import ArxivRateLimitError
 from app.services.domains.publications import pdf_resolution_pipeline as pipeline
 from app.services.domains.publication_identifiers.types import DisplayIdentifier
 from app.services.domains.unpaywall.application import OaResolutionOutcome
@@ -58,7 +59,8 @@ async def test_pipeline_prefers_openalex_before_arxiv(monkeypatch: pytest.Monkey
     async def _fake_openalex(row, request_email: str | None = None, openalex_api_key: str | None = None):
         return _api_outcome(pdf_url="https://oa.example.org/found.pdf", source="openalex")
 
-    async def _fail_arxiv(row):
+    async def _fail_arxiv(row, *, request_email: str | None = None, allow_lookup: bool = True):
+        _ = (row, request_email, allow_lookup)
         raise AssertionError(f"arXiv should not run when OpenAlex candidate exists.")
 
     monkeypatch.setattr(pipeline, "_openalex_outcome", _fake_openalex)
@@ -76,7 +78,8 @@ async def test_pipeline_uses_arxiv_after_openalex_failure(monkeypatch: pytest.Mo
     async def _fake_openalex(row, request_email: str | None = None, openalex_api_key: str | None = None):
         return None
 
-    async def _fake_arxiv(row, request_email: str | None = None):
+    async def _fake_arxiv(row, *, request_email: str | None = None, allow_lookup: bool = True):
+        _ = allow_lookup
         return _api_outcome(pdf_url="https://arxiv.org/pdf/1234.5678.pdf", source="arxiv")
 
     async def _fail_oa(*, row, request_email):
@@ -98,7 +101,8 @@ async def test_pipeline_uses_unpaywall_after_arxiv_failure(monkeypatch: pytest.M
     async def _fake_openalex(row, request_email: str | None = None, openalex_api_key: str | None = None):
         return None
 
-    async def _fake_arxiv(row, request_email: str | None = None):
+    async def _fake_arxiv(row, *, request_email: str | None = None, allow_lookup: bool = True):
+        _ = (request_email, allow_lookup)
         return None
 
     async def _fake_oa(*, row, request_email):
@@ -114,3 +118,93 @@ async def test_pipeline_uses_unpaywall_after_arxiv_failure(monkeypatch: pytest.M
     assert result.outcome is not None
     assert result.outcome.pdf_url == "https://example.org/fallback.pdf"
     assert result.outcome.source == "unpaywall"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_falls_back_to_unpaywall_when_arxiv_is_rate_limited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_openalex(row, request_email: str | None = None, openalex_api_key: str | None = None):
+        _ = (row, request_email, openalex_api_key)
+        return None
+
+    async def _raise_rate_limit(row, *, request_email: str | None = None, allow_lookup: bool = True):
+        _ = (row, request_email, allow_lookup)
+        raise ArxivRateLimitError("arXiv rate limit hit (429) — stopping batch")
+
+    async def _fake_oa(*, row, request_email):
+        _ = (row, request_email)
+        return _oa_fallback_outcome(pdf_url="https://example.org/fallback.pdf", source="unpaywall")
+
+    monkeypatch.setattr(pipeline, "_openalex_outcome", _fake_openalex)
+    monkeypatch.setattr(pipeline, "_arxiv_outcome", _raise_rate_limit)
+    monkeypatch.setattr(pipeline, "_oa_outcome", _fake_oa)
+
+    result = await pipeline.resolve_publication_pdf_outcome_for_row(row=_row(), request_email="user@example.com")
+
+    assert result.outcome is not None
+    assert result.outcome.source == "unpaywall"
+    assert result.arxiv_rate_limited is True
+
+
+@pytest.mark.asyncio
+async def test_arxiv_outcome_skips_when_strong_doi_identifier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = _row(
+        display_identifier=DisplayIdentifier(
+            kind="doi",
+            value="10.1000/example",
+            label="DOI",
+            url="https://doi.org/10.1000/example",
+            confidence_score=1.0,
+        )
+    )
+
+    async def _fail_discover(*, item, request_email: str | None = None, timeout_seconds: float | None = None):
+        raise AssertionError("arXiv lookup should be skipped when DOI evidence is strong.")
+
+    monkeypatch.setattr(
+        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        _fail_discover,
+    )
+    outcome = await pipeline._arxiv_outcome(row, request_email="user@example.com")
+    assert outcome is None
+
+
+@pytest.mark.asyncio
+async def test_arxiv_outcome_skips_when_title_quality_is_low(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = _row()
+    row.title = "AI 2024"
+
+    async def _fail_discover(*, item, request_email: str | None = None, timeout_seconds: float | None = None):
+        raise AssertionError("arXiv lookup should be skipped for low-quality titles.")
+
+    monkeypatch.setattr(
+        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        _fail_discover,
+    )
+    outcome = await pipeline._arxiv_outcome(row, request_email="user@example.com")
+    assert outcome is None
+
+
+@pytest.mark.asyncio
+async def test_arxiv_outcome_calls_arxiv_when_eligible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_discover(*, item, request_email: str | None = None, timeout_seconds: float | None = None):
+        return "1234.5678"
+
+    monkeypatch.setattr(
+        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        _fake_discover,
+    )
+    row = _row()
+    row.title = "Reliable Graph Neural Network Benchmark across Multiple Datasets"
+    outcome = await pipeline._arxiv_outcome(row, request_email="user@example.com")
+
+    assert outcome is not None
+    assert outcome.source == "arxiv"
+    assert outcome.pdf_url == "https://arxiv.org/pdf/1234.5678.pdf"

@@ -240,3 +240,35 @@ class TestCanonicalTitleForDedup:
         ]
         canonicals = [canonical_title_for_dedup(v) for v in variants]
         assert len(set(canonicals)) == 1, f"Expected one canonical, got: {canonicals}"
+
+    def test_strips_mojibake_conference_suffix(self) -> None:
+        noisy = (
+            "â€ œAdam: A method for stochastic optimization, "
+            "â€ 3rd Int. Conf. Learn. Represent. ICLR 2015-Conf"
+        )
+        clean = "Adam: A method for stochastic optimization"
+        assert canonical_title_for_dedup(noisy) == normalize_title(clean)
+
+    def test_preserves_clean_subtitle_not_venue_metadata(self) -> None:
+        title = "Vision-Language Models - A Survey"
+        assert canonical_title_for_dedup(title) == normalize_title(title)
+
+    def test_strips_leading_author_fragment_before_core_title(self) -> None:
+        noisy = "and Ba.J.:Adam: a method for stochastic optimization"
+        clean = "Adam: a method for stochastic optimization"
+        assert canonical_title_for_dedup(noisy) == normalize_title(clean)
+
+    def test_strips_leading_date_prefix(self) -> None:
+        noisy = "January 7-9). Adam: A method for stochastic optimization"
+        clean = "Adam: A method for stochastic optimization"
+        assert canonical_title_for_dedup(noisy) == normalize_title(clean)
+
+    def test_strips_trailing_publication_type(self) -> None:
+        noisy = "Adam: A method for stochastic optimization. conference paper"
+        clean = "Adam: A method for stochastic optimization"
+        assert canonical_title_for_dedup(noisy) == normalize_title(clean)
+
+    def test_strips_trailing_month_year_parenthetical(self) -> None:
+        noisy = "Adam: A method for stochastic optimization (Jan 2017)"
+        clean = "Adam: A method for stochastic optimization"
+        assert canonical_title_for_dedup(noisy) == normalize_title(clean)

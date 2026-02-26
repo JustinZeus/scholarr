@@ -370,16 +370,18 @@ async def _fetch_outcome_for_row(
     row: PublicationListItem,
     request_email: str | None,
     openalex_api_key: str | None = None,
-) -> OaResolutionOutcome:
+    allow_arxiv_lookup: bool = True,
+) -> tuple[OaResolutionOutcome, bool]:
     pipeline_result = await resolve_publication_pdf_outcome_for_row(
         row=row,
         request_email=request_email,
         openalex_api_key=openalex_api_key,
+        allow_arxiv_lookup=allow_arxiv_lookup,
     )
     outcome = pipeline_result.outcome
     if outcome is not None:
-        return outcome
-    return _failed_outcome(row=row)
+        return outcome, bool(pipeline_result.arxiv_rate_limited)
+    return _failed_outcome(row=row), bool(pipeline_result.arxiv_rate_limited)
 
 
 def _apply_publication_update(
@@ -450,17 +452,19 @@ async def _resolve_publication_row(
     request_email: str | None,
     row: PublicationListItem,
     openalex_api_key: str | None = None,
-) -> None:
+    allow_arxiv_lookup: bool = True,
+) -> bool:
     from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
-    from app.services.domains.arxiv.application import ArxivRateLimitError
+
     await _mark_attempt_started(publication_id=row.publication_id, user_id=user_id)
     try:
-        outcome = await _fetch_outcome_for_row(
+        outcome, arxiv_rate_limited = await _fetch_outcome_for_row(
             row=row,
             request_email=request_email,
             openalex_api_key=openalex_api_key,
+            allow_arxiv_lookup=allow_arxiv_lookup,
         )
-    except (OpenAlexBudgetExhaustedError, ArxivRateLimitError):
+    except OpenAlexBudgetExhaustedError:
         # Persist a terminal outcome so jobs do not remain stuck in "running".
         await _persist_outcome(
             publication_id=row.publication_id,
@@ -479,11 +483,13 @@ async def _resolve_publication_row(
             },
         )
         outcome = _failed_outcome(row=row)
+        arxiv_rate_limited = False
     await _persist_outcome(
         publication_id=row.publication_id,
         user_id=user_id,
         outcome=outcome,
     )
+    return bool(arxiv_rate_limited)
 
 
 async def _run_resolution_task(
@@ -493,7 +499,6 @@ async def _run_resolution_task(
     rows: list[PublicationListItem],
 ) -> None:
     from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
-    from app.services.domains.arxiv.application import ArxivRateLimitError
     from app.services.domains.settings import application as user_settings_service
 
     # Resolve the best available API key: per-user setting → env var fallback.
@@ -506,28 +511,30 @@ async def _run_resolution_task(
     except Exception:
         openalex_api_key = settings.openalex_api_key
 
+    arxiv_lookup_allowed = True
     for row in rows:
         try:
-            await _resolve_publication_row(
+            arxiv_rate_limited = await _resolve_publication_row(
                 user_id=user_id,
                 request_email=request_email,
                 row=row,
                 openalex_api_key=openalex_api_key,
+                allow_arxiv_lookup=arxiv_lookup_allowed,
             )
+            if arxiv_rate_limited and arxiv_lookup_allowed:
+                arxiv_lookup_allowed = False
+                logger.warning(
+                    "publications.pdf_queue.arxiv_batch_disabled",
+                    extra={
+                        "event": "publications.pdf_queue.arxiv_batch_disabled",
+                        "detail": "arXiv temporarily disabled for remaining batch after rate limit",
+                    },
+                )
         except OpenAlexBudgetExhaustedError:
             logger.warning(
                 "publications.pdf_queue.budget_exhausted",
                 extra={"event": "publications.pdf_queue.budget_exhausted",
                        "detail": "Stopping PDF resolution batch — OpenAlex daily budget exhausted"},
-            )
-            break
-        except ArxivRateLimitError:
-            logger.warning(
-                "publications.pdf_queue.arxiv_rate_limited",
-                extra={
-                    "event": "publications.pdf_queue.arxiv_rate_limited",
-                    "detail": "Stopping PDF resolution batch — arXiv rate limit hit (429)",
-                },
             )
             break
 

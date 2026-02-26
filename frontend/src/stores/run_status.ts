@@ -40,6 +40,8 @@ let eventSource: EventSource | null = null;
 let activeStreamRunId: number | null = null;
 const ACTIVE_STATUSES = new Set(["running", "resolving"]);
 
+type StreamDisplayIdentifier = PublicationItem["display_identifier"];
+
 function parseRunId(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -84,6 +86,46 @@ function parsePublicationCount(value: unknown, fallback: number): number {
     return Math.max(Math.trunc(value), 0);
   }
   return fallback;
+}
+
+function parseDisplayIdentifier(value: unknown): StreamDisplayIdentifier {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const payload = value as Record<string, unknown>;
+  if (typeof payload.kind !== "string" || typeof payload.value !== "string" || typeof payload.label !== "string") {
+    return null;
+  }
+  if (typeof payload.confidence_score !== "number" || !Number.isFinite(payload.confidence_score)) {
+    return null;
+  }
+  const url = typeof payload.url === "string" ? payload.url : null;
+  return {
+    kind: payload.kind,
+    value: payload.value,
+    label: payload.label,
+    url,
+    confidence_score: payload.confidence_score,
+  };
+}
+
+function withUpdatedDisplayIdentifier(
+  items: PublicationItem[],
+  update: {
+    publicationId: number;
+    displayIdentifier: StreamDisplayIdentifier;
+  },
+): PublicationItem[] {
+  const { publicationId, displayIdentifier } = update;
+  let changed = false;
+  const next = items.map((item) => {
+    if (item.publication_id !== publicationId) {
+      return item;
+    }
+    changed = true;
+    return { ...item, display_identifier: displayIdentifier };
+  });
+  return changed ? next : items;
 }
 
 function reconcileRunCounters(previous: RunListItem | null, next: RunListItem | null): RunListItem | null {
@@ -200,7 +242,7 @@ export const useRunStatusStore = defineStore("runStatus", {
       this.updateEventSource();
     },
     updateEventSource(): void {
-      const targetRunId = this.latestRun?.status === "running" ? this.latestRun.id : null;
+      const targetRunId = isActiveStatus(this.latestRun?.status) ? this.latestRun?.id ?? null : null;
       if (activeStreamRunId === targetRunId) {
         return;
       }
@@ -247,6 +289,25 @@ export const useRunStatusStore = defineStore("runStatus", {
             if (this.livePublications.length > 50) {
               this.livePublications.pop();
             }
+          } catch (err) {
+            console.error("Failed to parse SSE event", err);
+          }
+        });
+        eventSource.addEventListener("identifier_updated", (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            const publicationId = parseRunId(data?.publication_id);
+            const displayIdentifier = parseDisplayIdentifier(data?.display_identifier);
+            if (publicationId === null || displayIdentifier === null) {
+              return;
+            }
+            this.livePublications = withUpdatedDisplayIdentifier(
+              this.livePublications,
+              {
+                publicationId,
+                displayIdentifier,
+              },
+            );
           } catch (err) {
             console.error("Failed to parse SSE event", err);
           }
@@ -429,6 +490,7 @@ export const useRunStatusStore = defineStore("runStatus", {
       this.lastErrorRequestId = null;
       this.lastSyncAt = null;
       this.safetyState = createDefaultSafetyState();
+      this.livePublications = [];
     },
   },
 });

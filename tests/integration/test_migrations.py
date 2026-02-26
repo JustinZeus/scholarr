@@ -13,13 +13,15 @@ EXPECTED_TABLES = {
     "ingestion_queue_items",
     "author_search_runtime_state",
     "author_search_cache_entries",
+    "arxiv_runtime_state",
+    "arxiv_query_cache_entries",
     "data_repair_jobs",
     "publication_pdf_jobs",
     "publication_pdf_job_events",
 }
 
 EXPECTED_ENUMS = {"run_status", "run_trigger_type"}
-EXPECTED_REVISION = "20260225_0022"
+EXPECTED_REVISION = "20260226_0024"
 
 
 @pytest.mark.integration

@@ -30,6 +30,7 @@ from app.services.domains.ingestion.constants import (
     RESUMABLE_PARTIAL_REASONS,
     RUN_LOCK_NAMESPACE,
 )
+from app.services.domains.arxiv.errors import ArxivRateLimitError
 from app.services.domains.doi.normalize import first_doi_from_texts
 from app.services.domains.publication_identifiers import application as identifier_service
 from app.services.domains.ingestion.fingerprints import (
@@ -831,16 +832,78 @@ class ScholarIngestionService:
         )
 
     @staticmethod
+    def _result_counters(result_entry: dict[str, Any]) -> tuple[int, int, int]:
+        outcome = str(result_entry.get("outcome", "")).strip().lower()
+        if outcome == "success":
+            return 1, 0, 0
+        if outcome == "partial":
+            return 1, 0, 1
+        if outcome == "failed":
+            return 0, 1, 0
+        raise RuntimeError(f"Unexpected scholar outcome label: {outcome!r}")
+
+    @staticmethod
+    def _find_scholar_result_index(
+        *,
+        scholar_results: list[dict[str, Any]],
+        scholar_profile_id: int,
+    ) -> int | None:
+        for index, result_entry in enumerate(scholar_results):
+            current_scholar_id = _int_or_default(result_entry.get("scholar_profile_id"), 0)
+            if current_scholar_id == scholar_profile_id:
+                return index
+        return None
+
+    @staticmethod
+    def _adjust_progress_counts(
+        *,
+        progress: RunProgress,
+        succeeded_delta: int,
+        failed_delta: int,
+        partial_delta: int,
+    ) -> None:
+        progress.succeeded_count += succeeded_delta
+        progress.failed_count += failed_delta
+        progress.partial_count += partial_delta
+        if progress.succeeded_count < 0 or progress.failed_count < 0 or progress.partial_count < 0:
+            raise RuntimeError("RunProgress counters entered invalid negative state.")
+
+    @staticmethod
     def _apply_outcome_to_progress(
         *,
         progress: RunProgress,
-        run: CrawlRun,
         outcome: ScholarProcessingOutcome,
     ) -> None:
-        progress.succeeded_count += outcome.succeeded_count_delta
-        progress.failed_count += outcome.failed_count_delta
-        progress.partial_count += outcome.partial_count_delta
-        progress.scholar_results.append(outcome.result_entry)
+        scholar_profile_id = _int_or_default(outcome.result_entry.get("scholar_profile_id"), 0)
+        if scholar_profile_id <= 0:
+            raise RuntimeError("Scholar outcome missing valid scholar_profile_id.")
+        prior_index = ScholarIngestionService._find_scholar_result_index(
+            scholar_results=progress.scholar_results,
+            scholar_profile_id=scholar_profile_id,
+        )
+        next_succeeded, next_failed, next_partial = ScholarIngestionService._result_counters(
+            outcome.result_entry
+        )
+        if prior_index is None:
+            progress.scholar_results.append(outcome.result_entry)
+            ScholarIngestionService._adjust_progress_counts(
+                progress=progress,
+                succeeded_delta=next_succeeded,
+                failed_delta=next_failed,
+                partial_delta=next_partial,
+            )
+            return
+        previous_entry = progress.scholar_results[prior_index]
+        prev_succeeded, prev_failed, prev_partial = ScholarIngestionService._result_counters(
+            previous_entry
+        )
+        progress.scholar_results[prior_index] = outcome.result_entry
+        ScholarIngestionService._adjust_progress_counts(
+            progress=progress,
+            succeeded_delta=next_succeeded - prev_succeeded,
+            failed_delta=next_failed - prev_failed,
+            partial_delta=next_partial - prev_partial,
+        )
 
     def _unexpected_scholar_exception_outcome(
         self,
@@ -1327,7 +1390,7 @@ class ScholarIngestionService:
                 auto_queue_continuations=False,
                 queue_delay_seconds=queue_delay_seconds,
             )
-            self._apply_outcome_to_progress(progress=progress, run=run, outcome=outcome)
+            self._apply_outcome_to_progress(progress=progress, outcome=outcome)
             # Track where to resume from for the deep pass
             resume_cstart = outcome.result_entry.get("continuation_cstart")
             if resume_cstart is not None and int(resume_cstart) > start_cstart:
@@ -1366,7 +1429,7 @@ class ScholarIngestionService:
                 auto_queue_continuations=auto_queue_continuations,
                 queue_delay_seconds=queue_delay_seconds,
             )
-            self._apply_outcome_to_progress(progress=progress, run=run, outcome=outcome)
+            self._apply_outcome_to_progress(progress=progress, outcome=outcome)
         return progress
 
     def _complete_run_for_user(
@@ -2448,6 +2511,7 @@ class ScholarIngestionService:
         resolved_key = openalex_api_key or settings.openalex_api_key
         client = OpenAlexClient(api_key=resolved_key, mailto=settings.crossref_api_mailto)
         batch_size = 25
+        arxiv_lookup_allowed = True
 
         for i in range(0, len(publications), batch_size):
             if await self._run_is_canceled(db_session, run_id=run_id):
@@ -2494,12 +2558,11 @@ class ScholarIngestionService:
                     return
 
                 p.openalex_last_attempt_at = now
-                
-                # Perform identifier discovery (moved from synchronous ingest loop)
-                await identifier_service.discover_and_sync_identifiers_for_publication(
+                arxiv_lookup_allowed = await self._discover_identifiers_for_enrichment(
                     db_session,
                     publication=p,
-                    scholar_label=p.author_text or "",
+                    run_id=run_id,
+                    allow_arxiv_lookup=arxiv_lookup_allowed,
                 )
 
                 match = find_best_match(
@@ -2528,6 +2591,86 @@ class ScholarIngestionService:
                     "run_id": run_id,
                 },
             )
+
+    async def _discover_identifiers_for_enrichment(
+        self,
+        db_session: AsyncSession,
+        *,
+        publication: Publication,
+        run_id: int,
+        allow_arxiv_lookup: bool,
+    ) -> bool:
+        if not allow_arxiv_lookup:
+            await identifier_service.sync_identifiers_for_publication_fields(
+                db_session,
+                publication=publication,
+            )
+            await self._publish_identifier_update_event(
+                db_session,
+                run_id=run_id,
+                publication_id=int(publication.id),
+            )
+            return False
+        try:
+            await identifier_service.discover_and_sync_identifiers_for_publication(
+                db_session,
+                publication=publication,
+                scholar_label=publication.author_text or "",
+            )
+            await self._publish_identifier_update_event(
+                db_session,
+                run_id=run_id,
+                publication_id=int(publication.id),
+            )
+            return True
+        except ArxivRateLimitError:
+            logger.warning(
+                "ingestion.arxiv_rate_limited",
+                extra={
+                    "event": "ingestion.arxiv_rate_limited",
+                    "run_id": run_id,
+                    "publication_id": int(publication.id),
+                    "detail": "arXiv temporarily disabled for remaining enrichment pass",
+                },
+            )
+            await identifier_service.sync_identifiers_for_publication_fields(
+                db_session,
+                publication=publication,
+            )
+            await self._publish_identifier_update_event(
+                db_session,
+                run_id=run_id,
+                publication_id=int(publication.id),
+            )
+            return False
+
+    async def _publish_identifier_update_event(
+        self,
+        db_session: AsyncSession,
+        *,
+        run_id: int,
+        publication_id: int,
+    ) -> None:
+        display = await identifier_service.display_identifier_for_publication_id(
+            db_session,
+            publication_id=publication_id,
+        )
+        if display is None:
+            return
+        await run_events.publish(
+            run_id=run_id,
+            event_type="identifier_updated",
+            data={
+                "publication_id": int(publication_id),
+                "display_identifier": {
+                    "kind": display.kind,
+                    "value": display.value,
+                    "label": display.label,
+                    "url": display.url,
+                    "confidence_score": float(display.confidence_score),
+                },
+            },
+        )
 
     async def _enrich_publications_with_openalex(
         self,

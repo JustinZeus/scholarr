@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 from typing import Any
+import unicodedata
 from urllib.parse import urljoin
 
 from app.services.domains.ingestion.constants import (
@@ -24,37 +25,177 @@ _NOISE_PREPRINT_RE = re.compile(
     re.IGNORECASE,
 )
 _NOISE_TRAILING_YEAR_RE = re.compile(r"\s*[,(]\s*\d{4}\s*[),]?\s*$")
+_NOISE_TRAILING_MONTH_YEAR_RE = re.compile(
+    r"\s*[,(]\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{4}\s*[),]?\s*$",
+    re.IGNORECASE,
+)
+_NOISE_TRAILING_PUBLICATION_TYPE_RE = re.compile(
+    r"[,.\s]+(?:conference\s+paper|journal\s+article)\s*$",
+    re.IGNORECASE,
+)
+_NOISE_IN_PROCEEDINGS_SUFFIX_RE = re.compile(r"\s+in:\s+proceedings\b.*$", re.IGNORECASE)
 # Strips ". Capitalised sentence" appended as venue: ". Comput. Sci…", ". Journal of…"
 _NOISE_VENUE_SENTENCE_RE = re.compile(r"(?<=\w{3})\.\s+[A-Z][a-z].*$")
+_MOJIBAKE_HINT_RE = re.compile(r"[ÃÂâ]")
+_MOJIBAKE_CHAR_RE = re.compile(r"[ÃÂâ€œ”€™]")
+_METADATA_ORDINAL_RE = re.compile(r"^\d+(st|nd|rd|th)$")
+_NOISE_LEADING_DATE_PREFIX_RE = re.compile(
+    r"^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:\s*[-–]\s*\d{1,2})?\)?[,\.\s:;-]+",
+    re.IGNORECASE,
+)
+_NOISE_LEADING_AUTHOR_FRAGMENT_RE = re.compile(r"^(?:and|&)\s+[a-z.\s]{1,40}:\s*", re.IGNORECASE)
+_METADATA_SEPARATORS = (" - ", " — ", ",", ";", ". ")
+_VENUE_HINT_TOKENS = {
+    "aaai",
+    "conference",
+    "conf",
+    "cvpr",
+    "eccv",
+    "iclr",
+    "icml",
+    "journal",
+    "nips",
+    "neurips",
+    "proceedings",
+    "proc",
+    "symposium",
+    "workshop",
+}
+_PUBLICATION_TYPE_TOKENS = {"conference", "paper", "journal", "article"}
+_MIN_METADATA_HINT_TOKENS = 2
+_MIN_METADATA_CONTEXT_TOKENS = 4
 
 _CANONICAL_DEDUP_THRESHOLD = 0.82
 
 
 def normalize_title(value: str) -> str:
-    lowered = value.lower()
+    lowered = _normalized_text(value).lower()
     return TITLE_ALNUM_RE.sub("", lowered)
 
 
 def canonical_title_for_dedup(title: str) -> str:
     """Strip Scholar-specific noise suffixes then normalize for dedup comparison."""
-    t = title.strip()
-    t = _NOISE_DOI_RE.sub("", t)
-    t = _NOISE_ARXIV_RE.sub("", t)
-    t = _NOISE_PREPRINT_RE.sub("", t)
-    t = _NOISE_TRAILING_YEAR_RE.sub("", t)
-    t = _NOISE_VENUE_SENTENCE_RE.sub("", t)
-    return normalize_title(t.strip())
+    return normalize_title(_canonical_title_text(title))
+
+
+def canonical_title_text_for_dedup(title: str) -> str:
+    """Noise-stripped lowercase title with spaces preserved for token-level matching."""
+    return _stripped_title_for_canonical(title)
+
+
+def canonical_title_tokens_for_dedup(title: str) -> set[str]:
+    """Word tokens of the noise-stripped title."""
+    return _canonical_title_tokens(title)
 
 
 def _stripped_title_for_canonical(title: str) -> str:
     """Apply noise-stripping and lowercase but PRESERVE spaces (for later tokenization)."""
-    t = title.strip()
+    t = _canonical_title_text(title)
+    return t.lower().strip()
+
+
+def _canonical_title_text(title: str) -> str:
+    t = _normalized_text(title)
+    t = _strip_noise_suffixes(t)
+    t = _strip_venue_metadata_suffixes(t)
+    return _NOISE_VENUE_SENTENCE_RE.sub("", t).strip()
+
+
+def _strip_noise_suffixes(value: str) -> str:
+    t = _strip_leading_noise_prefixes(value.strip())
     t = _NOISE_DOI_RE.sub("", t)
     t = _NOISE_ARXIV_RE.sub("", t)
     t = _NOISE_PREPRINT_RE.sub("", t)
     t = _NOISE_TRAILING_YEAR_RE.sub("", t)
-    t = _NOISE_VENUE_SENTENCE_RE.sub("", t)
-    return t.lower().strip()
+    t = _NOISE_TRAILING_MONTH_YEAR_RE.sub("", t)
+    t = _NOISE_TRAILING_PUBLICATION_TYPE_RE.sub("", t)
+    t = _NOISE_IN_PROCEEDINGS_SUFFIX_RE.sub("", t)
+    return t.strip()
+
+
+def _strip_venue_metadata_suffixes(value: str) -> str:
+    stripped = value.strip()
+    while True:
+        cut_index = _metadata_cut_index(stripped)
+        if cut_index is None:
+            return stripped
+        stripped = stripped[:cut_index].strip()
+
+
+def _metadata_cut_index(value: str) -> int | None:
+    candidates: list[int] = []
+    for candidate in _METADATA_SEPARATORS:
+        start = 0
+        while True:
+            index = value.find(candidate, start)
+            if index <= 0:
+                break
+            suffix = value[index + len(candidate) :].strip()
+            if suffix and _looks_like_venue_metadata(suffix):
+                candidates.append(index)
+            start = index + len(candidate)
+    if not candidates:
+        return None
+    return min(candidates)
+
+
+def _looks_like_venue_metadata(value: str) -> bool:
+    tokens = WORD_RE.findall(value.lower())
+    if len(tokens) < _MIN_METADATA_HINT_TOKENS:
+        return False
+    has_hint = any(_is_venue_hint_token(token) for token in tokens)
+    if not has_hint:
+        return False
+    has_year = any(_is_year_token(token) for token in tokens)
+    has_ordinal = any(_METADATA_ORDINAL_RE.match(token) for token in tokens)
+    publication_type_only = all(token in _PUBLICATION_TYPE_TOKENS for token in tokens)
+    return has_year or has_ordinal or publication_type_only or len(tokens) >= _MIN_METADATA_CONTEXT_TOKENS
+
+
+def _strip_leading_noise_prefixes(value: str) -> str:
+    stripped = value
+    while True:
+        next_value = _NOISE_LEADING_DATE_PREFIX_RE.sub("", stripped).strip()
+        next_value = _NOISE_LEADING_AUTHOR_FRAGMENT_RE.sub("", next_value).strip()
+        if next_value == stripped:
+            return stripped
+        stripped = next_value
+
+
+def _is_venue_hint_token(token: str) -> bool:
+    if token in _VENUE_HINT_TOKENS:
+        return True
+    return token.startswith("conf") or token.startswith("proceed")
+
+
+def _is_year_token(token: str) -> bool:
+    if len(token) != 4 or not token.isdigit():
+        return False
+    year = int(token)
+    return 1900 <= year <= 2100
+
+
+def _normalized_text(value: str) -> str:
+    repaired = _repair_mojibake(value.strip())
+    normalized = unicodedata.normalize("NFKC", repaired)
+    cleaned = _MOJIBAKE_CHAR_RE.sub(" ", normalized)
+    return SPACE_RE.sub(" ", cleaned).strip()
+
+
+def _repair_mojibake(value: str) -> str:
+    if not value or not _MOJIBAKE_HINT_RE.search(value):
+        return value
+    try:
+        repaired = value.encode("latin1").decode("utf-8")
+    except UnicodeError:
+        return value
+    if _mojibake_score(repaired) < _mojibake_score(value):
+        return repaired
+    return value
+
+
+def _mojibake_score(value: str) -> int:
+    return len(_MOJIBAKE_HINT_RE.findall(value))
 
 
 def _canonical_title_tokens(title: str) -> set[str]:

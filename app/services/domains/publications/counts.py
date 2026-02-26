@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ScholarProfile, ScholarPublication
+from app.db.models import Publication, ScholarProfile, ScholarPublication
 from app.services.domains.publications.modes import (
     MODE_ALL,
     MODE_LATEST,
@@ -22,6 +22,7 @@ async def count_for_user(
     mode: str = MODE_ALL,
     scholar_profile_id: int | None = None,
     favorite_only: bool = False,
+    search: str | None = None,
     snapshot_before: datetime | None = None,
 ) -> int:
     resolved_mode = resolve_publication_view_mode(mode)
@@ -30,8 +31,10 @@ async def count_for_user(
         select(func.count(distinct(ScholarPublication.publication_id)))
         .select_from(ScholarPublication)
         .join(ScholarProfile, ScholarProfile.id == ScholarPublication.scholar_profile_id)
+        .join(Publication, Publication.id == ScholarPublication.publication_id)
         .where(ScholarProfile.user_id == user_id)
     )
+    stmt = _apply_search_filter(stmt, search=search)
     if scholar_profile_id is not None:
         stmt = stmt.where(ScholarProfile.id == scholar_profile_id)
     if favorite_only:
@@ -48,12 +51,25 @@ async def count_for_user(
     return int(result.scalar_one() or 0)
 
 
+def _apply_search_filter(stmt, *, search: str | None):
+    if not search:
+        return stmt
+    safe_search = search.replace("%", r"\%").replace("_", r"\_")
+    pattern = f"%{safe_search}%"
+    return stmt.where(
+        Publication.title_raw.ilike(pattern)
+        | ScholarProfile.display_name.ilike(pattern)
+        | Publication.venue_text.ilike(pattern)
+    )
+
+
 async def count_unread_for_user(
     db_session: AsyncSession,
     *,
     user_id: int,
     scholar_profile_id: int | None = None,
     favorite_only: bool = False,
+    search: str | None = None,
     snapshot_before: datetime | None = None,
 ) -> int:
     return await count_for_user(
@@ -62,6 +78,7 @@ async def count_unread_for_user(
         mode=MODE_UNREAD,
         scholar_profile_id=scholar_profile_id,
         favorite_only=favorite_only,
+        search=search,
         snapshot_before=snapshot_before,
     )
 
@@ -72,6 +89,7 @@ async def count_latest_for_user(
     user_id: int,
     scholar_profile_id: int | None = None,
     favorite_only: bool = False,
+    search: str | None = None,
     snapshot_before: datetime | None = None,
 ) -> int:
     return await count_for_user(
@@ -80,6 +98,7 @@ async def count_latest_for_user(
         mode=MODE_LATEST,
         scholar_profile_id=scholar_profile_id,
         favorite_only=favorite_only,
+        search=search,
         snapshot_before=snapshot_before,
     )
 
@@ -89,6 +108,7 @@ async def count_favorite_for_user(
     *,
     user_id: int,
     scholar_profile_id: int | None = None,
+    search: str | None = None,
     snapshot_before: datetime | None = None,
 ) -> int:
     return await count_for_user(
@@ -97,5 +117,6 @@ async def count_favorite_for_user(
         mode=MODE_ALL,
         scholar_profile_id=scholar_profile_id,
         favorite_only=True,
+        search=search,
         snapshot_before=snapshot_before,
     )

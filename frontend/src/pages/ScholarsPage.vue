@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import AppPage from "@/components/layout/AppPage.vue";
 import AsyncStateGate from "@/components/patterns/AsyncStateGate.vue";
@@ -34,6 +34,7 @@ import {
 } from "@/features/scholars";
 import ScholarAvatar from "@/features/scholars/components/ScholarAvatar.vue";
 import { ApiRequestError } from "@/lib/api/errors";
+import { useRunStatusStore } from "@/stores/run_status";
 
 const loading = ref(true);
 const saving = ref(false);
@@ -66,6 +67,10 @@ const successMessage = ref<string | null>(null);
 const SCHOLAR_ID_PATTERN = /^[a-zA-Z0-9_-]{12}$/;
 const URL_USER_PARAM_PATTERN = /(?:\?|&)user=([a-zA-Z0-9_-]{12})(?:&|#|$)/i;
 const nameSearchWip = true;
+const SCHOLARS_LIVE_SYNC_INTERVAL_MS = 4000;
+let scholarsLiveSyncTimer: ReturnType<typeof setInterval> | null = null;
+
+const runStatus = useRunStatusStore();
 
 const trackedScholarIds = computed(() => new Set(scholars.value.map((item) => item.scholar_id)));
 const activeScholarSettings = computed(
@@ -260,14 +265,54 @@ function syncImageDrafts(): void {
   imageUrlDraftByScholarId.value = next;
 }
 
+function applyScholarList(nextScholars: ScholarProfile[]): void {
+  scholars.value = nextScholars;
+  syncImageDrafts();
+}
+
+function upsertScholar(profile: ScholarProfile): void {
+  const existingIndex = scholars.value.findIndex((item) => item.id === profile.id);
+  if (existingIndex < 0) {
+    applyScholarList([profile, ...scholars.value]);
+    return;
+  }
+  const next = [...scholars.value];
+  next[existingIndex] = profile;
+  applyScholarList(next);
+}
+
+function stopScholarLiveSync(): void {
+  if (scholarsLiveSyncTimer === null) {
+    return;
+  }
+  clearInterval(scholarsLiveSyncTimer);
+  scholarsLiveSyncTimer = null;
+}
+
+function startScholarLiveSync(): void {
+  if (scholarsLiveSyncTimer !== null) {
+    return;
+  }
+  scholarsLiveSyncTimer = setInterval(() => {
+    void refreshScholarsSilently();
+  }, SCHOLARS_LIVE_SYNC_INTERVAL_MS);
+}
+
+async function refreshScholarsSilently(): Promise<void> {
+  try {
+    applyScholarList(await listScholars());
+  } catch (_error) {
+    // Keep existing list when transient refresh fails.
+  }
+}
+
 async function loadScholars(): Promise<void> {
   loading.value = true;
 
   try {
-    scholars.value = await listScholars();
-    syncImageDrafts();
+    applyScholarList(await listScholars());
   } catch (error) {
-    scholars.value = [];
+    applyScholarList([]);
     if (error instanceof ApiRequestError) {
       errorMessage.value = error.message;
       errorRequestId.value = error.requestId;
@@ -360,7 +405,11 @@ async function onAddScholars(): Promise<void> {
     }
 
     const settled = await Promise.allSettled(
-      scholarIds.map((scholarId) => createScholar({ scholar_id: scholarId })),
+      scholarIds.map(async (scholarId) => {
+        const created = await createScholar({ scholar_id: scholarId });
+        upsertScholar(created);
+        return created;
+      }),
     );
 
     const failures: string[] = [];
@@ -399,7 +448,7 @@ async function onAddScholars(): Promise<void> {
       errorRequestId.value = requestIdFromFailures;
     }
 
-    await loadScholars();
+    await refreshScholarsSilently();
   } catch (error) {
     if (error instanceof ApiRequestError) {
       errorMessage.value = error.message;
@@ -453,12 +502,12 @@ async function onAddCandidate(candidate: ScholarSearchCandidate): Promise<void> 
   successMessage.value = null;
 
   try {
-    await createScholar({
+    const created = await createScholar({
       scholar_id: candidate.scholar_id,
       profile_image_url: candidate.profile_image_url ?? undefined,
     });
+    upsertScholar(created);
     successMessage.value = `${candidate.display_name} added.`;
-    await loadScholars();
   } catch (error) {
     if (error instanceof ApiRequestError) {
       errorMessage.value = error.message;
@@ -608,6 +657,22 @@ async function onResetImage(profile: ScholarProfile): Promise<void> {
 onMounted(() => {
   void loadScholars();
 });
+
+onUnmounted(() => {
+  stopScholarLiveSync();
+});
+
+watch(
+  () => runStatus.isLikelyRunning,
+  (isRunning) => {
+    if (isRunning) {
+      startScholarLiveSync();
+      return;
+    }
+    stopScholarLiveSync();
+  },
+  { immediate: true },
+);
 </script>
 
 <template>

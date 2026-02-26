@@ -95,6 +95,40 @@ export interface TriggerPublicationLinkRepairResult {
   summary: Record<string, unknown>;
 }
 
+export interface NearDuplicateClusterMember {
+  publication_id: number;
+  title: string;
+  year: number | null;
+  citation_count: number;
+}
+
+export interface NearDuplicateCluster {
+  cluster_key: string;
+  winner_publication_id: number;
+  member_count: number;
+  similarity_score: number;
+  members: NearDuplicateClusterMember[];
+}
+
+export interface TriggerPublicationNearDuplicateRepairPayload {
+  dry_run?: boolean;
+  similarity_threshold?: number;
+  min_shared_tokens?: number;
+  max_year_delta?: number;
+  max_clusters?: number;
+  selected_cluster_keys?: string[];
+  requested_by?: string;
+  confirmation_text?: string;
+}
+
+export interface TriggerPublicationNearDuplicateRepairResult {
+  job_id: number;
+  status: string;
+  scope: Record<string, unknown>;
+  summary: Record<string, unknown>;
+  clusters: NearDuplicateCluster[];
+}
+
 export async function getAdminDbIntegrityReport(): Promise<AdminDbIntegrityReport> {
   const response = await apiRequest<AdminDbIntegrityReport>("/admin/db/integrity", { method: "GET" });
   return response.data;
@@ -114,6 +148,19 @@ export async function triggerPublicationLinkRepair(
 ): Promise<TriggerPublicationLinkRepairResult> {
   const response = await apiRequest<TriggerPublicationLinkRepairResult>(
     "/admin/db/repairs/publication-links",
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+  return response.data;
+}
+
+export async function triggerPublicationNearDuplicateRepair(
+  payload: TriggerPublicationNearDuplicateRepairPayload,
+): Promise<TriggerPublicationNearDuplicateRepairResult> {
+  const response = await apiRequest<TriggerPublicationNearDuplicateRepairResult>(
+    "/admin/db/repairs/publication-near-duplicates",
     {
       method: "POST",
       body: payload,

@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import CrawlRun, Publication, RunStatus, ScholarProfile, ScholarPublication
+from app.db.models import (
+    CrawlRun,
+    Publication,
+    PublicationPdfJob,
+    RunStatus,
+    ScholarProfile,
+    ScholarPublication,
+)
 from app.services.domains.publications.modes import MODE_LATEST, MODE_UNREAD
 from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
 
@@ -15,6 +22,29 @@ def _normalized_citation_count(value: object) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _pdf_status_sort_rank():
+    return case(
+        (Publication.pdf_url.is_not(None), 4),
+        (PublicationPdfJob.status == "resolved", 4),
+        (PublicationPdfJob.status == "running", 3),
+        (PublicationPdfJob.status == "queued", 2),
+        (PublicationPdfJob.status == "failed", 0),
+        else_=1,
+    )
+
+
+def _sort_column(sort_by: str):
+    sort_columns = {
+        "first_seen": ScholarPublication.created_at,
+        "title": Publication.title_raw,
+        "year": Publication.year,
+        "citations": Publication.citation_count,
+        "scholar": ScholarProfile.display_name,
+        "pdf_status": _pdf_status_sort_rank(),
+    }
+    return sort_columns.get(sort_by, ScholarPublication.created_at)
 
 
 async def get_latest_run_id_for_user(
@@ -55,14 +85,6 @@ def publications_query(
     sort_dir: str = "desc",
     snapshot_before: datetime | None = None,
 ) -> Select[tuple]:
-    _SORT_COLUMNS = {
-        "first_seen": ScholarPublication.created_at,
-        "title": Publication.title_raw,
-        "year": Publication.year,
-        "citations": Publication.citation_count,
-        "scholar": ScholarProfile.display_name,
-    }
-
     scholar_label = ScholarProfile.display_name
     stmt = (
         select(
@@ -83,6 +105,7 @@ def publications_query(
         )
         .join(ScholarPublication, ScholarPublication.publication_id == Publication.id)
         .join(ScholarProfile, ScholarProfile.id == ScholarPublication.scholar_profile_id)
+        .outerjoin(PublicationPdfJob, PublicationPdfJob.publication_id == Publication.id)
         .where(ScholarProfile.user_id == user_id)
     )
     if search:
@@ -106,7 +129,7 @@ def publications_query(
     if snapshot_before is not None:
         stmt = stmt.where(ScholarPublication.created_at <= snapshot_before)
 
-    sort_col = _SORT_COLUMNS.get(sort_by, ScholarPublication.created_at)
+    sort_col = _sort_column(sort_by)
     order = sort_col.desc() if sort_dir == "desc" else sort_col.asc()
     stmt = stmt.order_by(order, Publication.id.desc())
 

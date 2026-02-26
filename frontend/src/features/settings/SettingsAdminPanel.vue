@@ -20,11 +20,14 @@ import {
   listAdminPdfQueue,
   requeueAdminPdfLookup,
   requeueAllAdminPdfLookups,
+  triggerPublicationNearDuplicateRepair,
   triggerPublicationLinkRepair,
   type AdminDbIntegrityCheck,
   type AdminDbIntegrityReport,
   type AdminDbRepairJob,
   type AdminPdfQueueItem,
+  type NearDuplicateCluster,
+  type TriggerPublicationNearDuplicateRepairResult,
   type TriggerPublicationLinkRepairResult,
 } from "@/features/admin_dbops";
 import {
@@ -43,6 +46,7 @@ const SECTION_PDF = "pdf";
 const SCOPE_SINGLE_USER = "single_user";
 const SCOPE_ALL_USERS = "all_users";
 const APPLY_ALL_USERS_CONFIRM_TEXT = "REPAIR ALL USERS";
+const APPLY_NEAR_DUPLICATES_CONFIRM_TEXT = "MERGE SELECTED DUPLICATES";
 const DROP_PUBLICATIONS_CONFIRM_TEXT = "DROP ALL PUBLICATIONS";
 
 type RepairScopeMode = typeof SCOPE_SINGLE_USER | typeof SCOPE_ALL_USERS;
@@ -82,6 +86,17 @@ const repairRequestedBy = ref("");
 const repairDryRun = ref(true);
 const repairGcOrphans = ref(false);
 const repairConfirmationText = ref("");
+const runningNearDuplicateScan = ref(false);
+const applyingNearDuplicateRepair = ref(false);
+const nearDuplicateRequestedBy = ref("");
+const nearDuplicateSimilarityThreshold = ref("0.78");
+const nearDuplicateMinSharedTokens = ref("3");
+const nearDuplicateMaxYearDelta = ref("1");
+const nearDuplicateMaxClusters = ref("25");
+const nearDuplicateConfirmationText = ref("");
+const nearDuplicateSelectedClusterKeys = ref<Set<string>>(new Set());
+const nearDuplicateClusters = ref<NearDuplicateCluster[]>([]);
+const lastNearDuplicateResult = ref<TriggerPublicationNearDuplicateRepairResult | null>(null);
 
 const droppingPublications = ref(false);
 const dropConfirmationText = ref("");
@@ -105,6 +120,7 @@ const activeUser = computed(() => users.value.find((user) => user.id === activeU
 const typedConfirmationRequired = computed(
   () => repairScopeMode.value === SCOPE_ALL_USERS && !repairDryRun.value,
 );
+const nearDuplicateApplyEnabled = computed(() => nearDuplicateSelectedClusterKeys.value.size > 0);
 const pdfQueuePageSizeValue = computed(() => {
   const parsed = Number(pdfQueuePageSize.value);
   if (!Number.isFinite(parsed)) {
@@ -211,6 +227,64 @@ function validateTypedConfirmation(): string {
     throw new Error(`Type '${APPLY_ALL_USERS_CONFIRM_TEXT}' to apply repair for all users.`);
   }
   return normalized;
+}
+
+function parseBoundedNumber(
+  raw: string,
+  options: { minimum: number; maximum: number; fallback: number },
+): number {
+  const { minimum, maximum, fallback } = options;
+  const parsed = Number(raw.trim());
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(minimum, Math.min(maximum, parsed));
+}
+
+function nearDuplicatePayloadBase(): {
+  similarity_threshold: number;
+  min_shared_tokens: number;
+  max_year_delta: number;
+  max_clusters: number;
+  requested_by: string | undefined;
+} {
+  return {
+    similarity_threshold: parseBoundedNumber(nearDuplicateSimilarityThreshold.value, {
+      minimum: 0.5,
+      maximum: 1.0,
+      fallback: 0.78,
+    }),
+    min_shared_tokens: Math.trunc(
+      parseBoundedNumber(nearDuplicateMinSharedTokens.value, {
+        minimum: 1,
+        maximum: 8,
+        fallback: 3,
+      }),
+    ),
+    max_year_delta: Math.trunc(
+      parseBoundedNumber(nearDuplicateMaxYearDelta.value, {
+        minimum: 0,
+        maximum: 5,
+        fallback: 1,
+      }),
+    ),
+    max_clusters: Math.trunc(
+      parseBoundedNumber(nearDuplicateMaxClusters.value, {
+        minimum: 1,
+        maximum: 200,
+        fallback: 25,
+      }),
+    ),
+    requested_by: nearDuplicateRequestedBy.value.trim() || undefined,
+  };
+}
+
+function selectedNearDuplicateKeys(): string[] {
+  return [...nearDuplicateSelectedClusterKeys.value].sort((left, right) => left.localeCompare(right));
+}
+
+function checkboxEventChecked(event: Event): boolean {
+  return event.target instanceof HTMLInputElement ? event.target.checked : false;
 }
 
 function summaryCount(job: AdminDbRepairJob, key: string): string {
@@ -381,6 +455,67 @@ async function onRunRepair(): Promise<void> {
     assignError(error, "Unable to run publication link repair.");
   } finally {
     runningRepair.value = false;
+  }
+}
+
+function onToggleNearDuplicateClusterSelection(clusterKey: string, checked: boolean): void {
+  const next = new Set(nearDuplicateSelectedClusterKeys.value);
+  if (checked) {
+    next.add(clusterKey);
+  } else {
+    next.delete(clusterKey);
+  }
+  nearDuplicateSelectedClusterKeys.value = next;
+}
+
+async function onRunNearDuplicateScan(): Promise<void> {
+  runningNearDuplicateScan.value = true;
+  clearAlerts();
+  try {
+    const result = await triggerPublicationNearDuplicateRepair({
+      dry_run: true,
+      ...nearDuplicatePayloadBase(),
+    });
+    nearDuplicateClusters.value = result.clusters;
+    nearDuplicateSelectedClusterKeys.value = new Set();
+    nearDuplicateConfirmationText.value = "";
+    lastNearDuplicateResult.value = result;
+    successMessage.value = `Near-duplicate scan completed (job #${result.job_id}).`;
+    await refreshRepairJobs();
+  } catch (error) {
+    assignError(error, "Unable to scan for near-duplicate publications.");
+  } finally {
+    runningNearDuplicateScan.value = false;
+  }
+}
+
+async function onApplyNearDuplicateRepair(): Promise<void> {
+  applyingNearDuplicateRepair.value = true;
+  clearAlerts();
+  try {
+    const selectedKeys = selectedNearDuplicateKeys();
+    if (selectedKeys.length === 0) {
+      throw new Error("Select at least one near-duplicate cluster before applying.");
+    }
+    if (nearDuplicateConfirmationText.value.trim() !== APPLY_NEAR_DUPLICATES_CONFIRM_TEXT) {
+      throw new Error(`Type '${APPLY_NEAR_DUPLICATES_CONFIRM_TEXT}' to confirm merge.`);
+    }
+    const result = await triggerPublicationNearDuplicateRepair({
+      dry_run: false,
+      selected_cluster_keys: selectedKeys,
+      confirmation_text: nearDuplicateConfirmationText.value.trim(),
+      ...nearDuplicatePayloadBase(),
+    });
+    nearDuplicateClusters.value = result.clusters;
+    nearDuplicateSelectedClusterKeys.value = new Set();
+    nearDuplicateConfirmationText.value = "";
+    lastNearDuplicateResult.value = result;
+    successMessage.value = `Merged selected near-duplicate clusters (job #${result.job_id}).`;
+    await refreshRepairJobs();
+  } catch (error) {
+    assignError(error, "Unable to apply near-duplicate merge.");
+  } finally {
+    applyingNearDuplicateRepair.value = false;
   }
 }
 
@@ -669,6 +804,98 @@ watch(
               <span class="text-secondary">Status: {{ lastRepairResult.status }}</span>
             </div>
             <pre class="overflow-x-auto text-secondary">{{ JSON.stringify(lastRepairResult.summary, null, 2) }}</pre>
+          </div>
+        </AppCard>
+
+        <AppCard class="space-y-3">
+          <div class="flex items-center gap-1">
+            <h2 class="text-lg font-semibold text-ink-primary">Near-Duplicate Publication Repair</h2>
+            <AppHelpHint text="Run a dry-run scan first, verify candidate clusters, then merge only selected clusters." />
+          </div>
+
+          <form class="grid gap-3 md:grid-cols-2" @submit.prevent="onRunNearDuplicateScan">
+            <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+              <span>Similarity threshold</span>
+              <AppInput v-model="nearDuplicateSimilarityThreshold" placeholder="0.78" />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+              <span>Min shared tokens</span>
+              <AppInput v-model="nearDuplicateMinSharedTokens" placeholder="3" />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+              <span>Max year delta</span>
+              <AppInput v-model="nearDuplicateMaxYearDelta" placeholder="1" />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+              <span>Max preview clusters</span>
+              <AppInput v-model="nearDuplicateMaxClusters" placeholder="25" />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-ink-secondary md:col-span-2">
+              <span>Requested by (optional)</span>
+              <AppInput v-model="nearDuplicateRequestedBy" placeholder="email/name/ticket id" />
+            </label>
+            <div class="md:col-span-2">
+              <AppButton type="submit" :disabled="runningNearDuplicateScan">
+                {{ runningNearDuplicateScan ? "Scanning..." : "Scan near-duplicate clusters" }}
+              </AppButton>
+            </div>
+          </form>
+
+          <div v-if="nearDuplicateClusters.length > 0" class="space-y-3">
+            <AppTable label="Near duplicate clusters table">
+              <thead>
+                <tr>
+                  <th scope="col">Select</th>
+                  <th scope="col">Cluster</th>
+                  <th scope="col">Winner</th>
+                  <th scope="col">Members</th>
+                  <th scope="col">Similarity</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="cluster in nearDuplicateClusters" :key="cluster.cluster_key">
+                  <td>
+                    <input
+                      :id="`near-dup-${cluster.cluster_key}`"
+                      class="h-4 w-4 rounded border-stroke-default bg-surface-card"
+                      type="checkbox"
+                      :checked="nearDuplicateSelectedClusterKeys.has(cluster.cluster_key)"
+                      @change="onToggleNearDuplicateClusterSelection(cluster.cluster_key, checkboxEventChecked($event))"
+                    />
+                  </td>
+                  <td class="font-mono text-xs">{{ cluster.cluster_key }}</td>
+                  <td>#{{ cluster.winner_publication_id }}</td>
+                  <td>
+                    <div class="grid gap-1">
+                      <span v-for="member in cluster.members" :key="member.publication_id" class="text-xs text-secondary">
+                        #{{ member.publication_id }} · {{ member.title }}
+                      </span>
+                    </div>
+                  </td>
+                  <td>{{ cluster.similarity_score.toFixed(2) }}</td>
+                </tr>
+              </tbody>
+            </AppTable>
+
+            <form class="grid gap-3 md:grid-cols-2" @submit.prevent="onApplyNearDuplicateRepair">
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary md:col-span-2">
+                <span>Type '{{ APPLY_NEAR_DUPLICATES_CONFIRM_TEXT }}' to merge selected clusters</span>
+                <AppInput v-model="nearDuplicateConfirmationText" :placeholder="APPLY_NEAR_DUPLICATES_CONFIRM_TEXT" />
+              </label>
+              <div class="md:col-span-2">
+                <AppButton type="submit" :disabled="applyingNearDuplicateRepair || !nearDuplicateApplyEnabled">
+                  {{ applyingNearDuplicateRepair ? "Merging..." : "Merge selected clusters" }}
+                </AppButton>
+              </div>
+            </form>
+          </div>
+
+          <div v-if="lastNearDuplicateResult" class="rounded-lg border border-stroke-default bg-surface-card-muted p-3 text-xs">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+              <AppBadge :tone="statusTone(lastNearDuplicateResult.status)">Job #{{ lastNearDuplicateResult.job_id }}</AppBadge>
+              <span class="text-secondary">Status: {{ lastNearDuplicateResult.status }}</span>
+            </div>
+            <pre class="overflow-x-auto text-secondary">{{ JSON.stringify(lastNearDuplicateResult.summary, null, 2) }}</pre>
           </div>
         </AppCard>
 

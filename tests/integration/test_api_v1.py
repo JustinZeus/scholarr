@@ -580,6 +580,14 @@ async def test_api_admin_dbops_forbidden_for_non_admin_and_validates_scope(db_se
     assert forbidden_repair.status_code == 403
     assert forbidden_repair.json()["error"]["code"] == "forbidden"
 
+    forbidden_near_duplicate = client.post(
+        "/api/v1/admin/db/repairs/publication-near-duplicates",
+        json={"dry_run": True},
+        headers=headers,
+    )
+    assert forbidden_near_duplicate.status_code == 403
+    assert forbidden_near_duplicate.json()["error"]["code"] == "forbidden"
+
     admin_headers = _api_bootstrap_csrf_headers(client)
     admin_login = client.post(
         "/api/v1/auth/login",
@@ -648,6 +656,138 @@ async def test_api_admin_dbops_all_users_apply_requires_confirmation(db_session:
 
     remaining_links = await db_session.execute(text("SELECT count(*) FROM scholar_publications"))
     assert int(remaining_links.scalar_one()) == 0
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_api_admin_dbops_near_duplicate_repair_scan_and_apply(
+    db_session: AsyncSession,
+) -> None:
+    await insert_user(
+        db_session,
+        email="api-admin-near-dup@example.com",
+        password="admin-password",
+        is_admin=True,
+    )
+    user_id = await insert_user(
+        db_session,
+        email="api-near-dup-target@example.com",
+        password="user-password",
+    )
+    scholar_result = await db_session.execute(
+        text(
+            """
+            INSERT INTO scholar_profiles (user_id, scholar_id, display_name, is_enabled)
+            VALUES (:user_id, :scholar_id, :display_name, true)
+            RETURNING id
+            """
+        ),
+        {
+            "user_id": user_id,
+            "scholar_id": "nearDupScholar01",
+            "display_name": "Near Dup Target",
+        },
+    )
+    scholar_profile_id = int(scholar_result.scalar_one())
+    first_pub = await db_session.execute(
+        text(
+            """
+            INSERT INTO publications (fingerprint_sha256, title_raw, title_normalized, year, citation_count)
+            VALUES (:fingerprint, :title_raw, :title_normalized, 2014, 100)
+            RETURNING id
+            """
+        ),
+        {
+            "fingerprint": f"{(user_id + 1201):064x}",
+            "title_raw": "Adam: A method for stochastic optimization",
+            "title_normalized": "adam a method for stochastic optimization",
+        },
+    )
+    first_publication_id = int(first_pub.scalar_one())
+    second_pub = await db_session.execute(
+        text(
+            """
+            INSERT INTO publications (fingerprint_sha256, title_raw, title_normalized, year, citation_count)
+            VALUES (:fingerprint, :title_raw, :title_normalized, 2015, 10)
+            RETURNING id
+            """
+        ),
+        {
+            "fingerprint": f"{(user_id + 1202):064x}",
+            "title_raw": "â€ œAdam: A method for stochastic optimization, â€ 3rd Int. Conf. Learn. Represent.",
+            "title_normalized": "adam method for stochastic optimization",
+        },
+    )
+    second_publication_id = int(second_pub.scalar_one())
+    await db_session.execute(
+        text(
+            """
+            INSERT INTO scholar_publications (scholar_profile_id, publication_id, is_read)
+            VALUES (:scholar_profile_id, :first_publication_id, false),
+                   (:scholar_profile_id, :second_publication_id, false)
+            """
+        ),
+        {
+            "scholar_profile_id": scholar_profile_id,
+            "first_publication_id": first_publication_id,
+            "second_publication_id": second_publication_id,
+        },
+    )
+    await db_session.commit()
+
+    client = TestClient(app)
+    login_user(client, email="api-admin-near-dup@example.com", password="admin-password")
+    headers = _api_csrf_headers(client)
+
+    scan_response = client.post(
+        "/api/v1/admin/db/repairs/publication-near-duplicates",
+        json={"dry_run": True, "max_clusters": 20},
+        headers=headers,
+    )
+    assert scan_response.status_code == 200
+    scan_data = scan_response.json()["data"]
+    assert scan_data["status"] == "completed"
+    assert int(scan_data["summary"]["candidate_cluster_count"]) >= 1
+    assert len(scan_data["clusters"]) >= 1
+    selected_key = str(scan_data["clusters"][0]["cluster_key"])
+
+    missing_confirmation = client.post(
+        "/api/v1/admin/db/repairs/publication-near-duplicates",
+        json={"dry_run": False, "selected_cluster_keys": [selected_key]},
+        headers=headers,
+    )
+    assert missing_confirmation.status_code == 422
+    assert "confirmation_text" in str(missing_confirmation.json())
+
+    apply_response = client.post(
+        "/api/v1/admin/db/repairs/publication-near-duplicates",
+        json={
+            "dry_run": False,
+            "selected_cluster_keys": [selected_key],
+            "confirmation_text": "MERGE SELECTED DUPLICATES",
+        },
+        headers=headers,
+    )
+    assert apply_response.status_code == 200
+    apply_data = apply_response.json()["data"]
+    assert apply_data["status"] == "completed"
+    assert int(apply_data["summary"]["merged_publications"]) >= 1
+
+    remaining = await db_session.execute(
+        text(
+            """
+            SELECT count(*)
+            FROM publications
+            WHERE id IN (:first_publication_id, :second_publication_id)
+            """
+        ),
+        {
+            "first_publication_id": first_publication_id,
+            "second_publication_id": second_publication_id,
+        },
+    )
+    assert int(remaining.scalar_one()) == 1
 
 
 @pytest.mark.integration
@@ -753,9 +893,11 @@ async def test_api_scholars_search_and_profile_image_management(
 
     previous_upload_dir = settings.scholar_image_upload_dir
     previous_upload_max_bytes = settings.scholar_image_upload_max_bytes
+    previous_queue_enabled = settings.ingestion_continuation_queue_enabled
     app.dependency_overrides[get_scholar_source] = lambda: StubScholarSource()
     object.__setattr__(settings, "scholar_image_upload_dir", str(tmp_path / "scholar_images"))
     object.__setattr__(settings, "scholar_image_upload_max_bytes", 1_000_000)
+    object.__setattr__(settings, "ingestion_continuation_queue_enabled", False)
 
     try:
         client = TestClient(app)
@@ -826,6 +968,7 @@ async def test_api_scholars_search_and_profile_image_management(
             "scholar_image_upload_max_bytes",
             previous_upload_max_bytes,
         )
+        object.__setattr__(settings, "ingestion_continuation_queue_enabled", previous_queue_enabled)
 
 
 @pytest.mark.integration
@@ -1891,6 +2034,190 @@ async def test_api_publications_list_supports_pagination(db_session: AsyncSessio
     assert second_data["has_prev"] is True
     assert second_data["has_next"] is False
     assert len(second_data["publications"]) == 1
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_api_publications_search_pagination_uses_filtered_total_count(
+    db_session: AsyncSession,
+) -> None:
+    user_id = await insert_user(
+        db_session,
+        email="api-pubs-search-page@example.com",
+        password="api-password",
+    )
+    scholar_result = await db_session.execute(
+        text(
+            """
+            INSERT INTO scholar_profiles (user_id, scholar_id, display_name, is_enabled)
+            VALUES (:user_id, :scholar_id, :display_name, true)
+            RETURNING id
+            """
+        ),
+        {
+            "user_id": user_id,
+            "scholar_id": "searchPagingScholar01",
+            "display_name": "Search Paging Scholar",
+        },
+    )
+    scholar_profile_id = int(scholar_result.scalar_one())
+    titles = ["Alpha Optimization", "Alpha Learning", "Beta Methods"]
+    publication_ids: list[int] = []
+    for index, title in enumerate(titles):
+        created = await db_session.execute(
+            text(
+                """
+                INSERT INTO publications (fingerprint_sha256, title_raw, title_normalized, citation_count)
+                VALUES (:fingerprint, :title_raw, :title_normalized, 1)
+                RETURNING id
+                """
+            ),
+            {
+                "fingerprint": f"{(user_id + 900 + index):064x}",
+                "title_raw": title,
+                "title_normalized": title.lower(),
+            },
+        )
+        publication_ids.append(int(created.scalar_one()))
+    for publication_id in publication_ids:
+        await db_session.execute(
+            text(
+                """
+                INSERT INTO scholar_publications (scholar_profile_id, publication_id, is_read, is_favorite)
+                VALUES (:scholar_profile_id, :publication_id, false, false)
+                """
+            ),
+            {"scholar_profile_id": scholar_profile_id, "publication_id": publication_id},
+        )
+    await db_session.commit()
+
+    client = TestClient(app)
+    login_user(client, email="api-pubs-search-page@example.com", password="api-password")
+
+    response = client.get("/api/v1/publications?mode=all&page=1&page_size=2&search=alpha")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert int(data["total_count"]) == 2
+    assert data["has_next"] is False
+    assert len(data["publications"]) == 2
+    assert all("alpha" in str(item["title"]).lower() for item in data["publications"])
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_api_publications_supports_sort_by_pdf_status(
+    db_session: AsyncSession,
+) -> None:
+    user_id = await insert_user(
+        db_session,
+        email="api-pubs-pdf-sort@example.com",
+        password="api-password",
+    )
+    scholar_result = await db_session.execute(
+        text(
+            """
+            INSERT INTO scholar_profiles (user_id, scholar_id, display_name, is_enabled)
+            VALUES (:user_id, :scholar_id, :display_name, true)
+            RETURNING id
+            """
+        ),
+        {
+            "user_id": user_id,
+            "scholar_id": "pdfSortScholar01",
+            "display_name": "PDF Sort Scholar",
+        },
+    )
+    scholar_profile_id = int(scholar_result.scalar_one())
+
+    resolved_result = await db_session.execute(
+        text(
+            """
+            INSERT INTO publications (fingerprint_sha256, title_raw, title_normalized, citation_count, pdf_url)
+            VALUES (:fingerprint, :title_raw, :title_normalized, 1, :pdf_url)
+            RETURNING id
+            """
+        ),
+        {
+            "fingerprint": f"{(user_id + 1300):064x}",
+            "title_raw": "Resolved PDF",
+            "title_normalized": "resolved pdf",
+            "pdf_url": "https://example.org/resolved.pdf",
+        },
+    )
+    resolved_publication_id = int(resolved_result.scalar_one())
+    queued_result = await db_session.execute(
+        text(
+            """
+            INSERT INTO publications (fingerprint_sha256, title_raw, title_normalized, citation_count)
+            VALUES (:fingerprint, :title_raw, :title_normalized, 1)
+            RETURNING id
+            """
+        ),
+        {
+            "fingerprint": f"{(user_id + 1301):064x}",
+            "title_raw": "Queued PDF",
+            "title_normalized": "queued pdf",
+        },
+    )
+    queued_publication_id = int(queued_result.scalar_one())
+    failed_result = await db_session.execute(
+        text(
+            """
+            INSERT INTO publications (fingerprint_sha256, title_raw, title_normalized, citation_count)
+            VALUES (:fingerprint, :title_raw, :title_normalized, 1)
+            RETURNING id
+            """
+        ),
+        {
+            "fingerprint": f"{(user_id + 1302):064x}",
+            "title_raw": "Failed PDF",
+            "title_normalized": "failed pdf",
+        },
+    )
+    failed_publication_id = int(failed_result.scalar_one())
+    await db_session.execute(
+        text(
+            """
+            INSERT INTO scholar_publications (scholar_profile_id, publication_id, is_read, is_favorite)
+            VALUES
+              (:scholar_profile_id, :resolved_publication_id, false, false),
+              (:scholar_profile_id, :queued_publication_id, false, false),
+              (:scholar_profile_id, :failed_publication_id, false, false)
+            """
+        ),
+        {
+            "scholar_profile_id": scholar_profile_id,
+            "resolved_publication_id": resolved_publication_id,
+            "queued_publication_id": queued_publication_id,
+            "failed_publication_id": failed_publication_id,
+        },
+    )
+    await db_session.execute(
+        text(
+            """
+            INSERT INTO publication_pdf_jobs (publication_id, status, attempt_count)
+            VALUES (:queued_publication_id, 'queued', 1),
+                   (:failed_publication_id, 'failed', 2)
+            """
+        ),
+        {
+            "queued_publication_id": queued_publication_id,
+            "failed_publication_id": failed_publication_id,
+        },
+    )
+    await db_session.commit()
+
+    client = TestClient(app)
+    login_user(client, email="api-pubs-pdf-sort@example.com", password="api-password")
+
+    response = client.get("/api/v1/publications?mode=all&sort_by=pdf_status&sort_dir=desc")
+    assert response.status_code == 200
+    publications = response.json()["data"]["publications"]
+    publication_ids = [int(item["publication_id"]) for item in publications]
+    assert publication_ids[0] == resolved_publication_id
+    assert publication_ids[-1] == failed_publication_id
 
 
 @pytest.mark.integration

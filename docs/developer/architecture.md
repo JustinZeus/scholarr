@@ -14,6 +14,7 @@ Canonical business logic belongs in `app/services/domains/*`.
 - `app/services/domains/scholar/*`: fail-fast scholar parsing and source fetch adapters.
 - `app/services/domains/scholars/*`: scholar CRUD, profile image, and name-search controls.
 - `app/services/domains/publications/*`: listing/read-state, favorite toggles, enrichment scheduling, and retry paths.
+- `app/services/domains/arxiv/*`: typed API client, global DB-backed throttle, query cache, and in-flight request coalescing.
 - `app/services/domains/crossref/*` + `app/services/domains/unpaywall/*`: DOI/OA enrichment with bounded pacing.
 - `app/services/domains/runs/*`: run history and continuation queue operations.
 - `app/services/domains/portability/*`: import/export workflows.
@@ -49,3 +50,9 @@ graph TD
 
 ### Identifier Engine Philosophy
 The platform previously treated the `DOI` as a hardcoded 1:1 property of a publication. It now utilizes a decoupled *Identifier Gathering* module (`PublicationIdentifier` table). A single publication can have multiple identifiers (ex. `doi`, `arxiv`, `pmid`, `pmcid`). This creates high resilience when integrating with external APIs, allowing systems like Unpaywall to be fed explicitly with high-confidence DOIs, rather than relying on unstructured search heuristics.
+
+### arXiv Safety and Efficiency
+- arXiv requests are globally serialized via a PostgreSQL advisory lock and shared runtime row (`arxiv_runtime_state`).
+- identical request payloads are fingerprinted and cached in `arxiv_query_cache_entries` with TTL + optional max-entry pruning.
+- concurrent identical misses are coalesced in-process, so one outbound call serves all waiters.
+- structured logs provide auditability for scheduling/completion/cooldown/cache behavior.

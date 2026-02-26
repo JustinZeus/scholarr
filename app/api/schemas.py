@@ -703,6 +703,70 @@ class AdminRepairPublicationLinksEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class AdminNearDuplicateClusterMemberData(BaseModel):
+    publication_id: int
+    title: str
+    year: int | None
+    citation_count: int
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class AdminNearDuplicateClusterData(BaseModel):
+    cluster_key: str
+    winner_publication_id: int
+    member_count: int
+    similarity_score: float = Field(ge=0.0, le=1.0)
+    members: list[AdminNearDuplicateClusterMemberData] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class AdminRepairPublicationNearDuplicatesRequest(BaseModel):
+    dry_run: bool = True
+    similarity_threshold: float = Field(default=0.78, ge=0.5, le=1.0)
+    min_shared_tokens: int = Field(default=3, ge=1, le=8)
+    max_year_delta: int = Field(default=1, ge=0, le=5)
+    max_clusters: int = Field(default=25, ge=1, le=200)
+    selected_cluster_keys: list[str] = Field(default_factory=list, max_length=200)
+    requested_by: str | None = None
+    confirmation_text: str | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_apply_mode(self) -> "AdminRepairPublicationNearDuplicatesRequest":
+        if self.dry_run:
+            return self
+        if not self.selected_cluster_keys:
+            raise ValueError("selected_cluster_keys is required when dry_run=false.")
+        expected = "MERGE SELECTED DUPLICATES"
+        provided = (self.confirmation_text or "").strip()
+        if provided != expected:
+            raise ValueError(
+                "confirmation_text must equal 'MERGE SELECTED DUPLICATES' "
+                "when applying near-duplicate merges."
+            )
+        return self
+
+
+class AdminRepairPublicationNearDuplicatesResultData(BaseModel):
+    job_id: int
+    status: str
+    scope: dict[str, Any] = Field(default_factory=dict)
+    summary: dict[str, Any] = Field(default_factory=dict)
+    clusters: list[AdminNearDuplicateClusterData] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class AdminRepairPublicationNearDuplicatesEnvelope(BaseModel):
+    data: AdminRepairPublicationNearDuplicatesResultData
+    meta: ApiMeta
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class SettingsPolicyData(BaseModel):
     min_run_interval_minutes: int
     min_request_delay_seconds: int
