@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,7 @@ from app.services.domains.portability import application as import_export_servic
 from app.services.domains.scholar import rate_limit as scholar_rate_limit
 from app.services.domains.scholar.source import ScholarSource
 from app.services.domains.scholars import application as scholar_service
+from app.services.domains.scholars import search_hints as scholar_search_hints
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -110,7 +112,7 @@ def _serialize_scholar(profile) -> dict[str, object]:
     if profile.profile_image_upload_path:
         uploaded_image_url = _uploaded_image_media_path(int(profile.id))
 
-    profile_image_url, profile_image_source = scholar_service.resolve_profile_image(
+    profile_image_url, profile_image_source = scholar_search_hints.resolve_profile_image(
         profile,
         uploaded_image_url=uploaded_image_url,
     )
@@ -180,7 +182,7 @@ async def _hydrate_scholar_metadata_if_needed(
     return profile
 
 
-def _search_kwargs() -> dict[str, object]:
+def _search_kwargs() -> dict[str, Any]:
     return {
         "network_error_retries": settings.ingestion_network_error_retries,
         "retry_backoff_seconds": settings.ingestion_retry_backoff_seconds,
@@ -202,7 +204,7 @@ def _search_response_data(query: str, parsed) -> dict[str, object]:
         "query": query.strip(),
         "state": parsed.state.value,
         "state_reason": parsed.state_reason,
-        "action_hint": scholar_service.scrape_state_hint(
+        "action_hint": scholar_search_hints.scrape_state_hint(
             state=parsed.state,
             state_reason=parsed.state_reason,
         ),

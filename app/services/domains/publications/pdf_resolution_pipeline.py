@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.logging_utils import structured_log
-from app.services.domains.arxiv.application import ArxivRateLimitError
+from app.services.domains.arxiv.errors import ArxivRateLimitError
 from app.services.domains.arxiv.guards import arxiv_skip_reason_for_item
 from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
 from app.services.domains.publications.types import PublicationListItem

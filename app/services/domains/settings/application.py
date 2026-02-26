@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import UserSetting
+from app.settings import settings as app_settings
 
 
 class UserSettingsServiceError(ValueError):
@@ -101,9 +102,6 @@ def parse_nav_visible_pages(value: object) -> list[str]:
         raise UserSettingsServiceError("Dashboard, Scholars, and Settings must remain visible.")
 
     return deduped
-
-
-from app.settings import settings as app_settings
 
 
 async def get_or_create_settings(

@@ -93,8 +93,7 @@ def find_best_match(
 
     for original_score, cand in top_scored_candidates:
         tb_score = 0
-        if target_year is not None and cand.publication_year is not None:
-            if abs(target_year - cand.publication_year) <= 1:
+        if target_year is not None and cand.publication_year is not None and abs(target_year - cand.publication_year) <= 1:
                 tb_score += 1
 
         candidate_author_names = [a.display_name for a in cand.authors if a.display_name]

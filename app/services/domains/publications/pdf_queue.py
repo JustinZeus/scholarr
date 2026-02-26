@@ -190,12 +190,10 @@ def _can_enqueue_job(
         return False
     if int(job.attempt_count) >= _auto_retry_max_attempts():
         return False
-    if _cooldown_active(
+    return not _cooldown_active(
         last_attempt_at=job.last_attempt_at,
         attempt_count=int(job.attempt_count),
-    ):
-        return False
-    return True
+    )
 
 
 def _event_row(

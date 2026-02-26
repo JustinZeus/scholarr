@@ -367,10 +367,7 @@ def _publication_identity(pub: PublicationCandidate) -> str:
 
 
 def _is_fuzzy_dup(tokens: set[str], seen: list[set[str]]) -> bool:
-    for existing in seen:
-        if _jaccard(tokens, existing) >= _CANONICAL_DEDUP_THRESHOLD:
-            return True
-    return False
+    return any(_jaccard(tokens, existing) >= _CANONICAL_DEDUP_THRESHOLD for existing in seen)
 
 
 def _build_body_excerpt(body: str, *, max_chars: int = 220) -> str | None:

@@ -65,8 +65,9 @@ def _extract_explicit_doi(text: str | None) -> str | None:
 
 def _publication_doi(item: PublicationListItem | UnreadPublicationItem) -> str | None:
     stored = None
-    if getattr(item, "display_identifier", None) and item.display_identifier.kind == "doi":
-        stored = normalize_doi(item.display_identifier.value)
+    di = getattr(item, "display_identifier", None)
+    if di is not None and di.kind == "doi":
+        stored = normalize_doi(di.value)
 
     explicit_doi = _extract_explicit_doi(item.pub_url) or _extract_explicit_doi(item.venue_text)
     if explicit_doi:

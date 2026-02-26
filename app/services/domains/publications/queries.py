@@ -19,7 +19,7 @@ from app.services.domains.publications.types import PublicationListItem, UnreadP
 
 def _normalized_citation_count(value: object) -> int:
     try:
-        return int(value or 0)
+        return int(value or 0)  # type: ignore[call-overload]  # intentionally accepts any object
     except (TypeError, ValueError):
         return 0
 

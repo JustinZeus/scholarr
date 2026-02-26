@@ -6,6 +6,7 @@ import os
 import random
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import delete, func, select, text
@@ -182,11 +183,11 @@ def _deserialize_candidate_payload(value: object) -> dict[str, object] | None:
     }
 
 
-def _deserialize_candidates(payload: dict[str, object]) -> list[dict[str, object]]:
+def _deserialize_candidates(payload: dict[str, object]) -> list[dict[str, Any]]:
     candidates_payload = payload.get("candidates")
     if not isinstance(candidates_payload, list):
         return []
-    normalized: list[dict[str, object]] = []
+    normalized: list[dict[str, Any]] = []
     for value in candidates_payload:
         candidate = _deserialize_candidate_payload(value)
         if candidate is not None:
@@ -790,7 +791,7 @@ async def _perform_live_author_search(
     cache_ttl_seconds: int,
     cache_max_entries: int,
 ) -> tuple[ParsedAuthorSearchPage, bool]:
-    runtime_state_updated = await _wait_for_author_search_throttle(
+    await _wait_for_author_search_throttle(
         runtime_state=runtime_state,
         normalized_query=normalized_query,
         now_utc=datetime.now(UTC),

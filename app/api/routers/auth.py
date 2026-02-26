@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,7 +62,7 @@ def _serialize_user_payload(user: User) -> dict[str, object]:
     }
 
 
-def _raise_invalid_credentials(*, normalized_email: str) -> None:
+def _raise_invalid_credentials(*, normalized_email: str) -> NoReturn:
     structured_log(logger, "info", "api.auth.login_failed", email=normalized_email)
     raise ApiException(
         status_code=401,

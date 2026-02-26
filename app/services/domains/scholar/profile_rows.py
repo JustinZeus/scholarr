@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from html.parser import HTMLParser
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from app.services.domains.scholar.parser_constants import (
@@ -30,7 +31,7 @@ class ScholarRowParser(HTMLParser):
         self._title_depth = 0
         self._citation_depth = 0
         self._year_depth = 0
-        self._gray_stack: list[dict[str, object]] = []
+        self._gray_stack: list[dict[str, Any]] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if self._title_depth > 0:
@@ -252,9 +253,7 @@ def has_show_more_button(html: str) -> bool:
         return False
     if 'aria-disabled="true"' in button_tag or "aria-disabled='true'" in button_tag:
         return False
-    if "gs_dis" in button_tag:
-        return False
-    return True
+    return "gs_dis" not in button_tag
 
 
 def has_operation_error_banner(html: str) -> bool:

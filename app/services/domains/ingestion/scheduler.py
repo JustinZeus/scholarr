@@ -330,9 +330,7 @@ class SchedulerService:
             await session.commit()
         if queue_item is None:
             return False
-        if queue_item.status == QueueItemStatus.DROPPED.value:
-            return False
-        return True
+        return queue_item.status != QueueItemStatus.DROPPED.value
 
     async def _queue_job_has_available_scholar(
         self,

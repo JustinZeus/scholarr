@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from typing import Any
@@ -32,6 +33,7 @@ from app.services.domains.settings import application as user_settings_service
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
+_background_tasks: set[asyncio.Task[Any]] = set()
 
 router = APIRouter(prefix="/runs", tags=["api-runs"])
 ACTIVE_RUN_STATUSES = {RunStatus.RUNNING, RunStatus.RESOLVING}
@@ -656,11 +658,9 @@ async def run_manual(
         await db_session.commit()
 
         # Kick off background execution
-        import asyncio
-
         from app.db.session import get_session_factory
 
-        asyncio.create_task(
+        task = asyncio.create_task(
             ingest_service.execute_run(
                 session_factory=get_session_factory(),
                 run_id=run.id,
@@ -680,6 +680,8 @@ async def run_manual(
                 idempotency_key=idempotency_key,
             )
         )
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
         return success_payload(
             request,

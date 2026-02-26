@@ -12,6 +12,15 @@ from app.services.domains.scholar.parser_types import (
     ScholarDomInvariantError,
     ScholarMalformedDataError,
 )
+from app.services.domains.scholar.parser_types import (
+    ParseState as ParseState,
+)
+from app.services.domains.scholar.parser_types import (
+    ScholarParserError as ScholarParserError,
+)
+from app.services.domains.scholar.parser_types import (
+    ScholarSearchCandidate as ScholarSearchCandidate,
+)
 from app.services.domains.scholar.parser_utils import (
     strip_tags,
 )

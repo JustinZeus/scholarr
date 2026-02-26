@@ -109,6 +109,9 @@ def _classify_failure_bucket(*, state: str, state_reason: str) -> str:
     return FAILURE_BUCKET_OTHER
 
 
+_background_tasks: set[asyncio.Task[Any]] = set()
+
+
 class ScholarIngestionService:
     def __init__(self, *, source: ScholarSource) -> None:
         self._source = source
@@ -287,9 +290,8 @@ class ScholarIngestionService:
         paged_parse_result: PagedParseResult,
     ) -> None:
         parsed_page = paged_parse_result.parsed_page
-        if parsed_page.state in {ParseState.OK, ParseState.NO_RESULTS}:
-            if any(code.startswith("layout_") for code in parsed_page.warnings):
-                raise RuntimeError(f"Layout warning marked as terminal for scholar_id={scholar_id}.")
+        if parsed_page.state in {ParseState.OK, ParseState.NO_RESULTS} and any(code.startswith("layout_") for code in parsed_page.warnings):
+            raise RuntimeError(f"Layout warning marked as terminal for scholar_id={scholar_id}.")
         for publication in paged_parse_result.publications:
             if not publication.title.strip():
                 raise RuntimeError(f"Malformed publication title for scholar_id={scholar_id}.")
@@ -1490,7 +1492,7 @@ class ScholarIngestionService:
 
                 # Fire-and-forget enrichment in a separate background task
                 if intended_final_status not in (RunStatus.CANCELED,):
-                    asyncio.create_task(
+                    task = asyncio.create_task(
                         self._background_enrich(
                             session_factory,
                             run_id=run.id,
@@ -1498,6 +1500,8 @@ class ScholarIngestionService:
                             openalex_api_key=getattr(user_settings, "openalex_api_key", None),
                         )
                     )
+                    _background_tasks.add(task)
+                    task.add_done_callback(_background_tasks.discard)
             except Exception as exc:
                 await db_session.rollback()
                 logger.exception("ingestion.background_run_failed", extra={"run_id": run_id, "user_id": user_id})
@@ -2807,7 +2811,7 @@ class ScholarIngestionService:
             publication.venue_text = candidate.venue_text
         if candidate.title_url:
             publication.pub_url = build_publication_url(candidate.title_url)
-        local_doi = first_doi_from_texts(candidate.title_url, candidate.venue_text, candidate.title)
+        first_doi_from_texts(candidate.title_url, candidate.venue_text, candidate.title)
 
     async def _resolve_publication(
         self,

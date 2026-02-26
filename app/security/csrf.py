@@ -54,7 +54,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if request_token is None and self._is_form_payload(request):
             body = await request.body()
             request_token = self._token_from_form_body(request, body)
-            request._receive = self._build_receive(body)  # type: ignore[attr-defined]
+            request._receive = self._build_receive(body)
 
         if not request_token or not compare_digest(str(session_token), str(request_token)):
             structured_log(

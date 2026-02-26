@@ -11,6 +11,7 @@ from app.api.errors import ApiException
 from app.db.models import User
 from app.db.session import get_db_session
 from app.services.domains.scholars import application as scholar_service
+from app.services.domains.scholars import uploads as scholar_uploads
 from app.settings import settings
 
 router = APIRouter(tags=["media"])
@@ -41,7 +42,7 @@ async def get_uploaded_scholar_image(
         )
 
     try:
-        image_path = scholar_service.resolve_upload_file_path(
+        image_path = scholar_uploads.resolve_upload_file_path(
             upload_dir=settings.scholar_image_upload_dir,
             relative_path=profile.profile_image_upload_path,
         )

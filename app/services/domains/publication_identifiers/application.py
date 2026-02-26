@@ -188,7 +188,7 @@ async def _discover_crossref_doi(
 
     discovered_doi = await crossref_service.discover_doi_for_publication(item=item)
     normalized_doi = normalize_doi(discovered_doi)
-    if normalized_doi is None:
+    if discovered_doi is None or normalized_doi is None:
         return False
     candidate = _candidate(
         IdentifierKind.DOI,
@@ -216,7 +216,7 @@ async def _discover_arxiv_identifier(
 
     discovered_arxiv = await arxiv_service.discover_arxiv_id_for_publication(item=item)
     normalized_arxiv = normalize_arxiv_id(discovered_arxiv)
-    if normalized_arxiv is None:
+    if discovered_arxiv is None or normalized_arxiv is None:
         return
     candidate = _candidate(
         IdentifierKind.ARXIV,
