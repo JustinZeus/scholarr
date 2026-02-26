@@ -21,6 +21,7 @@ from app.http.middleware import (
     parse_skip_paths,
 )
 from app.logging_config import configure_logging, parse_redact_fields
+from app.logging_utils import structured_log
 from app.security.csrf import CSRFMiddleware
 from app.services.domains.ingestion.scheduler import SchedulerService
 from app.settings import settings
@@ -50,22 +51,15 @@ scheduler_service = SchedulerService(
 )
 
 
-def _log_startup_build_marker() -> None:
-    logger.info(
-        "app.startup_build_marker",
-        extra={
-            "event": "app.startup_build_marker",
-            "build_marker": BUILD_MARKER,
-            "frontend_enabled": settings.frontend_enabled,
-            "scheduler_enabled": settings.scheduler_enabled,
-            "log_format": settings.log_format,
-        },
-    )
-
-
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    _log_startup_build_marker()
+    structured_log(
+        logger, "info", "app.startup_build_marker",
+        build_marker=BUILD_MARKER,
+        frontend_enabled=settings.frontend_enabled,
+        scheduler_enabled=settings.scheduler_enabled,
+        log_format=settings.log_format,
+    )
     
     from app.db.session import get_session_factory
     from sqlalchemy import text
@@ -74,7 +68,7 @@ async def lifespan(_: FastAPI):
         async with session_factory() as session:
             await session.execute(text("UPDATE crawl_runs SET status = 'failed' WHERE status::text IN ('running', 'resolving')"))
             await session.commit()
-            logger.info("app.startup_orphaned_runs_cleaned", extra={"event": "app.startup_orphaned_runs_cleaned"})
+            structured_log(logger, "info", "app.startup_orphaned_runs_cleaned")
     except Exception as e:
         logger.error(f"Failed to clean orphaned runs at startup: {e}")
 

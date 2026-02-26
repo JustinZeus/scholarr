@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from app.logging_utils import structured_log
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -30,13 +31,10 @@ def _normalized_pool_mode(raw_mode: str) -> str:
         return "queue"
     if mode in {"null", "queue"}:
         return mode
-    logger.warning(
-        "db.invalid_pool_mode_fallback",
-        extra={
-            "event": "db.invalid_pool_mode_fallback",
-            "database_pool_mode": raw_mode,
-            "fallback_mode": "queue",
-        },
+    structured_log(
+        logger, "warning", "db.invalid_pool_mode_fallback",
+        database_pool_mode=raw_mode,
+        fallback_mode="queue",
     )
     return "queue"
 
@@ -56,12 +54,9 @@ def get_engine() -> AsyncEngine:
             engine_kwargs["pool_timeout"] = max(1, int(settings.database_pool_timeout_seconds))
 
         _engine = create_async_engine(settings.database_url, **engine_kwargs)
-        logger.info(
-            "db.engine_initialized",
-            extra={
-                "event": "db.engine_initialized",
-                "pool_mode": pool_mode,
-            },
+        structured_log(
+            logger, "info", "db.engine_initialized",
+            pool_mode=pool_mode,
         )
     return _engine
 
@@ -86,7 +81,7 @@ async def check_database() -> bool:
             result = await conn.execute(text("SELECT 1"))
             return result.scalar_one() == 1
     except Exception:
-        logger.exception("db.healthcheck_failed", extra={"event": "db.healthcheck_failed"})
+        logger.exception("db.healthcheck_failed")
         return False
 
 
@@ -94,6 +89,6 @@ async def close_engine() -> None:
     global _engine, _session_factory
     if _engine is not None:
         await _engine.dispose()
-        logger.info("db.engine_disposed", extra={"event": "db.engine_disposed"})
+        structured_log(logger, "info", "db.engine_disposed")
         _engine = None
         _session_factory = None

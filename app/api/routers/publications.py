@@ -22,6 +22,7 @@ from app.api.schemas import (
 )
 from app.db.models import User
 from app.db.session import get_db_session
+from app.logging_utils import structured_log
 from app.services.domains.publication_identifiers import application as identifier_service
 from app.services.domains.publications import application as publication_service
 from app.services.domains.scholars import application as scholar_service
@@ -340,30 +341,6 @@ async def _favorite_publication_state(
     return identifiers[0] if identifiers else current
 
 
-def _log_retry_pdf_result(
-    *,
-    current_user: User,
-    scholar_profile_id: int,
-    publication_id: int,
-    queued: bool,
-    resolved_pdf: bool,
-    pdf_status: str,
-    doi: str | None,
-) -> None:
-    logger.info(
-        "api.publications.retry_pdf",
-        extra={
-            "event": "api.publications.retry_pdf",
-            "user_id": current_user.id,
-            "scholar_profile_id": scholar_profile_id,
-            "publication_id": publication_id,
-            "queued": queued,
-            "resolved_pdf": resolved_pdf,
-            "pdf_status": pdf_status,
-        },
-    )
-
-
 @router.get(
     "",
     response_model=PublicationsListEnvelope,
@@ -443,14 +420,7 @@ async def mark_all_publications_read(
         db_session,
         user_id=current_user.id,
     )
-    logger.info(
-        "api.publications.mark_all_read",
-        extra={
-            "event": "api.publications.mark_all_read",
-            "user_id": current_user.id,
-            "updated_count": updated_count,
-        },
-    )
+    structured_log(logger, "info", "api.publications.mark_all_read", user_id=current_user.id, updated_count=updated_count)
     return success_payload(
         request,
         data={
@@ -481,15 +451,7 @@ async def mark_selected_publications_read(
         user_id=current_user.id,
         selections=selection_pairs,
     )
-    logger.info(
-        "api.publications.mark_selected_read",
-        extra={
-            "event": "api.publications.mark_selected_read",
-            "user_id": current_user.id,
-            "requested_count": len(selection_pairs),
-            "updated_count": updated_count,
-        },
-    )
+    structured_log(logger, "info", "api.publications.mark_selected_read", user_id=current_user.id, requested_count=len(selection_pairs), updated_count=updated_count)
     return success_payload(
         request,
         data={
@@ -523,14 +485,14 @@ async def retry_publication_pdf(
         resolved_pdf=resolved_pdf,
         pdf_status=current.pdf_status,
     )
-    _log_retry_pdf_result(
-        current_user=current_user,
+    structured_log(
+        logger, "info", "api.publications.retry_pdf",
+        user_id=current_user.id,
         scholar_profile_id=payload.scholar_profile_id,
         publication_id=publication_id,
         queued=queued,
         resolved_pdf=resolved_pdf,
         pdf_status=current.pdf_status,
-        doi=None,
     )
     return success_payload(
         request,
@@ -561,16 +523,7 @@ async def toggle_publication_favorite(
         publication_id=publication_id,
         is_favorite=payload.is_favorite,
     )
-    logger.info(
-        "api.publications.favorite",
-        extra={
-            "event": "api.publications.favorite",
-            "user_id": current_user.id,
-            "scholar_profile_id": payload.scholar_profile_id,
-            "publication_id": publication_id,
-            "is_favorite": bool(payload.is_favorite),
-        },
-    )
+    structured_log(logger, "info", "api.publications.favorite", user_id=current_user.id, scholar_profile_id=payload.scholar_profile_id, publication_id=publication_id, is_favorite=bool(payload.is_favorite))
     return success_payload(
         request,
         data={

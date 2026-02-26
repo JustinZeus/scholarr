@@ -13,6 +13,7 @@ from app.services.domains.unpaywall.pdf_discovery import (
     resolve_pdf_from_landing_page,
 )
 from app.services.domains.unpaywall.rate_limit import wait_for_unpaywall_slot
+from app.logging_utils import structured_log
 from app.settings import settings
 
 if TYPE_CHECKING:
@@ -157,10 +158,7 @@ async def _resolved_pdf_url_from_payload(
     for page_url in _crawl_targets(payload=payload, pdf_candidates=pdf_candidates)[:3]:
         discovered = await resolve_pdf_from_landing_page(client, page_url=page_url)
         if discovered:
-            logger.info(
-                "unpaywall.pdf_discovered_from_landing",
-                extra={"event": "unpaywall.pdf_discovered_from_landing", "landing_url": page_url},
-            )
+            structured_log(logger, "info", "unpaywall.pdf_discovered_from_landing", landing_url=page_url)
             return discovered
     return None
 
@@ -189,27 +187,6 @@ async def _fetch_unpaywall_payload_by_doi(
 def _email_for_request(request_email: str | None) -> str | None:
     email = (request_email or "").strip() or settings.unpaywall_email.strip()
     return email or None
-
-
-def _log_resolution_summary(
-    *,
-    publication_count: int,
-    doi_input_count: int,
-    search_attempt_count: int,
-    resolved_pdf_count: int,
-    email: str,
-) -> None:
-    logger.info(
-        "unpaywall.resolve_completed",
-        extra={
-            "event": "unpaywall.resolve_completed",
-            "publication_count": publication_count,
-            "doi_input_count": doi_input_count,
-            "search_attempt_count": search_attempt_count,
-            "resolved_pdf_count": resolved_pdf_count,
-            "email_domain": email.split("@", 1)[-1] if "@" in email else None,
-        },
-    )
 
 
 async def _resolve_item_payload(
@@ -370,14 +347,7 @@ async def _safe_outcome_for_item(
             allow_crossref=allow_crossref,
         )
     except Exception as exc:  # pragma: no cover - defensive network boundary
-        logger.warning(
-            "unpaywall.resolve_item_failed",
-            extra={
-                "event": "unpaywall.resolve_item_failed",
-                "publication_id": item.publication_id,
-                "error": str(exc),
-            },
-        )
+        structured_log(logger, "warning", "unpaywall.resolve_item_failed", publication_id=item.publication_id, error=str(exc))
         return _outcome_with_failure(
             item=item,
             failure_reason=FAILURE_RESOLUTION_EXCEPTION,
@@ -439,12 +409,13 @@ async def resolve_publication_oa_outcomes(
             targets=targets,
             email=email,
         )
-    _log_resolution_summary(
+    structured_log(
+        logger, "info", "unpaywall.resolve_completed",
         publication_count=len(items),
         doi_input_count=_doi_input_count(items),
         search_attempt_count=_search_attempt_count(targets=targets),
         resolved_pdf_count=_resolved_pdf_count(outcomes),
-        email=email,
+        email_domain=email.split("@", 1)[-1] if "@" in email else None,
     )
     return outcomes
 

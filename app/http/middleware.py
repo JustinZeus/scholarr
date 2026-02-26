@@ -9,6 +9,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.logging_context import set_request_id
+from app.logging_utils import structured_log
 
 REQUEST_ID_HEADER = "X-Request-ID"
 DEFAULT_PERMISSIONS_POLICY = (
@@ -61,13 +62,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         should_log = self._log_requests and not self._is_skipped_path(request.url.path)
         if should_log:
-            logger.debug(
-                "request.started",
-                extra={
-                    "event": "request.started",
-                    "method": request.method,
-                    "path": request.url.path,
-                },
+            structured_log(
+                logger, "debug", "request.started",
+                method=request.method,
+                path=request.url.path,
             )
 
         try:
@@ -77,7 +75,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             logger.exception(
                 "request.failed",
                 extra={
-                    "event": "request.failed",
                     "method": request.method,
                     "path": request.url.path,
                     "duration_ms": duration_ms,
@@ -88,15 +85,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             duration_ms = int((time.perf_counter() - start) * 1000)
             response.headers[REQUEST_ID_HEADER] = request_id
             if should_log:
-                logger.debug(
-                    "request.completed",
-                    extra={
-                        "event": "request.completed",
-                        "method": request.method,
-                        "path": request.url.path,
-                        "status_code": response.status_code,
-                        "duration_ms": duration_ms,
-                    },
+                structured_log(
+                    logger, "debug", "request.completed",
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=response.status_code,
+                    duration_ms=duration_ms,
                 )
             return response
         finally:

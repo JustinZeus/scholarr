@@ -27,6 +27,7 @@ from app.services.domains.unpaywall.application import (
     FAILURE_RESOLUTION_EXCEPTION,
     OaResolutionOutcome,
 )
+from app.logging_utils import structured_log
 from app.settings import settings
 
 PDF_STATUS_UNTRACKED = "untracked"
@@ -320,10 +321,7 @@ def _drop_finished_task(task: asyncio.Task[None]) -> None:
     try:
         task.result()
     except Exception:
-        logger.exception(
-            "publications.pdf_queue.task_failed",
-            extra={"event": "publications.pdf_queue.task_failed"},
-        )
+        logger.exception("publications.pdf_queue.task_failed")
 
 
 async def _mark_attempt_started(
@@ -474,14 +472,7 @@ async def _resolve_publication_row(
         # Propagate upward so the batch loop can stop immediately.
         raise
     except Exception as exc:  # pragma: no cover - defensive network boundary
-        logger.warning(
-            "publications.pdf_queue.resolve_failed",
-            extra={
-                "event": "publications.pdf_queue.resolve_failed",
-                "publication_id": row.publication_id,
-                "error": str(exc),
-            },
-        )
+        structured_log(logger, "warning", "publications.pdf_queue.resolve_failed", publication_id=row.publication_id, error=str(exc))
         outcome = _failed_outcome(row=row)
         arxiv_rate_limited = False
     await _persist_outcome(
@@ -523,19 +514,9 @@ async def _run_resolution_task(
             )
             if arxiv_rate_limited and arxiv_lookup_allowed:
                 arxiv_lookup_allowed = False
-                logger.warning(
-                    "publications.pdf_queue.arxiv_batch_disabled",
-                    extra={
-                        "event": "publications.pdf_queue.arxiv_batch_disabled",
-                        "detail": "arXiv temporarily disabled for remaining batch after rate limit",
-                    },
-                )
+                structured_log(logger, "warning", "publications.pdf_queue.arxiv_batch_disabled", detail="arXiv temporarily disabled for remaining batch after rate limit")
         except OpenAlexBudgetExhaustedError:
-            logger.warning(
-                "publications.pdf_queue.budget_exhausted",
-                extra={"event": "publications.pdf_queue.budget_exhausted",
-                       "detail": "Stopping PDF resolution batch — OpenAlex daily budget exhausted"},
-            )
+            structured_log(logger, "warning", "publications.pdf_queue.budget_exhausted", detail="Stopping PDF resolution batch — OpenAlex daily budget exhausted")
             break
 
 

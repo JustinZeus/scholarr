@@ -41,6 +41,7 @@ from app.services.domains.scholars.constants import (
     SEARCH_COOLDOWN_REASON,
     SEARCH_DISABLED_REASON,
 )
+from app.logging_utils import structured_log
 from app.services.domains.scholars.exceptions import ScholarServiceError
 from app.services.domains.scholars.search_hints import (
     _merge_warnings,
@@ -430,9 +431,9 @@ def _normalize_author_search_inputs(query: str, limit: int) -> tuple[str, int, s
 
 
 def _disabled_search_result(*, normalized_query: str, bounded_limit: int) -> ParsedAuthorSearchPage:
-    logger.warning(
-        "scholar_search.disabled_by_configuration",
-        extra={"event": "scholar_search.disabled_by_configuration", "query": normalized_query},
+    structured_log(
+        logger, "warning", "scholar_search.disabled_by_configuration",
+        query=normalized_query,
     )
     return _policy_blocked_author_search_result(
         reason=SEARCH_DISABLED_REASON,
@@ -456,9 +457,9 @@ def _normalize_runtime_cooldown_state(
         updated = True
     if now_utc < cooldown_until:
         return updated
-    logger.info(
-        "scholar_search.cooldown_expired",
-        extra={"event": "scholar_search.cooldown_expired", "cooldown_until_utc": cooldown_until.isoformat()},
+    structured_log(
+        logger, "info", "scholar_search.cooldown_expired",
+        cooldown_until_utc=cooldown_until.isoformat(),
     )
     runtime_state.cooldown_until = None
     runtime_state.cooldown_rejection_count = 0
@@ -492,15 +493,12 @@ def _emit_cooldown_threshold_alert(
         return True
     if bool(runtime_state.cooldown_alert_emitted):
         return True
-    logger.error(
-        "scholar_search.cooldown_rejection_threshold_exceeded",
-        extra={
-            "event": "scholar_search.cooldown_rejection_threshold_exceeded",
-            "query": normalized_query,
-            "cooldown_rejection_count": int(runtime_state.cooldown_rejection_count),
-            "threshold": threshold,
-            "cooldown_until_utc": runtime_state.cooldown_until.isoformat() if runtime_state.cooldown_until else None,
-        },
+    structured_log(
+        logger, "error", "scholar_search.cooldown_rejection_threshold_exceeded",
+        query=normalized_query,
+        cooldown_rejection_count=int(runtime_state.cooldown_rejection_count),
+        threshold=threshold,
+        cooldown_until_utc=runtime_state.cooldown_until.isoformat() if runtime_state.cooldown_until else None,
     )
     runtime_state.cooldown_alert_emitted = True
     return True
@@ -519,14 +517,11 @@ def _cooldown_block_result(
         normalized_query=normalized_query,
         cooldown_rejection_alert_threshold=cooldown_rejection_alert_threshold,
     )
-    logger.warning(
-        "scholar_search.cooldown_active",
-        extra={
-            "event": "scholar_search.cooldown_active",
-            "query": normalized_query,
-            "cooldown_remaining_seconds": cooldown_remaining_seconds,
-            "cooldown_until_utc": runtime_state.cooldown_until.isoformat() if runtime_state.cooldown_until else None,
-        },
+    structured_log(
+        logger, "warning", "scholar_search.cooldown_active",
+        query=normalized_query,
+        cooldown_remaining_seconds=cooldown_remaining_seconds,
+        cooldown_until_utc=runtime_state.cooldown_until.isoformat() if runtime_state.cooldown_until else None,
     )
     return _policy_blocked_author_search_result(
         reason=SEARCH_COOLDOWN_REASON,
@@ -553,14 +548,11 @@ async def _cache_hit_result(
     )
     if cached is None:
         return None
-    logger.info(
-        "scholar_search.cache_hit",
-        extra={
-            "event": "scholar_search.cache_hit",
-            "query": normalized_query,
-            "state": cached.state.value,
-            "state_reason": cached.state_reason,
-        },
+    structured_log(
+        logger, "info", "scholar_search.cache_hit",
+        query=normalized_query,
+        state=cached.state.value,
+        state_reason=cached.state_reason,
     )
     state_reason_override = SEARCH_CACHED_BLOCK_REASON if _is_author_search_block_state(cached) else None
     return _trim_author_search_result(
@@ -610,9 +602,10 @@ async def _wait_for_author_search_throttle(
     )
     if sleep_seconds <= 0.0:
         return updated
-    logger.info(
-        "scholar_search.throttle_wait",
-        extra={"event": "scholar_search.throttle_wait", "query": normalized_query, "sleep_seconds": round(sleep_seconds, 3)},
+    structured_log(
+        logger, "info", "scholar_search.throttle_wait",
+        query=normalized_query,
+        sleep_seconds=round(sleep_seconds, 3),
     )
     await asyncio.sleep(sleep_seconds)
     return True
@@ -665,16 +658,13 @@ def _with_retry_warnings(
     threshold = max(1, int(retry_alert_threshold))
     if retry_scheduled_count < threshold:
         return merged
-    logger.warning(
-        "scholar_search.retry_threshold_exceeded",
-        extra={
-            "event": "scholar_search.retry_threshold_exceeded",
-            "query": normalized_query,
-            "retry_scheduled_count": retry_scheduled_count,
-            "threshold": threshold,
-            "final_state": merged.state.value,
-            "final_state_reason": merged.state_reason,
-        },
+    structured_log(
+        logger, "warning", "scholar_search.retry_threshold_exceeded",
+        query=normalized_query,
+        retry_scheduled_count=retry_scheduled_count,
+        threshold=threshold,
+        final_state=merged.state.value,
+        final_state_reason=merged.state_reason,
     )
     return replace(
         merged,
@@ -697,14 +687,11 @@ def _apply_block_circuit_breaker(
         runtime_state.consecutive_blocked_count = 0
         return merged_parsed
     runtime_state.consecutive_blocked_count = int(runtime_state.consecutive_blocked_count) + 1
-    logger.warning(
-        "scholar_search.block_detected",
-        extra={
-            "event": "scholar_search.block_detected",
-            "query": normalized_query,
-            "state_reason": merged_parsed.state_reason,
-            "consecutive_blocked_count": int(runtime_state.consecutive_blocked_count),
-        },
+    structured_log(
+        logger, "warning", "scholar_search.block_detected",
+        query=normalized_query,
+        state_reason=merged_parsed.state_reason,
+        consecutive_blocked_count=int(runtime_state.consecutive_blocked_count),
     )
     if int(runtime_state.consecutive_blocked_count) < max(1, int(cooldown_block_threshold)):
         return merged_parsed
@@ -712,13 +699,10 @@ def _apply_block_circuit_breaker(
     runtime_state.consecutive_blocked_count = 0
     runtime_state.cooldown_rejection_count = 0
     runtime_state.cooldown_alert_emitted = False
-    logger.error(
-        "scholar_search.cooldown_activated",
-        extra={
-            "event": "scholar_search.cooldown_activated",
-            "query": normalized_query,
-            "cooldown_until_utc": runtime_state.cooldown_until.isoformat() if runtime_state.cooldown_until else None,
-        },
+    structured_log(
+        logger, "error", "scholar_search.cooldown_activated",
+        query=normalized_query,
+        cooldown_until_utc=runtime_state.cooldown_until.isoformat() if runtime_state.cooldown_until else None,
     )
     return replace(
         merged_parsed,

@@ -147,9 +147,7 @@ async def test_client_logs_cache_hit_and_miss(
         return httpx.Response(200, text=_CLIENT_FEED_XML, request=request)
 
     def _capture_log(_msg: str, *args, **kwargs) -> None:
-        extra = kwargs.get("extra")
-        if isinstance(extra, dict):
-            logged.append(extra)
+        logged.append({"event": _msg, **(kwargs.get("extra") or {})})
 
     monkeypatch.setattr("app.services.domains.arxiv.client.logger.info", _capture_log)
     client = ArxivClient(request_fn=_request_fn, cache_enabled=True)
@@ -183,9 +181,7 @@ async def test_request_feed_skips_live_call_when_global_cooldown_is_active(
         return httpx.Response(200, text=_CLIENT_FEED_XML)
 
     def _capture_warning(_msg: str, *args, **kwargs) -> None:
-        extra = kwargs.get("extra")
-        if isinstance(extra, dict):
-            logged.append(extra)
+        logged.append({"event": _msg, **(kwargs.get("extra") or {})})
 
     monkeypatch.setattr(arxiv_client_module, "get_arxiv_cooldown_status", _cooldown_status)
     monkeypatch.setattr(arxiv_client_module, "run_with_global_arxiv_limit", _unexpected_limit_call)

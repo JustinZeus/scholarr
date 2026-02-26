@@ -95,9 +95,7 @@ async def test_arxiv_rate_limit_logs_request_scheduled_and_completed(
         return httpx.Response(200, text="ok")
 
     def _capture_log(_msg: str, *args, **kwargs) -> None:
-        extra = kwargs.get("extra")
-        if isinstance(extra, dict):
-            logged.append(extra)
+        logged.append({"event": _msg, **(kwargs.get("extra") or {})})
 
     monkeypatch.setattr("app.services.domains.arxiv.rate_limit.logger.info", _capture_log)
     await run_with_global_arxiv_limit(fetch=_fetch, source_path="search")
@@ -126,9 +124,7 @@ async def test_arxiv_rate_limit_logs_cooldown_activation(
             return httpx.Response(429, text="rate limited")
 
         def _capture_warning(_msg: str, *args, **kwargs) -> None:
-            extra = kwargs.get("extra")
-            if isinstance(extra, dict):
-                logged_warning.append(extra)
+            logged_warning.append({"event": _msg, **(kwargs.get("extra") or {})})
 
         monkeypatch.setattr("app.services.domains.arxiv.rate_limit.logger.warning", _capture_warning)
         with pytest.raises(ArxivRateLimitError):

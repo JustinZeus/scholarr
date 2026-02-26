@@ -9,6 +9,7 @@ from app.services.domains.arxiv.guards import arxiv_skip_reason_for_item
 from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
 from app.services.domains.publications.types import PublicationListItem
 from app.services.domains.unpaywall.application import OaResolutionOutcome, resolve_publication_oa_outcomes
+from app.logging_utils import structured_log
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -44,13 +45,7 @@ async def resolve_publication_pdf_outcome_for_row(
     except ArxivRateLimitError:
         arxiv_rate_limited = True
         arxiv_outcome = None
-        logger.warning(
-            "publications.pdf_resolution.arxiv_rate_limited",
-            extra={
-                "event": "publications.pdf_resolution.arxiv_rate_limited",
-                "publication_id": int(row.publication_id),
-            },
-        )
+        structured_log(logger, "warning", "publications.pdf_resolution.arxiv_rate_limited", publication_id=int(row.publication_id))
     if arxiv_outcome and arxiv_outcome.pdf_url:
         return PipelineOutcome(arxiv_outcome, None, arxiv_rate_limited=arxiv_rate_limited)
 
@@ -99,10 +94,7 @@ async def _openalex_outcome(
         # Re-raise so the caller's batch loop can stop hitting the API.
         raise
     except Exception as exc:
-        logger.warning(
-            "publications.pdf_resolution.openalex_failed",
-            extra={"event": "publications.pdf_resolution.openalex_failed", "error": str(exc)},
-        )
+        structured_log(logger, "warning", "publications.pdf_resolution.openalex_failed", error=str(exc))
     return None
 
 
@@ -115,12 +107,12 @@ async def _arxiv_outcome(
     from app.services.domains.arxiv.application import discover_arxiv_id_for_publication
 
     if not allow_lookup:
-        _log_arxiv_skip(row=row, skip_reason="batch_arxiv_cooldown_active")
+        structured_log(logger, "info", "publications.pdf_resolution.arxiv_skipped", publication_id=int(row.publication_id), skip_reason="batch_arxiv_cooldown_active")
         return None
 
     skip_reason = arxiv_skip_reason_for_item(item=row)
     if skip_reason is not None:
-        _log_arxiv_skip(row=row, skip_reason=skip_reason)
+        structured_log(logger, "info", "publications.pdf_resolution.arxiv_skipped", publication_id=int(row.publication_id), skip_reason=skip_reason)
         return None
 
     try:
@@ -138,22 +130,9 @@ async def _arxiv_outcome(
     except ArxivRateLimitError:
         raise  # propagate so orchestration can switch to non-arXiv fallback
     except Exception as exc:
-        logger.warning(
-            "publications.pdf_resolution.arxiv_failed",
-            extra={"event": "publications.pdf_resolution.arxiv_failed", "error": str(exc)},
-        )
+        structured_log(logger, "warning", "publications.pdf_resolution.arxiv_failed", error=str(exc))
     return None
 
-
-def _log_arxiv_skip(*, row: PublicationListItem, skip_reason: str) -> None:
-    logger.info(
-        "publications.pdf_resolution.arxiv_skipped",
-        extra={
-            "event": "publications.pdf_resolution.arxiv_skipped",
-            "publication_id": int(row.publication_id),
-            "skip_reason": skip_reason,
-        },
-    )
 
 
 async def _oa_outcome(

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ArxivRuntimeState
 from app.db.session import get_session_factory
+from app.logging_utils import structured_log
 from app.services.domains.arxiv.constants import (
     ARXIV_RATE_LIMIT_LOCK_KEY,
     ARXIV_RATE_LIMIT_LOCK_NAMESPACE,
@@ -83,14 +84,12 @@ async def _run_serialized_fetch(
                 response_status=int(response.status_code),
                 source_path=source_path,
             )
-            _log_request_completed(
-                response_status=int(response.status_code),
+            structured_log(
+                logger, "info", "arxiv.request_completed",
+                status_code=int(response.status_code),
                 wait_seconds=wait_seconds,
+                cooldown_remaining_seconds=_cooldown_remaining_seconds(runtime_state.cooldown_until, now_utc=datetime.now(timezone.utc)),
                 source_path=source_path,
-                cooldown_remaining_seconds=_cooldown_remaining_seconds(
-                    runtime_state.cooldown_until,
-                    now_utc=datetime.now(timezone.utc),
-                ),
             )
             return response, hit_rate_limit
 
@@ -128,18 +127,10 @@ async def _wait_for_allowed_slot_or_raise(
     now_utc = datetime.now(timezone.utc)
     cooldown_seconds = _cooldown_remaining_seconds(runtime_state.cooldown_until, now_utc=now_utc)
     if cooldown_seconds > 0:
-        _log_request_scheduled(
-            wait_seconds=0.0,
-            source_path=source_path,
-            cooldown_remaining_seconds=cooldown_seconds,
-        )
+        structured_log(logger, "info", "arxiv.request_scheduled", wait_seconds=0.0, source_path=source_path, cooldown_remaining_seconds=cooldown_seconds)
         raise ArxivRateLimitError(f"arXiv global cooldown active ({cooldown_seconds:.0f}s remaining)")
     wait_seconds = _next_allowed_wait_seconds(runtime_state.next_allowed_at, now_utc=now_utc)
-    _log_request_scheduled(
-        wait_seconds=wait_seconds,
-        source_path=source_path,
-        cooldown_remaining_seconds=0.0,
-    )
+    structured_log(logger, "info", "arxiv.request_scheduled", wait_seconds=wait_seconds, source_path=source_path, cooldown_remaining_seconds=0.0)
     if wait_seconds > 0:
         await asyncio.sleep(wait_seconds)
     return wait_seconds
@@ -156,9 +147,10 @@ def _record_post_response_state(
     if response_status == 429:
         cooldown_seconds = _cooldown_seconds()
         runtime_state.cooldown_until = now_utc + timedelta(seconds=cooldown_seconds)
-        _log_cooldown_activated(
-            source_path=source_path,
+        structured_log(
+            logger, "warning", "arxiv.cooldown_activated",
             cooldown_remaining_seconds=cooldown_seconds,
+            source_path=source_path,
         )
         return True
     if _cooldown_remaining_seconds(runtime_state.cooldown_until, now_utc=now_utc) <= 0:
@@ -196,52 +188,3 @@ def _cooldown_seconds() -> float:
     return max(float(settings.arxiv_rate_limit_cooldown_seconds), 0.0)
 
 
-def _log_request_scheduled(
-    *,
-    wait_seconds: float,
-    source_path: str,
-    cooldown_remaining_seconds: float,
-) -> None:
-    logger.info(
-        "arxiv.request_scheduled",
-        extra={
-            "event": "arxiv.request_scheduled",
-            "wait_seconds": float(wait_seconds),
-            "cooldown_remaining_seconds": float(cooldown_remaining_seconds),
-            "source_path": source_path,
-        },
-    )
-
-
-def _log_request_completed(
-    *,
-    response_status: int,
-    wait_seconds: float,
-    source_path: str,
-    cooldown_remaining_seconds: float,
-) -> None:
-    logger.info(
-        "arxiv.request_completed",
-        extra={
-            "event": "arxiv.request_completed",
-            "status_code": int(response_status),
-            "wait_seconds": float(wait_seconds),
-            "cooldown_remaining_seconds": float(cooldown_remaining_seconds),
-            "source_path": source_path,
-        },
-    )
-
-
-def _log_cooldown_activated(
-    *,
-    source_path: str,
-    cooldown_remaining_seconds: float,
-) -> None:
-    logger.warning(
-        "arxiv.cooldown_activated",
-        extra={
-            "event": "arxiv.cooldown_activated",
-            "cooldown_remaining_seconds": float(cooldown_remaining_seconds),
-            "source_path": source_path,
-        },
-    )

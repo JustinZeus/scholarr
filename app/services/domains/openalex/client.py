@@ -84,7 +84,7 @@ class OpenAlexClient:
                 )
             raise OpenAlexRateLimitError("Rate limit exceeded fetching OpenAlex work by DOI")
         if response.status_code >= 400:
-            logger.warning("OpenAlex API error: %s %s", response.status_code, response.text)
+            logger.warning("OpenAlex API error: %s %s", response.status_code, response.text[:500])
             raise OpenAlexClientError(f"API Error {response.status_code}")
 
         data = response.json()
@@ -134,7 +134,7 @@ class OpenAlexClient:
                 )
             raise OpenAlexRateLimitError("Rate limit exceeded fetching OpenAlex works list")
         if response.status_code >= 400:
-            logger.warning("OpenAlex API error (filters=%s): %s %s", filters, response.status_code, response.text)
+            logger.warning("OpenAlex API error (filters=%s): %s %s", filters, response.status_code, response.text[:500])
             raise OpenAlexClientError(f"API Error {response.status_code}")
 
         data = response.json()

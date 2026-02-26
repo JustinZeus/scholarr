@@ -5,6 +5,7 @@ import re
 from typing import TYPE_CHECKING, Protocol
 import unicodedata
 
+from app.logging_utils import structured_log
 from app.services.domains.arxiv.client import ArxivClient
 from app.services.domains.arxiv.errors import ArxivRateLimitError
 from app.services.domains.arxiv.types import ArxivFeed
@@ -112,7 +113,7 @@ class HttpArxivGateway:
         except ArxivRateLimitError:
             raise
         except Exception as exc:
-            logger.debug("arxiv.query_failed", extra={"event": "arxiv.query_failed", "error": str(exc)})
+            structured_log(logger, "debug", "arxiv.query_failed", error=str(exc))
             return None
 
 
@@ -136,6 +137,6 @@ def _author_surname(scholar_label: str | None) -> str | None:
 def _first_discovered_id(result: ArxivFeed) -> str | None:
     for entry in result.entries:
         if entry.arxiv_id:
-            logger.debug("arxiv.id_discovered", extra={"event": "arxiv.id_discovered", "arxiv_id": entry.arxiv_id})
+            structured_log(logger, "debug", "arxiv.id_discovered", arxiv_id=entry.arxiv_id)
             return entry.arxiv_id
     return None

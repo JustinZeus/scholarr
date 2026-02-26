@@ -9,6 +9,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from app.logging_utils import structured_log
 from app.services.domains.scholar import rate_limit as scholar_rate_limit
 from app.settings import settings
 
@@ -100,15 +101,12 @@ class LiveScholarSource:
             cstart=cstart,
             pagesize=pagesize,
         )
-        logger.debug(
-            "scholar_source.fetch_started",
-            extra={
-                "event": "scholar_source.fetch_started",
-                "scholar_id": scholar_id,
-                "requested_url": requested_url,
-                "cstart": cstart,
-                "pagesize": pagesize,
-            },
+        structured_log(
+            logger, "debug", "scholar_source.fetch_started",
+            scholar_id=scholar_id,
+            requested_url=requested_url,
+            cstart=cstart,
+            pagesize=pagesize,
         )
         return await self._fetch_with_global_throttle(requested_url)
 
@@ -122,24 +120,18 @@ class LiveScholarSource:
             query=query,
             start=start,
         )
-        logger.debug(
-            "scholar_source.search_fetch_started",
-            extra={
-                "event": "scholar_source.search_fetch_started",
-                "query": query,
-                "requested_url": requested_url,
-                "start": start,
-            },
+        structured_log(
+            logger, "debug", "scholar_source.search_fetch_started",
+            query=query,
+            requested_url=requested_url,
+            start=start,
         )
         return await self._fetch_with_global_throttle(requested_url)
 
     async def fetch_publication_html(self, publication_url: str) -> FetchResult:
-        logger.debug(
-            "scholar_source.publication_fetch_started",
-            extra={
-                "event": "scholar_source.publication_fetch_started",
-                "requested_url": publication_url,
-            },
+        structured_log(
+            logger, "debug", "scholar_source.publication_fetch_started",
+            requested_url=publication_url,
         )
         return await self._fetch_with_global_throttle(publication_url)
 
@@ -169,9 +161,9 @@ class LiveScholarSource:
 
     @staticmethod
     def _network_error_result(requested_url: str, exc: URLError) -> FetchResult:
-        logger.warning(
-            "scholar_source.fetch_network_error",
-            extra={"event": "scholar_source.fetch_network_error", "requested_url": requested_url},
+        structured_log(
+            logger, "warning", "scholar_source.fetch_network_error",
+            requested_url=requested_url,
         )
         return FetchResult(
             requested_url=requested_url,
@@ -183,13 +175,10 @@ class LiveScholarSource:
 
     @staticmethod
     def _http_error_result(requested_url: str, exc: HTTPError) -> FetchResult:
-        logger.warning(
-            "scholar_source.fetch_http_error",
-            extra={
-                "event": "scholar_source.fetch_http_error",
-                "requested_url": requested_url,
-                "status_code": exc.code,
-            },
+        structured_log(
+            logger, "warning", "scholar_source.fetch_http_error",
+            requested_url=requested_url,
+            status_code=exc.code,
         )
         return FetchResult(
             requested_url=requested_url,
@@ -203,13 +192,10 @@ class LiveScholarSource:
     def _success_result(requested_url: str, response) -> FetchResult:
         body = response.read().decode("utf-8", errors="replace")
         status_code = getattr(response, "status", 200)
-        logger.debug(
-            "scholar_source.fetch_succeeded",
-            extra={
-                "event": "scholar_source.fetch_succeeded",
-                "requested_url": requested_url,
-                "status_code": status_code,
-            },
+        structured_log(
+            logger, "debug", "scholar_source.fetch_succeeded",
+            requested_url=requested_url,
+            status_code=status_code,
         )
         return FetchResult(
             requested_url=requested_url,

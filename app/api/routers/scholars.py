@@ -23,6 +23,7 @@ from app.api.schemas import (
 )
 from app.db.models import User
 from app.db.session import get_db_session
+from app.logging_utils import structured_log
 from app.services.domains.ingestion import queue as ingestion_queue_service
 from app.services.domains.portability import application as import_export_service
 from app.services.domains.scholar import rate_limit as scholar_rate_limit
@@ -80,24 +81,18 @@ async def _enqueue_initial_scrape_job_for_scholar(
         await db_session.commit()
     except Exception:
         await db_session.rollback()
-        logger.warning(
-            "api.scholars.initial_scrape_enqueue_failed",
-            extra={
-                "event": "api.scholars.initial_scrape_enqueue_failed",
-                "user_id": user_id,
-                "scholar_profile_id": profile.id,
-            },
+        structured_log(
+            logger, "warning", "api.scholars.initial_scrape_enqueue_failed",
+            user_id=user_id,
+            scholar_profile_id=profile.id,
         )
         return False
 
-    logger.info(
-        "api.scholars.initial_scrape_enqueued",
-        extra={
-            "event": "api.scholars.initial_scrape_enqueued",
-            "user_id": user_id,
-            "scholar_profile_id": profile.id,
-            "reason": INITIAL_SCHOLAR_SCRAPE_QUEUE_REASON,
-        },
+    structured_log(
+        logger, "info", "api.scholars.initial_scrape_enqueued",
+        user_id=user_id,
+        scholar_profile_id=profile.id,
+        reason=INITIAL_SCHOLAR_SCRAPE_QUEUE_REASON,
     )
     return True
 
@@ -143,15 +138,12 @@ async def _hydrate_scholar_metadata_if_needed(
 
     should_skip, remaining_seconds = _is_create_hydration_rate_limited()
     if should_skip:
-        logger.info(
-            "api.scholars.create_metadata_hydration_skipped",
-            extra={
-                "event": "api.scholars.create_metadata_hydration_skipped",
-                "reason": "scholar_request_throttle_active",
-                "user_id": user_id,
-                "scholar_profile_id": profile.id,
-                "retry_after_seconds": round(remaining_seconds, 3),
-            },
+        structured_log(
+            logger, "info", "api.scholars.create_metadata_hydration_skipped",
+            reason="scholar_request_throttle_active",
+            user_id=user_id,
+            scholar_profile_id=profile.id,
+            retry_after_seconds=round(remaining_seconds, 3),
         )
         return profile
 
@@ -165,23 +157,17 @@ async def _hydrate_scholar_metadata_if_needed(
             timeout=CREATE_METADATA_HYDRATION_TIMEOUT_SECONDS,
         )
     except TimeoutError:
-        logger.info(
-            "api.scholars.create_metadata_hydration_skipped",
-            extra={
-                "event": "api.scholars.create_metadata_hydration_skipped",
-                "reason": "create_timeout",
-                "user_id": user_id,
-                "scholar_profile_id": profile.id,
-            },
+        structured_log(
+            logger, "info", "api.scholars.create_metadata_hydration_skipped",
+            reason="create_timeout",
+            user_id=user_id,
+            scholar_profile_id=profile.id,
         )
     except Exception:
-        logger.warning(
-            "api.scholars.create_metadata_hydration_failed",
-            extra={
-                "event": "api.scholars.create_metadata_hydration_failed",
-                "user_id": user_id,
-                "scholar_profile_id": profile.id,
-            },
+        structured_log(
+            logger, "warning", "api.scholars.create_metadata_hydration_failed",
+            user_id=user_id,
+            scholar_profile_id=profile.id,
         )
     return profile
 
@@ -330,14 +316,7 @@ async def import_scholars_and_publications(
             code="invalid_import_payload",
             message=str(exc),
         ) from exc
-    logger.info(
-        "api.scholars.imported",
-        extra={
-            "event": "api.scholars.imported",
-            "user_id": current_user.id,
-            **result,
-        },
-    )
+    structured_log(logger, "info", "api.scholars.imported", user_id=current_user.id, **result)
     return success_payload(request, data=result)
 
 
@@ -367,14 +346,7 @@ async def create_scholar(
             code="invalid_scholar",
             message=str(exc),
         ) from exc
-    logger.info(
-        "api.scholars.created",
-        extra={
-            "event": "api.scholars.created",
-            "user_id": current_user.id,
-            "scholar_profile_id": created.id,
-        },
-    )
+    structured_log(logger, "info", "api.scholars.created", user_id=current_user.id, scholar_profile_id=created.id)
     did_queue_initial_scrape = await _enqueue_initial_scrape_job_for_scholar(
         db_session,
         profile=created,
@@ -421,16 +393,7 @@ async def search_scholars(
             message=str(exc),
         ) from exc
 
-    logger.info(
-        "api.scholars.search.completed",
-        extra={
-            "event": "api.scholars.search.completed",
-            "user_id": current_user.id,
-            "query": query.strip(),
-            "candidate_count": len(parsed.candidates),
-            "state": parsed.state.value,
-        },
-    )
+    structured_log(logger, "info", "api.scholars.search.completed", user_id=current_user.id, query=query.strip(), candidate_count=len(parsed.candidates), state=parsed.state.value)
     return success_payload(
         request,
         data=_search_response_data(query, parsed),
@@ -459,15 +422,7 @@ async def toggle_scholar(
             message="Scholar not found.",
         )
     updated = await scholar_service.toggle_scholar_enabled(db_session, profile=profile)
-    logger.info(
-        "api.scholars.toggled",
-        extra={
-            "event": "api.scholars.toggled",
-            "user_id": current_user.id,
-            "scholar_profile_id": updated.id,
-            "is_enabled": updated.is_enabled,
-        },
-    )
+    structured_log(logger, "info", "api.scholars.toggled", user_id=current_user.id, scholar_profile_id=updated.id, is_enabled=updated.is_enabled)
     return success_payload(
         request,
         data=_serialize_scholar(updated),
@@ -500,14 +455,7 @@ async def delete_scholar(
         profile=profile,
         upload_dir=settings.scholar_image_upload_dir,
     )
-    logger.info(
-        "api.scholars.deleted",
-        extra={
-            "event": "api.scholars.deleted",
-            "user_id": current_user.id,
-            "scholar_profile_id": scholar_profile_id,
-        },
-    )
+    structured_log(logger, "info", "api.scholars.deleted", user_id=current_user.id, scholar_profile_id=scholar_profile_id)
     return success_payload(
         request,
         data={"message": "Scholar deleted."},
@@ -551,14 +499,7 @@ async def update_scholar_image_url(
             message=str(exc),
         ) from exc
 
-    logger.info(
-        "api.scholars.image_url_updated",
-        extra={
-            "event": "api.scholars.image_url_updated",
-            "user_id": current_user.id,
-            "scholar_profile_id": updated.id,
-        },
-    )
+    structured_log(logger, "info", "api.scholars.image_url_updated", user_id=current_user.id, scholar_profile_id=updated.id)
     return success_payload(
         request,
         data=_serialize_scholar(updated),
@@ -600,16 +541,7 @@ async def upload_scholar_image(
         ) from exc
 
     image_size = len(image_bytes)
-    logger.info(
-        "api.scholars.image_uploaded",
-        extra={
-            "event": "api.scholars.image_uploaded",
-            "user_id": current_user.id,
-            "scholar_profile_id": updated.id,
-            "content_type": image.content_type,
-            "size_bytes": image_size,
-        },
-    )
+    structured_log(logger, "info", "api.scholars.image_uploaded", user_id=current_user.id, scholar_profile_id=updated.id, content_type=image.content_type, size_bytes=image_size)
     return success_payload(
         request,
         data=_serialize_scholar(updated),
@@ -643,14 +575,7 @@ async def clear_scholar_image_customization(
         profile=profile,
         upload_dir=settings.scholar_image_upload_dir,
     )
-    logger.info(
-        "api.scholars.image_customization_cleared",
-        extra={
-            "event": "api.scholars.image_customization_cleared",
-            "user_id": current_user.id,
-            "scholar_profile_id": updated.id,
-        },
-    )
+    structured_log(logger, "info", "api.scholars.image_customization_cleared", user_id=current_user.id, scholar_profile_id=updated.id)
     return success_payload(
         request,
         data=_serialize_scholar(updated),

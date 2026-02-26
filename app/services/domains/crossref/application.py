@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from crossref.restful import Etiquette, Works
 
 from app.services.domains.doi.normalize import normalize_doi
+from app.logging_utils import structured_log
 from app.settings import settings
 
 if TYPE_CHECKING:
@@ -377,6 +378,6 @@ async def discover_doi_for_publication(
             author_surname=author_surname,
         )
         if doi:
-            logger.debug("crossref.doi_discovered", extra={"event": "crossref.doi_discovered"})
+            structured_log(logger, "debug", "crossref.doi_discovered")
             return doi
     return None

@@ -5,6 +5,7 @@ import logging
 
 import httpx
 
+from app.logging_utils import structured_log
 from app.services.domains.arxiv.cache import (
     build_query_fingerprint,
     get_cached_feed,
@@ -102,17 +103,9 @@ class ArxivClient:
         if self._cache_enabled:
             cached = await get_cached_feed(query_fingerprint=query_fingerprint)
             if cached is not None:
-                _log_cache_event(
-                    event_name="arxiv.cache_hit",
-                    query_fingerprint=query_fingerprint,
-                    source_path=source_path,
-                )
+                structured_log(logger, "info", "arxiv.cache_hit", query_fingerprint=query_fingerprint, source_path=source_path)
                 return cached
-            _log_cache_event(
-                event_name="arxiv.cache_miss",
-                query_fingerprint=query_fingerprint,
-                source_path=source_path,
-            )
+            structured_log(logger, "info", "arxiv.cache_miss", query_fingerprint=query_fingerprint, source_path=source_path)
         return await run_with_inflight_dedupe(
             query_fingerprint=query_fingerprint,
             fetch_feed=lambda: self._fetch_live_feed(
@@ -222,9 +215,10 @@ async def _request_arxiv_feed(
     source_path = _source_path_from_params(params)
     cooldown_status = await get_arxiv_cooldown_status()
     if cooldown_status.is_active:
-        _log_request_skipped_for_cooldown(
+        structured_log(
+            logger, "warning", "arxiv.request_skipped_cooldown",
             source_path=source_path,
-            cooldown_remaining_seconds=cooldown_status.remaining_seconds,
+            cooldown_remaining_seconds=float(cooldown_status.remaining_seconds),
         )
         raise ArxivRateLimitError(
             f"arXiv global cooldown active ({cooldown_status.remaining_seconds:.0f}s remaining)"
@@ -280,32 +274,3 @@ def _source_path_from_params(params: dict[str, object]) -> str:
     return ARXIV_SOURCE_PATH_UNKNOWN
 
 
-def _log_cache_event(
-    *,
-    event_name: str,
-    query_fingerprint: str,
-    source_path: str,
-) -> None:
-    logger.info(
-        event_name,
-        extra={
-            "event": event_name,
-            "query_fingerprint": query_fingerprint,
-            "source_path": source_path,
-        },
-    )
-
-
-def _log_request_skipped_for_cooldown(
-    *,
-    source_path: str,
-    cooldown_remaining_seconds: float,
-) -> None:
-    logger.warning(
-        "arxiv.request_skipped_cooldown",
-        extra={
-            "event": "arxiv.request_skipped_cooldown",
-            "source_path": source_path,
-            "cooldown_remaining_seconds": float(cooldown_remaining_seconds),
-        },
-    )

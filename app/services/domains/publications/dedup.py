@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.db.models import Publication, PublicationIdentifier, ScholarPublication
+from app.logging_utils import structured_log
 from app.services.domains.ingestion.fingerprints import (
     canonical_title_text_for_dedup,
     canonical_title_tokens_for_dedup,
@@ -104,14 +105,7 @@ async def merge_duplicate_publication(
     await _migrate_scholar_links(db_session, winner_id=winner_id, dup_id=dup_id)
     await _migrate_identifiers(db_session, winner_id=winner_id, dup_id=dup_id)
     await db_session.execute(delete(Publication).where(Publication.id == dup_id))
-    logger.info(
-        "publications.identifier_merge",
-        extra={
-            "event": "publications.identifier_merge",
-            "winner_id": winner_id,
-            "dup_id": dup_id,
-        },
-    )
+    structured_log(logger, "info", "publications.identifier_merge", winner_id=winner_id, dup_id=dup_id)
 
 
 async def _load_publication(

@@ -9,6 +9,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.types import Message
 
+from app.logging_utils import structured_log
 
 CSRF_SESSION_KEY = "csrf_token"
 CSRF_FORM_FIELD = "csrf_token"
@@ -36,13 +37,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         session_token = request.session.get(CSRF_SESSION_KEY)
         if not session_token:
-            logger.warning(
-                "csrf.missing_session_token",
-                extra={
-                    "event": "csrf.missing_session_token",
-                    "method": request.method,
-                    "path": request.url.path,
-                },
+            structured_log(
+                logger, "warning", "csrf.missing_session_token",
+                method=request.method,
+                path=request.url.path,
             )
             return self._csrf_error_response(
                 request,
@@ -57,13 +55,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             request._receive = self._build_receive(body)  # type: ignore[attr-defined]
 
         if not request_token or not compare_digest(str(session_token), str(request_token)):
-            logger.warning(
-                "csrf.invalid_token",
-                extra={
-                    "event": "csrf.invalid_token",
-                    "method": request.method,
-                    "path": request.url.path,
-                },
+            structured_log(
+                logger, "warning", "csrf.invalid_token",
+                method=request.method,
+                path=request.url.path,
             )
             return self._csrf_error_response(
                 request,

@@ -22,6 +22,7 @@ from app.api.schemas import (
 )
 from app.db.models import RunStatus, RunTriggerType, User
 from app.db.session import get_db_session
+from app.logging_utils import structured_log
 from app.services.domains.ingestion import application as ingestion_service
 from app.services.domains.ingestion import safety as run_safety_service
 from app.services.domains.runs import application as run_service
@@ -287,31 +288,21 @@ async def _load_safety_state(
     if run_safety_service.clear_expired_cooldown(user_settings):
         await db_session.commit()
         await db_session.refresh(user_settings)
-        logger.info(
-            "api.runs.safety_cooldown_cleared",
-            extra={
-                "event": "api.runs.safety_cooldown_cleared",
-                "user_id": user_id,
-                "reason": previous_safety_state.get("cooldown_reason"),
-                "cooldown_until": previous_safety_state.get("cooldown_until"),
-                "metric_name": "api_runs_safety_cooldown_cleared_total",
-                "metric_value": 1,
-            },
-    )
+        structured_log(
+            logger, "info", "api.runs.safety_cooldown_cleared",
+            user_id=user_id,
+            reason=previous_safety_state.get("cooldown_reason"),
+            cooldown_until=previous_safety_state.get("cooldown_until"),
+        )
     return run_safety_service.get_safety_state_payload(user_settings)
 
 
 def _raise_manual_runs_disabled(*, user_id: int, safety_state: dict[str, Any]) -> None:
-    logger.warning(
-        "api.runs.manual_blocked_policy",
-        extra={
-            "event": "api.runs.manual_blocked_policy",
-            "user_id": user_id,
-            "policy": {"manual_run_allowed": False},
-            "safety_state": safety_state,
-            "metric_name": "api_runs_manual_blocked_policy_total",
-            "metric_value": 1,
-        },
+    structured_log(
+        logger, "warning", "api.runs.manual_blocked_policy",
+        user_id=user_id,
+        policy={"manual_run_allowed": False},
+        safety_state=safety_state,
     )
     raise ApiException(
         status_code=403,
@@ -399,7 +390,7 @@ async def _recover_integrity_error(
     if idempotency_key is None:
         logger.exception(
             "api.runs.manual_integrity_error",
-            extra={"event": "api.runs.manual_integrity_error", "user_id": user_id},
+            extra={"user_id": user_id},
         )
         raise ApiException(status_code=500, code="manual_run_failed", message="Manual run failed.") from original_exc
     existing_run = await run_service.get_manual_run_by_idempotency_key(
@@ -410,7 +401,7 @@ async def _recover_integrity_error(
     if existing_run is None:
         logger.exception(
             "api.runs.manual_integrity_error",
-            extra={"event": "api.runs.manual_integrity_error", "user_id": user_id},
+            extra={"user_id": user_id},
         )
         raise ApiException(status_code=500, code="manual_run_failed", message="Manual run failed.") from original_exc
     if existing_run.status in (RunStatus.RUNNING, RunStatus.RESOLVING):
@@ -471,17 +462,12 @@ async def _execute_manual_run(
 
 
 def _raise_manual_blocked_safety(*, exc, user_id: int) -> None:
-    logger.info(
-        "api.runs.manual_blocked_safety",
-        extra={
-            "event": "api.runs.manual_blocked_safety",
-            "user_id": user_id,
-            "reason": exc.safety_state.get("cooldown_reason"),
-            "cooldown_until": exc.safety_state.get("cooldown_until"),
-            "cooldown_remaining_seconds": exc.safety_state.get("cooldown_remaining_seconds"),
-            "metric_name": "api_runs_manual_blocked_safety_total",
-            "metric_value": 1,
-        },
+    structured_log(
+        logger, "info", "api.runs.manual_blocked_safety",
+        user_id=user_id,
+        reason=exc.safety_state.get("cooldown_reason"),
+        cooldown_until=exc.safety_state.get("cooldown_until"),
+        cooldown_remaining_seconds=exc.safety_state.get("cooldown_remaining_seconds"),
     )
     raise ApiException(
         status_code=429,
@@ -494,7 +480,7 @@ def _raise_manual_blocked_safety(*, exc, user_id: int) -> None:
 def _raise_manual_failed(*, exc: Exception, user_id: int) -> None:
     logger.exception(
         "api.runs.manual_failed",
-        extra={"event": "api.runs.manual_failed", "user_id": user_id},
+        extra={"user_id": user_id},
     )
     raise ApiException(status_code=500, code="manual_run_failed", message="Manual run failed.") from exc
 

@@ -6,6 +6,7 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.session import clear_session_user, get_session_user, set_session_user
+from app.logging_utils import structured_log
 from app.db.models import User
 from app.security.csrf import CSRF_SESSION_KEY
 from app.services.domains.users import application as user_service
@@ -28,13 +29,7 @@ async def get_authenticated_user(
 
     user = await user_service.get_user_by_id(db_session, session_user.id)
     if user is None or not user.is_active:
-        logger.info(
-            "auth.session_invalidated",
-            extra={
-                "event": "auth.session_invalidated",
-                "session_user_id": session_user.id,
-            },
-        )
+        structured_log(logger, "info", "auth.session_invalidated", session_user_id=session_user.id)
         invalidate_session(request)
         return None
 
