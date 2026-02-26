@@ -57,7 +57,6 @@ def _serialize_pdf_queue_item(item) -> dict[str, object]:
     return {
         "publication_id": item.publication_id,
         "title": item.title,
-        "doi": item.doi,
         "display_identifier": _serialize_display_identifier(item.display_identifier),
         "pdf_url": item.pdf_url,
         "status": item.status,
@@ -348,3 +347,64 @@ async def trigger_publication_link_repair(
         },
     )
     return success_payload(request, data=result)
+
+
+DROP_PUBLICATIONS_CONFIRMATION = "DROP ALL PUBLICATIONS"
+
+
+@router.post("/drop-all-publications")
+async def drop_all_publications(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    admin_user: User = Depends(get_api_admin_user),
+):
+    body = await request.json()
+    confirmation_text = (body.get("confirmation_text") or "").strip()
+    if confirmation_text != DROP_PUBLICATIONS_CONFIRMATION:
+        raise ApiException(
+            status_code=400,
+            code="confirmation_required",
+            message=f"Type '{DROP_PUBLICATIONS_CONFIRMATION}' to confirm this destructive action.",
+        )
+
+    from sqlalchemy import delete, func, select, update
+
+    from app.db.models import (
+        Publication,
+        PublicationIdentifier,
+        PublicationPdfJob,
+        PublicationPdfJobEvent,
+        ScholarProfile,
+        ScholarPublication,
+    )
+
+    count_result = await db_session.execute(select(func.count()).select_from(Publication))
+    total_publications = count_result.scalar_one()
+
+    await db_session.execute(delete(ScholarPublication))
+    await db_session.execute(delete(PublicationIdentifier))
+    await db_session.execute(delete(PublicationPdfJobEvent))
+    await db_session.execute(delete(PublicationPdfJob))
+    await db_session.execute(delete(Publication))
+    await db_session.execute(
+        update(ScholarProfile).values(baseline_completed=False)
+    )
+    await db_session.commit()
+
+    logger.warning(
+        "api.admin.db.all_publications_dropped",
+        extra={
+            "event": "api.admin.db.all_publications_dropped",
+            "admin_user_id": int(admin_user.id),
+            "admin_email": admin_user.email,
+            "deleted_count": int(total_publications),
+        },
+    )
+    return success_payload(
+        request,
+        data={
+            "deleted_count": int(total_publications),
+            "message": f"Dropped {total_publications} publication(s) and all related data. "
+            "Scholar baselines have been reset; the next run will re-discover all publications.",
+        },
+    )

@@ -31,9 +31,11 @@ class RunTriggerType(StrEnum):
 
 class RunStatus(StrEnum):
     RUNNING = "running"
+    RESOLVING = "resolving"
     SUCCESS = "success"
     PARTIAL_FAILURE = "partial_failure"
     FAILED = "failed"
+    CANCELED = "canceled"
 
 
 class QueueItemStatus(StrEnum):
@@ -113,6 +115,11 @@ class UserSetting(Base):
     )
     scrape_cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     scrape_cooldown_reason: Mapped[str | None] = mapped_column(String(64))
+    
+    openalex_api_key: Mapped[str | None] = mapped_column(String(255))
+    crossref_api_token: Mapped[str | None] = mapped_column(String(255))
+    crossref_api_mailto: Mapped[str | None] = mapped_column(String(255))
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -161,6 +168,14 @@ class CrawlRun(Base):
     __tablename__ = "crawl_runs"
     __table_args__ = (
         Index("ix_crawl_runs_user_start", "user_id", "start_dt"),
+        Index(
+            "uq_crawl_runs_user_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text(
+                "status IN ('running'::run_status, 'resolving'::run_status)"
+            ),
+        ),
         Index(
             "uq_crawl_runs_user_manual_idempotency_key",
             "user_id",
@@ -228,8 +243,16 @@ class Publication(Base):
     author_text: Mapped[str | None] = mapped_column(Text)
     venue_text: Mapped[str | None] = mapped_column(Text)
     pub_url: Mapped[str | None] = mapped_column(Text)
-    doi: Mapped[str | None] = mapped_column(String(255))
     pdf_url: Mapped[str | None] = mapped_column(Text)
+    canonical_title_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    openalex_enriched: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    openalex_last_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -43,6 +43,9 @@ describe("user settings store", () => {
           last_evaluated_run_id: null,
         },
       },
+      openalex_api_key: null,
+      crossref_api_token: null,
+      crossref_api_mailto: null,
     });
 
     expect(store.networkFailureThreshold).toBe(2);

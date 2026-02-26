@@ -7,9 +7,10 @@ import { createDefaultSafetyState } from "@/features/safety";
 vi.mock("@/features/runs", () => ({
   listRuns: vi.fn(),
   triggerManualRun: vi.fn(),
+  cancelRun: vi.fn(),
 }));
 
-import { listRuns, triggerManualRun } from "@/features/runs";
+import { cancelRun, listRuns, triggerManualRun } from "@/features/runs";
 import {
   RUN_STATUS_POLL_INTERVAL_MS,
   RUN_STATUS_STARTING_PHASE_MS,
@@ -51,11 +52,13 @@ function buildRunsPayload(runs: ReturnType<typeof buildRun>[]) {
 describe("run status store", () => {
   const mockedListRuns = vi.mocked(listRuns);
   const mockedTriggerManualRun = vi.mocked(triggerManualRun);
+  const mockedCancelRun = vi.mocked(cancelRun);
 
   beforeEach(() => {
     setActivePinia(createPinia());
     mockedListRuns.mockReset();
     mockedTriggerManualRun.mockReset();
+    mockedCancelRun.mockReset();
     vi.useRealTimers();
   });
 
@@ -222,5 +225,88 @@ describe("run status store", () => {
     await vi.advanceTimersByTimeAsync(520);
     await startPromise;
     expect(store.isRunActive).toBe(true);
+  });
+
+  it("cancels an active check and transitions to canceled state", async () => {
+    mockedCancelRun.mockResolvedValueOnce({
+      run: buildRun({ id: 50, status: "canceled" }),
+      summary: {
+        succeeded_count: 0,
+        failed_count: 0,
+        partial_count: 0,
+        failed_state_counts: {},
+        failed_reason_counts: {},
+        scrape_failure_counts: {},
+        retry_counts: {
+          retries_scheduled_count: 0,
+          scholars_with_retries_count: 0,
+          retry_exhausted_count: 0,
+        },
+        alert_thresholds: {},
+        alert_flags: {},
+      },
+      scholar_results: [],
+      safety_state: createDefaultSafetyState(),
+    } as any);
+
+    const store = useRunStatusStore();
+    store.setLatestRun(buildRun({ id: 50, status: "running", end_dt: null }));
+    expect(store.isRunActive).toBe(true);
+
+    const result = await store.cancelActiveCheck();
+
+    expect(result.kind).toBe("success");
+    expect(store.latestRun?.status).toBe("canceled");
+    expect(store.isRunActive).toBe(false);
+    expect(store.isPolling).toBe(false);
+  });
+
+  it("cancels a resolving run using server status as source of truth", async () => {
+    mockedCancelRun.mockResolvedValueOnce({
+      run: buildRun({ id: 72, status: "failed" }),
+      summary: {
+        succeeded_count: 0,
+        failed_count: 1,
+        partial_count: 0,
+        failed_state_counts: {},
+        failed_reason_counts: {},
+        scrape_failure_counts: {},
+        retry_counts: {
+          retries_scheduled_count: 0,
+          scholars_with_retries_count: 0,
+          retry_exhausted_count: 0,
+        },
+        alert_thresholds: {},
+        alert_flags: {},
+      },
+      scholar_results: [],
+      safety_state: createDefaultSafetyState(),
+    } as any);
+
+    const store = useRunStatusStore();
+    store.setLatestRun(buildRun({ id: 72, status: "resolving", end_dt: null }));
+
+    const result = await store.cancelActiveCheck();
+
+    expect(result.kind).toBe("success");
+    expect(store.latestRun?.status).toBe("failed");
+    expect(store.isRunActive).toBe(false);
+  });
+
+  it("reconciles poll responses without regressing publication counters", async () => {
+    mockedListRuns.mockResolvedValueOnce(
+      buildRunsPayload([buildRun({ id: 99, status: "running", new_publication_count: 1, end_dt: null })]),
+    );
+
+    const store = useRunStatusStore();
+    await store.syncLatest();
+    store.latestRun = buildRun({ id: 99, status: "running", new_publication_count: 5, end_dt: null });
+
+    mockedListRuns.mockResolvedValueOnce(
+      buildRunsPayload([buildRun({ id: 99, status: "running", new_publication_count: 3, end_dt: null })]),
+    );
+    await store.syncLatest();
+
+    expect(store.latestRun?.new_publication_count).toBe(5);
   });
 });

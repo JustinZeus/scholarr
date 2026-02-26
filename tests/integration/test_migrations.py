@@ -19,7 +19,7 @@ EXPECTED_TABLES = {
 }
 
 EXPECTED_ENUMS = {"run_status", "run_trigger_type"}
-EXPECTED_REVISION = "20260221_0015"
+EXPECTED_REVISION = "20260225_0022"
 
 
 @pytest.mark.integration
@@ -134,6 +134,28 @@ async def test_crawl_runs_has_manual_idempotency_unique_index(db_session: AsyncS
     indexdef = result.scalar_one()
     assert "UNIQUE INDEX" in indexdef
     assert "(user_id, idempotency_key)" in indexdef
+    assert "WHERE" in indexdef
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.migrations
+@pytest.mark.asyncio
+async def test_crawl_runs_has_single_active_run_unique_index(db_session: AsyncSession) -> None:
+    result = await db_session.execute(
+        text(
+            """
+            SELECT indexdef
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND tablename = 'crawl_runs'
+              AND indexname = 'uq_crawl_runs_user_active'
+            """
+        )
+    )
+    indexdef = result.scalar_one()
+    assert "UNIQUE INDEX" in indexdef
+    assert "(user_id)" in indexdef
     assert "WHERE" in indexdef
 
 

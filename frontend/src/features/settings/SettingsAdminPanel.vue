@@ -14,6 +14,7 @@ import AppRefreshButton from "@/components/ui/AppRefreshButton.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AppTable from "@/components/ui/AppTable.vue";
 import {
+  dropAllPublications,
   getAdminDbIntegrityReport,
   listAdminDbRepairJobs,
   listAdminPdfQueue,
@@ -42,6 +43,7 @@ const SECTION_PDF = "pdf";
 const SCOPE_SINGLE_USER = "single_user";
 const SCOPE_ALL_USERS = "all_users";
 const APPLY_ALL_USERS_CONFIRM_TEXT = "REPAIR ALL USERS";
+const DROP_PUBLICATIONS_CONFIRM_TEXT = "DROP ALL PUBLICATIONS";
 
 type RepairScopeMode = typeof SCOPE_SINGLE_USER | typeof SCOPE_ALL_USERS;
 
@@ -80,6 +82,13 @@ const repairRequestedBy = ref("");
 const repairDryRun = ref(true);
 const repairGcOrphans = ref(false);
 const repairConfirmationText = ref("");
+
+const droppingPublications = ref(false);
+const dropConfirmationText = ref("");
+const dropResult = ref<{ deleted_count: number; message: string } | null>(null);
+const dropConfirmationValid = computed(
+  () => dropConfirmationText.value.trim() === DROP_PUBLICATIONS_CONFIRM_TEXT,
+);
 
 const refreshingPdfQueue = ref(false);
 const requeueingPublicationId = ref<number | null>(null);
@@ -433,6 +442,22 @@ async function onRequeueAllPdfs(): Promise<void> {
   }
 }
 
+async function onDropAllPublications(): Promise<void> {
+  droppingPublications.value = true;
+  clearAlerts();
+  dropResult.value = null;
+  try {
+    const result = await dropAllPublications(dropConfirmationText.value.trim());
+    dropResult.value = result;
+    successMessage.value = result.message;
+    dropConfirmationText.value = "";
+  } catch (error) {
+    assignError(error, "Unable to drop publications.");
+  } finally {
+    droppingPublications.value = false;
+  }
+}
+
 onMounted(async () => {
   loading.value = true;
   clearAlerts();
@@ -685,6 +710,45 @@ watch(
               </tr>
             </tbody>
           </AppTable>
+        </AppCard>
+
+        <AppCard class="space-y-3 border-danger-300 dark:border-danger-700">
+          <div class="flex items-center gap-1">
+            <h2 class="text-lg font-semibold text-danger-600 dark:text-danger-400">Drop All Publications</h2>
+            <AppHelpHint text="Permanently delete ALL publications, links, identifiers, and PDF jobs. Scholar baselines will be reset so the next run re-discovers everything." />
+          </div>
+
+          <p class="text-sm text-secondary">
+            This action is <strong>irreversible</strong>. It deletes every publication record across all users.
+            The next ingestion run will re-populate all data from scratch.
+          </p>
+
+          <form class="grid gap-3" @submit.prevent="onDropAllPublications">
+            <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+              <span>Type '{{ DROP_PUBLICATIONS_CONFIRM_TEXT }}' to confirm</span>
+              <AppInput
+                v-model="dropConfirmationText"
+                :placeholder="DROP_PUBLICATIONS_CONFIRM_TEXT"
+                autocomplete="off"
+              />
+            </label>
+            <div>
+              <AppButton
+                type="submit"
+                variant="danger"
+                :disabled="droppingPublications || !dropConfirmationValid"
+              >
+                {{ droppingPublications ? "Dropping..." : "Drop all publications" }}
+              </AppButton>
+            </div>
+          </form>
+
+          <div v-if="dropResult" class="rounded-lg border border-stroke-default bg-surface-card-muted p-3 text-xs">
+            <div class="mb-1 flex items-center gap-2">
+              <AppBadge tone="danger">Deleted: {{ dropResult.deleted_count }}</AppBadge>
+            </div>
+            <p class="text-secondary">{{ dropResult.message }}</p>
+          </div>
         </AppCard>
       </section>
 

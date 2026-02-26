@@ -64,6 +64,7 @@ const startCheckLabel = computed(() => {
 const isStartCheckAnimating = computed(
   () => runStatus.isSubmitting || runStatus.isLikelyRunning,
 );
+const isCancelAnimating = ref(false);
 
 const displayedLatestRun = computed(() => {
   const snapshotLatest = snapshot.value?.latestRun ?? null;
@@ -102,6 +103,25 @@ const recentRuns = computed(() => {
   mergedRuns.splice(existingIndex, 1, latest);
   return mergedRuns;
 });
+
+const recentPublications = computed(() => {
+  const stream = runStatus.livePublications;
+  // DashboardSnapshot's recentPublications is compatible with PublicationItem,
+  // but let's cast it slightly to guarantee iteration.
+  const base = snapshot.value?.recentPublications ?? [];
+  const merged = [...stream, ...base];
+  
+  const seenIds = new Set();
+  const deduped: any[] = [];
+  for (const item of merged) {
+    if (!seenIds.has(item.publication_id)) {
+      seenIds.add(item.publication_id);
+      deduped.push(item);
+    }
+  }
+  return deduped;
+});
+
 const activeRunId = computed(() => runStatus.latestRun?.status === "running" ? runStatus.latestRun.id : null);
 const showRunningHint = computed(
   () => runStatus.isLikelyRunning && displayedLatestRun.value?.status !== "running",
@@ -178,11 +198,32 @@ async function onTriggerRun(): Promise<void> {
       return;
     }
 
-    errorMessage.value = result.message;
     errorRequestId.value = result.requestId;
   } catch {
     errorMessage.value = "Unable to start an update check.";
     errorRequestId.value = null;
+  }
+}
+
+async function onCancelRun(): Promise<void> {
+  if (!activeRunId.value) return;
+  errorMessage.value = null;
+  errorRequestId.value = null;
+  successMessage.value = null;
+  isCancelAnimating.value = true;
+
+  try {
+    const result = await runStatus.cancelActiveCheck();
+    if (result.kind === "success") {
+      successMessage.value = "Update check canceled successfully.";
+      await loadSnapshot();
+    } else {
+      errorMessage.value = result.message;
+    }
+  } catch {
+    errorMessage.value = "Unable to cancel the update check.";
+  } finally {
+    isCancelAnimating.value = false;
   }
 }
 
@@ -252,14 +293,14 @@ watch(
                 </div>
 
                 <AppEmptyState
-                  v-if="snapshot.recentPublications.length === 0"
+                  v-if="recentPublications.length === 0"
                   title="No new publications"
                   body="When a completed update check discovers changes, they will appear here."
                 />
 
                 <ul v-else class="grid min-h-0 flex-1 content-start gap-3 overflow-y-scroll overscroll-contain pr-1">
                   <li
-                    v-for="item in snapshot.recentPublications.slice(0, 20)"
+                    v-for="item in recentPublications.slice(0, 20)"
                     :key="item.publication_id"
                     class="grid gap-1 rounded-xl border border-stroke-default bg-surface-card-muted px-3 py-2"
                   >
@@ -328,6 +369,22 @@ watch(
                       />
                     </div>
                     <div class="flex items-center gap-2">
+                      <AppButton
+                        v-if="auth.isAdmin && runStatus.isLikelyRunning"
+                        variant="danger"
+                        :disabled="!activeRunId || isCancelAnimating.value"
+                        @click="onCancelRun"
+                      >
+                        <span class="inline-flex items-center gap-2">
+                          <span v-if="isCancelAnimating" class="relative inline-flex h-2.5 w-2.5">
+                            <span
+                              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60"
+                            />
+                            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-current" />
+                          </span>
+                          Cancel check
+                        </span>
+                      </AppButton>
                       <AppButton
                         v-if="auth.isAdmin"
                         :disabled="isStartBlocked"

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from datetime import datetime
+
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ScholarProfile, ScholarPublication
@@ -10,7 +12,7 @@ from app.services.domains.publications.modes import (
     MODE_UNREAD,
     resolve_publication_view_mode,
 )
-from app.services.domains.publications.queries import get_latest_completed_run_id_for_user
+from app.services.domains.publications.queries import get_latest_run_id_for_user
 
 
 async def count_for_user(
@@ -20,11 +22,12 @@ async def count_for_user(
     mode: str = MODE_ALL,
     scholar_profile_id: int | None = None,
     favorite_only: bool = False,
+    snapshot_before: datetime | None = None,
 ) -> int:
     resolved_mode = resolve_publication_view_mode(mode)
-    latest_run_id = await get_latest_completed_run_id_for_user(db_session, user_id=user_id)
+    latest_run_id = await get_latest_run_id_for_user(db_session, user_id=user_id)
     stmt = (
-        select(func.count())
+        select(func.count(distinct(ScholarPublication.publication_id)))
         .select_from(ScholarPublication)
         .join(ScholarProfile, ScholarProfile.id == ScholarPublication.scholar_profile_id)
         .where(ScholarProfile.user_id == user_id)
@@ -33,6 +36,8 @@ async def count_for_user(
         stmt = stmt.where(ScholarProfile.id == scholar_profile_id)
     if favorite_only:
         stmt = stmt.where(ScholarPublication.is_favorite.is_(True))
+    if snapshot_before is not None:
+        stmt = stmt.where(ScholarPublication.created_at <= snapshot_before)
     if resolved_mode == MODE_UNREAD:
         stmt = stmt.where(ScholarPublication.is_read.is_(False))
     if resolved_mode == MODE_LATEST:
@@ -49,6 +54,7 @@ async def count_unread_for_user(
     user_id: int,
     scholar_profile_id: int | None = None,
     favorite_only: bool = False,
+    snapshot_before: datetime | None = None,
 ) -> int:
     return await count_for_user(
         db_session,
@@ -56,6 +62,7 @@ async def count_unread_for_user(
         mode=MODE_UNREAD,
         scholar_profile_id=scholar_profile_id,
         favorite_only=favorite_only,
+        snapshot_before=snapshot_before,
     )
 
 
@@ -65,6 +72,7 @@ async def count_latest_for_user(
     user_id: int,
     scholar_profile_id: int | None = None,
     favorite_only: bool = False,
+    snapshot_before: datetime | None = None,
 ) -> int:
     return await count_for_user(
         db_session,
@@ -72,6 +80,7 @@ async def count_latest_for_user(
         mode=MODE_LATEST,
         scholar_profile_id=scholar_profile_id,
         favorite_only=favorite_only,
+        snapshot_before=snapshot_before,
     )
 
 
@@ -80,6 +89,7 @@ async def count_favorite_for_user(
     *,
     user_id: int,
     scholar_profile_id: int | None = None,
+    snapshot_before: datetime | None = None,
 ) -> int:
     return await count_for_user(
         db_session,
@@ -87,4 +97,5 @@ async def count_favorite_for_user(
         mode=MODE_ALL,
         scholar_profile_id=scholar_profile_id,
         favorite_only=True,
+        snapshot_before=snapshot_before,
     )

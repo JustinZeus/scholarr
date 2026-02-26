@@ -30,6 +30,7 @@ const TAB_ADMIN_USERS = "admin-users";
 const TAB_ADMIN_INTEGRITY = "admin-integrity";
 const TAB_ADMIN_REPAIRS = "admin-repairs";
 const TAB_ADMIN_PDF = "admin-pdf";
+const TAB_ADMIN_INTEGRATIONS = "admin-integrations";
 
 const auth = useAuthStore();
 const userSettings = useUserSettingsStore();
@@ -45,6 +46,9 @@ const autoRunEnabled = ref(false);
 const runIntervalMinutes = ref("60");
 const requestDelaySeconds = ref("2");
 const navVisiblePages = ref<string[]>([]);
+const openalexApiKey = ref("");
+const crossrefApiToken = ref("");
+const crossrefApiMailto = ref("");
 
 const currentPassword = ref("");
 const newPassword = ref("");
@@ -72,6 +76,7 @@ const tabItems = computed<AppTabItem[]>(() => {
       { id: TAB_ADMIN_INTEGRITY, label: "Integrity" },
       { id: TAB_ADMIN_REPAIRS, label: "Repairs" },
       { id: TAB_ADMIN_PDF, label: "PDF Queue" },
+      { id: TAB_ADMIN_INTEGRATIONS, label: "Integrations" },
     );
   }
   return tabs;
@@ -129,6 +134,10 @@ function hydrateSettings(settings: UserSettings): void {
   requestDelaySeconds.value = String(settings.request_delay_seconds);
   navVisiblePages.value = normalizeUserNavVisiblePages(settings.nav_visible_pages);
 
+  openalexApiKey.value = settings.openalex_api_key ?? "";
+  crossrefApiToken.value = settings.crossref_api_token ?? "";
+  crossrefApiMailto.value = settings.crossref_api_mailto ?? "";
+
   userSettings.applySettings(settings);
   runStatus.setSafetyState(settings.safety_state);
 }
@@ -183,6 +192,9 @@ async function onSaveSettings(): Promise<void> {
         minRequestDelaySeconds.value,
       ),
       nav_visible_pages: normalizeUserNavVisiblePages(navVisiblePages.value),
+      openalex_api_key: openalexApiKey.value.trim() || null,
+      crossref_api_token: crossrefApiToken.value.trim() || null,
+      crossref_api_mailto: crossrefApiMailto.value.trim() || null,
     };
 
     const saved = await updateSettings(payload);
@@ -355,6 +367,50 @@ onMounted(async () => {
               </AppButton>
             </div>
           </form>
+        </section>
+
+        <section v-if="activeTab === TAB_ADMIN_INTEGRATIONS" class="grid gap-4">
+          <div class="flex items-center gap-1">
+            <h2 class="text-lg font-semibold text-ink-primary">API Integrations</h2>
+            <AppHelpHint text="Configure API keys for external services like OpenAlex and Crossref. These are global system settings." />
+          </div>
+          <p class="text-sm text-secondary">If no keys are provided, the system will gracefully fall back to free unauthenticated tiers where available.</p>
+
+          <div class="grid gap-3">
+            <div class="grid gap-2 rounded-lg border border-stroke-default bg-surface-card-muted p-3">
+              <h3 class="text-sm font-semibold text-ink-secondary">OpenAlex</h3>
+              <p class="text-xs text-secondary mb-2">
+                OpenAlex is a free index of the world's research. Providing a key unlocks a higher rate limit. 
+                Values returned from the backend might be 'SET' to hide the raw key for security.
+              </p>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+                <span>API Key</span>
+                <AppInput v-model="openalexApiKey" placeholder="e.g. iBo3Ye2q322zKYkEyI..." autocomplete="off" />
+              </label>
+            </div>
+
+            <div class="grid gap-2 rounded-lg border border-stroke-default bg-surface-card-muted p-3">
+              <h3 class="text-sm font-semibold text-ink-secondary">Crossref</h3>
+              <p class="text-xs text-secondary mb-2">
+                Crossref metadata search for DOIs. A "mailto" address puts you in their "Polite Pool" for better performance. 
+                A Plus API token unlocks the fastest tier.
+              </p>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+                <span>API Token (Plus)</span>
+                <AppInput v-model="crossrefApiToken" placeholder="Usually empty unless you have an enterprise Plus account" autocomplete="off" />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary mt-2">
+                <span>Mailto (Polite Pool)</span>
+                <AppInput v-model="crossrefApiMailto" placeholder="e.g. admin@yourdomain.com" type="email" autocomplete="off" />
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <AppButton :disabled="saving" @click="onSaveSettings">
+              {{ saving ? "Saving..." : "Save integrations" }}
+            </AppButton>
+          </div>
         </section>
 
         <SettingsAdminPanel v-if="activeAdminSection" :section="activeAdminSection" />

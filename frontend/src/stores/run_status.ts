@@ -1,11 +1,12 @@
 import { defineStore } from "pinia";
 
-import { listRuns, triggerManualRun, type RunListItem } from "@/features/runs";
+import { listRuns, triggerManualRun, cancelRun, type RunListItem } from "@/features/runs";
 import {
   createDefaultSafetyState,
   normalizeSafetyState,
   type ScrapeSafetyState,
 } from "@/features/safety";
+import { type PublicationItem } from "@/features/publications";
 import { ApiRequestError } from "@/lib/api/errors";
 
 export const RUN_STATUS_POLL_INTERVAL_MS = 5000;
@@ -13,24 +14,31 @@ export const RUN_STATUS_STARTING_PHASE_MS = 1500;
 
 export type StartManualCheckResult =
   | {
-      kind: "started";
-      runId: number;
-      reusedExistingRun: boolean;
-    }
+    kind: "started";
+    runId: number;
+    reusedExistingRun: boolean;
+  }
   | {
-      kind: "already_running";
-      runId: number | null;
-      requestId: string | null;
-    }
+    kind: "already_running";
+    runId: number | null;
+    requestId: string | null;
+  }
   | {
-      kind: "error";
-      message: string;
-      requestId: string | null;
-    };
+    kind: "error";
+    message: string;
+    requestId: string | null;
+  };
+
+export type CancelCheckResult =
+  | { kind: "success" }
+  | { kind: "error"; message: string };
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let syncPromise: Promise<void> | null = null;
 let submittingPhaseTimer: ReturnType<typeof setTimeout> | null = null;
+let eventSource: EventSource | null = null;
+let activeStreamRunId: number | null = null;
+const ACTIVE_STATUSES = new Set(["running", "resolving"]);
 
 function parseRunId(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -67,6 +75,32 @@ function extractSafetyStateFromDetails(details: unknown): ScrapeSafetyState | nu
   return normalizeSafetyState(candidate);
 }
 
+function isActiveStatus(value: string | null | undefined): boolean {
+  return value !== undefined && value !== null && ACTIVE_STATUSES.has(value);
+}
+
+function parsePublicationCount(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(Math.trunc(value), 0);
+  }
+  return fallback;
+}
+
+function reconcileRunCounters(previous: RunListItem | null, next: RunListItem | null): RunListItem | null {
+  if (previous === null || next === null) {
+    return next;
+  }
+  if (previous.id !== next.id) {
+    return next;
+  }
+  const previousCount = parsePublicationCount(previous.new_publication_count, 0);
+  const nextCount = parsePublicationCount(next.new_publication_count, previousCount);
+  return {
+    ...next,
+    new_publication_count: Math.max(previousCount, nextCount),
+  };
+}
+
 function buildPlaceholderRunningRun(runId: number): RunListItem {
   return {
     id: runId,
@@ -91,13 +125,16 @@ export const useRunStatusStore = defineStore("runStatus", {
     lastErrorMessage: null as string | null,
     lastErrorRequestId: null as string | null,
     lastSyncAt: null as number | null,
+    livePublications: [] as Array<PublicationItem>,
   }),
   getters: {
     isRunActive(state): boolean {
-      return state.isSubmitting || state.latestRun?.status === "running";
+      const s = state.latestRun?.status;
+      return state.isSubmitting || s === "running" || s === "resolving";
     },
     isLikelyRunning(state): boolean {
-      return state.latestRun?.status === "running" || state.assumeRunningFromSubmission;
+      const s = state.latestRun?.status;
+      return s === "running" || s === "resolving" || state.assumeRunningFromSubmission;
     },
     canStart(): boolean {
       return !this.isRunActive && !this.safetyState.cooldown_active;
@@ -125,7 +162,7 @@ export const useRunStatusStore = defineStore("runStatus", {
       this.lastSyncAt = Date.now();
       this.lastErrorMessage = null;
       this.lastErrorRequestId = null;
-      if (run?.status === "running") {
+      if (isActiveStatus(run?.status)) {
         this.assumeRunningFromSubmission = true;
       } else if (!this.isSubmitting) {
         this.assumeRunningFromSubmission = false;
@@ -156,9 +193,69 @@ export const useRunStatusStore = defineStore("runStatus", {
     updatePolling(): void {
       if (this.isRunActive) {
         this.startPolling();
+        this.updateEventSource();
         return;
       }
       this.stopPolling();
+      this.updateEventSource();
+    },
+    updateEventSource(): void {
+      const targetRunId = this.latestRun?.status === "running" ? this.latestRun.id : null;
+      if (activeStreamRunId === targetRunId) {
+        return;
+      }
+      if (eventSource !== null) {
+        eventSource.close();
+        eventSource = null;
+        activeStreamRunId = null;
+      }
+      if (targetRunId !== null) {
+        if (typeof EventSource === "undefined") {
+          return;
+        }
+        activeStreamRunId = targetRunId;
+        this.livePublications = [];
+        eventSource = new EventSource(`/api/v1/runs/${targetRunId}/stream`);
+        eventSource.addEventListener("publication_discovered", (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (this.latestRun && this.latestRun.id === targetRunId) {
+              const baseline = parsePublicationCount(this.latestRun.new_publication_count, 0);
+              const payloadCount = parsePublicationCount(data?.new_publication_count, baseline + 1);
+              this.latestRun.new_publication_count = Math.max(baseline, payloadCount);
+            }
+            this.livePublications.unshift({
+              publication_id: data.publication_id,
+              scholar_profile_id: data.scholar_profile_id,
+              scholar_label: data.scholar_label,
+              title: data.title,
+              pub_url: data.pub_url,
+              first_seen_at: data.first_seen_at,
+              year: null,
+              citation_count: 0,
+              venue_text: null,
+              display_identifier: null,
+              pdf_url: null,
+              pdf_status: "untracked",
+              pdf_attempt_count: 0,
+              pdf_failure_reason: null,
+              pdf_failure_detail: null,
+              is_read: false,
+              is_favorite: false,
+              is_new_in_latest_run: true,
+            });
+            if (this.livePublications.length > 50) {
+              this.livePublications.pop();
+            }
+          } catch (err) {
+            console.error("Failed to parse SSE event", err);
+          }
+        });
+        eventSource.onerror = () => {
+          // Reconnecting is handled automatically by EventSource,
+          // but if it's permanently closed, we could do something here.
+        };
+      }
     },
     async syncLatest(): Promise<void> {
       if (syncPromise) {
@@ -169,13 +266,13 @@ export const useRunStatusStore = defineStore("runStatus", {
       syncPromise = (async () => {
         try {
           const payload = await listRuns({ limit: 1 });
-          const latest = payload.runs[0] ?? null;
+          const latest = reconcileRunCounters(this.latestRun, payload.runs[0] ?? null);
           this.latestRun = latest;
           this.safetyState = normalizeSafetyState(payload.safety_state);
           this.lastSyncAt = Date.now();
           this.lastErrorMessage = null;
           this.lastErrorRequestId = null;
-          if (latest?.status === "running") {
+          if (isActiveStatus(latest?.status)) {
             this.assumeRunningFromSubmission = true;
           } else if (!this.isSubmitting) {
             this.assumeRunningFromSubmission = false;
@@ -294,14 +391,36 @@ export const useRunStatusStore = defineStore("runStatus", {
       } finally {
         this.isSubmitting = false;
         this.clearSubmittingPhaseTimer();
-        if (this.latestRun?.status !== "running") {
+        if (!isActiveStatus(this.latestRun?.status)) {
           this.assumeRunningFromSubmission = false;
         }
         this.updatePolling();
       }
     },
+    async cancelActiveCheck(): Promise<{ kind: "success" } | { kind: "error"; message: string }> {
+      if (!this.latestRun || !isActiveStatus(this.latestRun.status)) {
+        return { kind: "error", message: "No active run to cancel." };
+      }
+      try {
+        const response = await cancelRun(this.latestRun.id);
+        this.setLatestRun(reconcileRunCounters(this.latestRun, response.run));
+        this.setSafetyState(response.safety_state);
+        return { kind: "success" };
+      } catch (error) {
+        let errMessage = "Failed to cancel check.";
+        if (error instanceof ApiRequestError) {
+          errMessage = error.message;
+        }
+        return { kind: "error", message: errMessage };
+      }
+    },
     reset(): void {
       this.stopPolling();
+      if (eventSource !== null) {
+        eventSource.close();
+        eventSource = null;
+        activeStreamRunId = null;
+      }
       this.clearSubmittingPhaseTimer();
       this.latestRun = null;
       this.isSubmitting = false;

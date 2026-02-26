@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.domains.publication_identifiers import application as identifier_service
@@ -9,7 +11,7 @@ from app.services.domains.publications.modes import (
     resolve_publication_view_mode,
 )
 from app.services.domains.publications.queries import (
-    get_latest_completed_run_id_for_user,
+    get_latest_run_id_for_user,
     get_publication_item_for_user,
     publication_list_item_from_row,
     publications_query,
@@ -25,11 +27,15 @@ async def list_for_user(
     mode: str = MODE_ALL,
     scholar_profile_id: int | None = None,
     favorite_only: bool = False,
-    limit: int = 300,
+    search: str | None = None,
+    sort_by: str = "first_seen",
+    sort_dir: str = "desc",
+    limit: int = 100,
     offset: int = 0,
+    snapshot_before: datetime | None = None,
 ) -> list[PublicationListItem]:
     resolved_mode = resolve_publication_view_mode(mode)
-    latest_run_id = await get_latest_completed_run_id_for_user(db_session, user_id=user_id)
+    latest_run_id = await get_latest_run_id_for_user(db_session, user_id=user_id)
     result = await db_session.execute(
         publications_query(
             user_id=user_id,
@@ -37,8 +43,12 @@ async def list_for_user(
             latest_run_id=latest_run_id,
             scholar_profile_id=scholar_profile_id,
             favorite_only=favorite_only,
+            search=search,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
             limit=limit,
             offset=offset,
+            snapshot_before=snapshot_before,
         )
     )
     rows = [

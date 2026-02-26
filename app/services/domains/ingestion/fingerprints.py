@@ -15,10 +15,57 @@ from app.services.domains.ingestion.constants import (
 )
 from app.services.domains.scholar.parser import ParseState, ParsedProfilePage, PublicationCandidate
 
+# Scholar-specific noise patterns stripped before canonical comparison.
+# Applied in order; each targets a different Scholar metadata injection style.
+_NOISE_DOI_RE = re.compile(r"[,.\s]+doi\s*:\s*\S+.*$", re.IGNORECASE)
+_NOISE_ARXIV_RE = re.compile(r"[,.\s]+arxiv\b.*$", re.IGNORECASE)
+_NOISE_PREPRINT_RE = re.compile(
+    r"[,\s]+(?:preprint|extended\s+version|technical\s+report|working\s+paper)\b.*$",
+    re.IGNORECASE,
+)
+_NOISE_TRAILING_YEAR_RE = re.compile(r"\s*[,(]\s*\d{4}\s*[),]?\s*$")
+# Strips ". Capitalised sentence" appended as venue: ". Comput. Sci…", ". Journal of…"
+_NOISE_VENUE_SENTENCE_RE = re.compile(r"(?<=\w{3})\.\s+[A-Z][a-z].*$")
+
+_CANONICAL_DEDUP_THRESHOLD = 0.82
+
 
 def normalize_title(value: str) -> str:
     lowered = value.lower()
     return TITLE_ALNUM_RE.sub("", lowered)
+
+
+def canonical_title_for_dedup(title: str) -> str:
+    """Strip Scholar-specific noise suffixes then normalize for dedup comparison."""
+    t = title.strip()
+    t = _NOISE_DOI_RE.sub("", t)
+    t = _NOISE_ARXIV_RE.sub("", t)
+    t = _NOISE_PREPRINT_RE.sub("", t)
+    t = _NOISE_TRAILING_YEAR_RE.sub("", t)
+    t = _NOISE_VENUE_SENTENCE_RE.sub("", t)
+    return normalize_title(t.strip())
+
+
+def _stripped_title_for_canonical(title: str) -> str:
+    """Apply noise-stripping and lowercase but PRESERVE spaces (for later tokenization)."""
+    t = title.strip()
+    t = _NOISE_DOI_RE.sub("", t)
+    t = _NOISE_ARXIV_RE.sub("", t)
+    t = _NOISE_PREPRINT_RE.sub("", t)
+    t = _NOISE_TRAILING_YEAR_RE.sub("", t)
+    t = _NOISE_VENUE_SENTENCE_RE.sub("", t)
+    return t.lower().strip()
+
+
+def _canonical_title_tokens(title: str) -> set[str]:
+    """Word tokens of the noise-stripped title (preserves token boundaries)."""
+    return set(WORD_RE.findall(_stripped_title_for_canonical(title)))
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
 
 
 def _first_author_last_name(authors_text: str | None) -> str:
@@ -100,29 +147,89 @@ def _next_cstart_value(*, articles_range: str | None, fallback: int) -> int:
     return int(fallback)
 
 
+def _title_tokens(value: str) -> set[str]:
+    """Extract normalized word tokens for fuzzy title comparison."""
+    return set(WORD_RE.findall(value.lower()))
+
+
+def fuzzy_titles_match(
+    title_a: str,
+    title_b: str,
+    *,
+    threshold: float = 0.85,
+) -> bool:
+    """Return True if two titles are near-duplicates by token-level Jaccard similarity.
+
+    A threshold of 0.85 catches common academic duplicate patterns:
+    differences in punctuation, minor word variations, subtitle changes.
+    """
+    tokens_a = _title_tokens(title_a)
+    tokens_b = _title_tokens(title_b)
+    return _jaccard(tokens_a, tokens_b) >= threshold
+
+
 def _dedupe_publication_candidates(
     publications: list[PublicationCandidate],
+    *,
+    seen_canonical: set[str] | None = None,
 ) -> list[PublicationCandidate]:
+    """Deduplicate candidates using canonical title matching.
+
+    Args:
+        publications: candidates to filter
+        seen_canonical: optional mutable set shared across pages.  Stores the
+            noise-stripped *lowercased* (but space-preserved) canonical string
+            so it can be tokenized on the next page for cross-page fuzzy dedup.
+            Accepted canonicals are added; existing entries are consulted.
+    """
     deduped: list[PublicationCandidate] = []
-    seen: set[str] = set()
-    for publication in publications:
-        if publication.cluster_id:
-            identity = f"cluster:{publication.cluster_id}"
-        else:
-            identity = "|".join(
-                [
-                    "fallback",
-                    normalize_title(publication.title),
-                    str(publication.year) if publication.year is not None else "",
-                    publication.authors_text or "",
-                    publication.venue_text or "",
-                ]
-            )
-        if identity in seen:
+    seen_exact: set[str] = set()
+    # Token sets for fuzzy comparison; seeded from cross-page state.
+    seen_tokens: list[set[str]] = []
+
+    if seen_canonical:
+        for stripped in seen_canonical:
+            seen_tokens.append(set(WORD_RE.findall(stripped)))
+
+    for pub in publications:
+        identity = _publication_identity(pub)
+        if identity in seen_exact:
             continue
-        seen.add(identity)
-        deduped.append(publication)
+
+        # Use space-preserving stripped form for token-level fuzzy match.
+        tokens = _canonical_title_tokens(pub.title)
+        if _is_fuzzy_dup(tokens, seen_tokens):
+            continue
+
+        seen_exact.add(identity)
+        seen_tokens.append(tokens)
+        if seen_canonical is not None:
+            # Store the noise-stripped lowercased (space-preserved) form.
+            seen_canonical.add(_stripped_title_for_canonical(pub.title))
+        deduped.append(pub)
+
     return deduped
+
+
+def _publication_identity(pub: PublicationCandidate) -> str:
+    if pub.cluster_id:
+        return f"cluster:{pub.cluster_id}"
+    canonical = canonical_title_for_dedup(pub.title)
+    return "|".join(
+        [
+            "fallback",
+            canonical,
+            str(pub.year) if pub.year is not None else "",
+            _first_author_last_name(pub.authors_text),
+        ]
+    )
+
+
+def _is_fuzzy_dup(tokens: set[str], seen: list[set[str]]) -> bool:
+    for existing in seen:
+        if _jaccard(tokens, existing) >= _CANONICAL_DEDUP_THRESHOLD:
+            return True
+    return False
 
 
 def _build_body_excerpt(body: str, *, max_chars: int = 220) -> str | None:

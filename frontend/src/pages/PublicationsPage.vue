@@ -30,11 +30,9 @@ import { useUserSettingsStore } from "@/stores/user_settings";
 
 type PublicationSortKey =
   | "title"
-  | "favorite"
   | "scholar"
   | "year"
   | "citations"
-  | "status"
   | "first_seen";
 
 type BulkAction =
@@ -56,6 +54,7 @@ const sortKey = ref<PublicationSortKey>("first_seen");
 const sortDirection = ref<"asc" | "desc">("desc");
 const currentPage = ref(1);
 const pageSize = ref("50");
+const publicationSnapshot = ref<string | null>(null);
 
 const scholars = ref<ScholarProfile[]>([]);
 const listState = ref<PublicationsResult | null>(null);
@@ -190,26 +189,41 @@ const selectedScholarName = computed(() => {
 });
 
 const filteredPublications = computed(() => {
+  let stream = [...runStatus.livePublications];
+  if (favoriteOnly.value) {
+    stream = stream.filter((p) => p.is_favorite);
+  }
+  if (mode.value === "unread") {
+    stream = stream.filter((p) => !p.is_read);
+  }
+  const selectedScholarId = Number(selectedScholarFilter.value);
+  if (Number.isInteger(selectedScholarId) && selectedScholarId > 0) {
+    stream = stream.filter((p) => p.scholar_profile_id === selectedScholarId);
+  }
+
   const base = listState.value?.publications ?? [];
+  const merged = [...stream, ...base];
+  const seenIds = new Set();
+  const deduped: typeof base = [];
+  for (const item of merged) {
+    if (!seenIds.has(item.publication_id)) {
+      seenIds.add(item.publication_id);
+      deduped.push(item);
+    }
+  }
+
   const normalized = searchQuery.value.trim().toLowerCase();
   if (!normalized) {
-    return base;
+    return deduped;
   }
-  return base.filter((item) => {
-    const year = item.year === null ? "" : String(item.year);
-    return [item.title, item.scholar_label, item.venue_text || "", year]
-      .join(" ")
-      .toLowerCase()
-      .includes(normalized);
-  });
+  // Client-side fallback: filter live-discovered publications that haven't been
+  // server-round-tripped yet. The main server query already filters by search.
+  return deduped;
 });
 
 function publicationSortValue(item: PublicationItem, key: PublicationSortKey): number | string {
   if (key === "title") {
     return item.title;
-  }
-  if (key === "favorite") {
-    return item.is_favorite ? 1 : 0;
   }
   if (key === "scholar") {
     return item.scholar_label;
@@ -220,38 +234,14 @@ function publicationSortValue(item: PublicationItem, key: PublicationSortKey): n
   if (key === "citations") {
     return item.citation_count;
   }
-  if (key === "status") {
-    if (item.is_read) {
-      return 2;
-    }
-    if (item.is_new_in_latest_run) {
-      return 0;
-    }
-    return 1;
-  }
   const timestamp = Date.parse(item.first_seen_at);
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
 const sortedPublications = computed(() => {
-  const sorted = [...filteredPublications.value];
-  sorted.sort((a, b) => {
-    const left = publicationSortValue(a, sortKey.value);
-    const right = publicationSortValue(b, sortKey.value);
-
-    let comparison: number;
-    if (typeof left === "string" && typeof right === "string") {
-      comparison = textCollator.compare(left, right);
-    } else {
-      comparison = Number(left) - Number(right);
-    }
-
-    if (comparison === 0) {
-      comparison = textCollator.compare(a.title, b.title);
-    }
-    return sortDirection.value === "asc" ? comparison : comparison * -1;
-  });
-  return sorted;
+  // Server already returns data in the correct sort order.
+  // We just pass through the filtered/merged list without client-side re-sorting.
+  return filteredPublications.value;
 });
 
 const visibleUnreadKeys = computed(() => {
@@ -437,13 +427,16 @@ watch(hasSelection, (nextHasSelection) => {
   bulkAction.value = nextHasSelection ? "mark_selected_read" : "mark_all_unread_read";
 });
 
-function toggleSort(nextKey: PublicationSortKey): void {
+async function toggleSort(nextKey: PublicationSortKey): Promise<void> {
   if (sortKey.value === nextKey) {
     sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
-    return;
+  } else {
+    sortKey.value = nextKey;
+    sortDirection.value = nextKey === "first_seen" ? "desc" : "asc";
   }
-  sortKey.value = nextKey;
-  sortDirection.value = nextKey === "first_seen" ? "desc" : "asc";
+  currentPage.value = 1;
+  publicationSnapshot.value = null;
+  await loadPublications();
 }
 
 function sortMarker(key: PublicationSortKey): string {
@@ -476,9 +469,14 @@ async function loadPublications(): Promise<void> {
       mode: mode.value,
       favoriteOnly: favoriteOnly.value,
       scholarProfileId: selectedScholarId(),
+      search: searchQuery.value.trim() || undefined,
+      sortBy: sortKey.value,
+      sortDir: sortDirection.value,
       page: currentPage.value,
       pageSize: pageSizeValue.value,
+      snapshot: publicationSnapshot.value ?? undefined,
     });
+    publicationSnapshot.value = listState.value.snapshot;
     currentPage.value = listState.value.page;
     pageSize.value = String(listState.value.page_size);
     selectedPublicationKeys.value = new Set();
@@ -498,12 +496,14 @@ async function loadPublications(): Promise<void> {
 
 async function onModeChanged(): Promise<void> {
   currentPage.value = 1;
+  publicationSnapshot.value = null;
   await syncFiltersToRoute();
   await loadPublications();
 }
 
 async function onScholarFilterChanged(): Promise<void> {
   currentPage.value = 1;
+  publicationSnapshot.value = null;
   await syncFiltersToRoute();
   await loadPublications();
 }
@@ -511,12 +511,14 @@ async function onScholarFilterChanged(): Promise<void> {
 async function onFavoriteOnlyChanged(): Promise<void> {
   favoriteOnly.value = !favoriteOnly.value;
   currentPage.value = 1;
+  publicationSnapshot.value = null;
   await syncFiltersToRoute();
   await loadPublications();
 }
 
 async function onPageSizeChanged(): Promise<void> {
   currentPage.value = 1;
+  publicationSnapshot.value = null;
   await syncFiltersToRoute();
   await loadPublications();
 }
@@ -605,15 +607,15 @@ function canRetryPublicationPdf(item: PublicationItem): boolean {
 
 function pdfPendingLabel(item: PublicationItem): string {
   if (item.pdf_status === "queued") {
-    return "queued";
+    return "Queued";
   }
   if (item.pdf_status === "running") {
-    return "resolving";
+    return "Resolving...";
   }
   if (item.pdf_status === "failed") {
-    return "failed";
+    return "Missing";
   }
-  return "untracked";
+  return "Untracked";
 }
 
 function replacePublication(updated: PublicationItem): void {
@@ -784,6 +786,18 @@ function resetSearchQuery(): void {
   searchQuery.value = "";
 }
 
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+watch(searchQuery, () => {
+  if (searchDebounceTimer !== null) {
+    clearTimeout(searchDebounceTimer);
+  }
+  searchDebounceTimer = setTimeout(() => {
+    currentPage.value = 1;
+    publicationSnapshot.value = null;
+    void loadPublications();
+  }, 300);
+});
+
 onMounted(() => {
   syncFiltersFromRoute();
   void Promise.all([loadScholarFilters(), loadPublications(), runStatus.syncLatest()]);
@@ -792,9 +806,17 @@ onMounted(() => {
 watch(
   () => [route.query.scholar, route.query.favorite, route.query.page],
   async () => {
+    const previousScholar = selectedScholarFilter.value;
+    const previousFavorite = favoriteOnly.value;
     const changed = syncFiltersFromRoute();
     if (!changed) {
       return;
+    }
+    if (
+      selectedScholarFilter.value !== previousScholar
+      || favoriteOnly.value !== previousFavorite
+    ) {
+      publicationSnapshot.value = null;
     }
     await loadPublications();
   },
@@ -843,7 +865,7 @@ watch(
         <label class="grid gap-1 text-xs text-secondary" for="publications-search-input">
           <span class="inline-flex items-center gap-1">
             Search
-            <AppHelpHint text="Searches title, scholar, venue, and year within currently loaded results." />
+            <AppHelpHint text="Searches title, scholar name, and venue." />
           </span>
           <div class="flex min-w-0 items-center gap-2">
             <AppInput
@@ -975,11 +997,7 @@ watch(
                   @change="onToggleAllVisible"
                 />
               </th>
-              <th scope="col" class="w-12">
-                <button type="button" class="table-sort" @click="toggleSort('favorite')">
-                  ★ <span aria-hidden="true" class="sort-marker">{{ sortMarker('favorite') }}</span>
-                </button>
-              </th>
+              <th scope="col" class="w-12 text-left font-semibold text-ink-primary">★</th>
               <th scope="col" class="w-[44%] min-w-[24rem]">
                 <button type="button" class="table-sort" @click="toggleSort('title')">
                   Title <span aria-hidden="true" class="sort-marker">{{ sortMarker('title') }}</span>
@@ -990,7 +1008,7 @@ watch(
                   Scholar <span aria-hidden="true" class="sort-marker">{{ sortMarker('scholar') }}</span>
                 </button>
               </th>
-              <th scope="col" class="w-[8.5rem] whitespace-nowrap">PDF</th>
+              <th scope="col" class="w-[8.5rem] whitespace-nowrap text-left font-semibold text-ink-primary">PDF</th>
               <th scope="col" class="w-16 whitespace-nowrap">
                 <button type="button" class="table-sort" @click="toggleSort('year')">
                   Year <span aria-hidden="true" class="sort-marker">{{ sortMarker('year') }}</span>
@@ -1001,11 +1019,7 @@ watch(
                   Citations <span aria-hidden="true" class="sort-marker">{{ sortMarker('citations') }}</span>
                 </button>
               </th>
-              <th scope="col" class="w-44 whitespace-nowrap">
-                <button type="button" class="table-sort" @click="toggleSort('status')">
-                  Read status <span aria-hidden="true" class="sort-marker">{{ sortMarker('status') }}</span>
-                </button>
-              </th>
+              <th scope="col" class="w-44 whitespace-nowrap text-left font-semibold text-ink-primary">Read status</th>
               <th scope="col" class="w-32 whitespace-nowrap">
                 <button type="button" class="table-sort" @click="toggleSort('first_seen')">
                   First seen <span aria-hidden="true" class="sort-marker">{{ sortMarker('first_seen') }}</span>
@@ -1073,8 +1087,12 @@ watch(
                   target="_blank"
                   rel="noreferrer"
                   class="pdf-link-button"
+                  title="Open PDF"
                 >
-                  PDF
+                  <svg class="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  Available
                 </a>
                 <button
                   v-else-if="canRetryPublicationPdf(item)"
@@ -1083,9 +1101,19 @@ watch(
                   :disabled="isRetryingPublication(item)"
                   @click="onRetryPdf(item)"
                 >
-                  {{ isRetryingPublication(item) ? "..." : "retry" }}
+                  <svg v-if="isRetryingPublication(item)" class="mr-1 h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ isRetryingPublication(item) ? "Retrying..." : "Missing (Retry)" }}
                 </button>
-                <span v-else class="pdf-state-label">{{ pdfPendingLabel(item) }}</span>
+                <span v-else class="pdf-state-label" :class="{ 'bg-surface-accent-muted border-accent-300 text-accent-700': item.pdf_status === 'running' || item.pdf_status === 'queued' }">
+                  <svg v-if="item.pdf_status === 'running'" class="mr-1 h-3 w-3 animate-spin text-accent-600" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ pdfPendingLabel(item) }}
+                </span>
               </td>
               <td class="whitespace-nowrap">{{ item.year ?? "n/a" }}</td>
               <td class="whitespace-nowrap">{{ item.citation_count }}</td>

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,15 +17,24 @@ def _normalized_citation_count(value: object) -> int:
         return 0
 
 
-async def get_latest_completed_run_id_for_user(
+async def get_latest_run_id_for_user(
     db_session: AsyncSession,
     *,
     user_id: int,
 ) -> int | None:
+    # We include RUNNING and RESOLVING statuses so that the "New" tab shows
+    # results in real-time as they are discovered.
     result = await db_session.execute(
         select(func.max(CrawlRun.id)).where(
             CrawlRun.user_id == user_id,
-            CrawlRun.status != RunStatus.RUNNING,
+            CrawlRun.status.in_(
+                [
+                    RunStatus.RUNNING,
+                    RunStatus.RESOLVING,
+                    RunStatus.SUCCESS,
+                    RunStatus.PARTIAL_FAILURE,
+                ]
+            ),
         )
     )
     latest_run_id = result.scalar_one_or_none()
@@ -39,7 +50,19 @@ def publications_query(
     favorite_only: bool,
     limit: int,
     offset: int = 0,
+    search: str | None = None,
+    sort_by: str = "first_seen",
+    sort_dir: str = "desc",
+    snapshot_before: datetime | None = None,
 ) -> Select[tuple]:
+    _SORT_COLUMNS = {
+        "first_seen": ScholarPublication.created_at,
+        "title": Publication.title_raw,
+        "year": Publication.year,
+        "citations": Publication.citation_count,
+        "scholar": ScholarProfile.display_name,
+    }
+
     scholar_label = ScholarProfile.display_name
     stmt = (
         select(
@@ -52,7 +75,6 @@ def publications_query(
             Publication.citation_count,
             Publication.venue_text,
             Publication.pub_url,
-            Publication.doi,
             Publication.pdf_url,
             ScholarPublication.is_read,
             ScholarPublication.is_favorite,
@@ -62,10 +84,15 @@ def publications_query(
         .join(ScholarPublication, ScholarPublication.publication_id == Publication.id)
         .join(ScholarProfile, ScholarProfile.id == ScholarPublication.scholar_profile_id)
         .where(ScholarProfile.user_id == user_id)
-        .order_by(ScholarPublication.created_at.desc(), Publication.id.desc())
-        .offset(max(int(offset), 0))
-        .limit(limit)
     )
+    if search:
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
+        pat = f"%{safe_search}%"
+        stmt = stmt.where(
+            Publication.title_raw.ilike(pat)
+            | ScholarProfile.display_name.ilike(pat)
+            | Publication.venue_text.ilike(pat)
+        )
     if scholar_profile_id is not None:
         stmt = stmt.where(ScholarProfile.id == scholar_profile_id)
     if favorite_only:
@@ -76,6 +103,16 @@ def publications_query(
         if latest_run_id is None:
             return stmt.where(False)
         stmt = stmt.where(ScholarPublication.first_seen_run_id == latest_run_id)
+    if snapshot_before is not None:
+        stmt = stmt.where(ScholarPublication.created_at <= snapshot_before)
+
+    sort_col = _SORT_COLUMNS.get(sort_by, ScholarPublication.created_at)
+    order = sort_col.desc() if sort_dir == "desc" else sort_col.asc()
+    stmt = stmt.order_by(order, Publication.id.desc())
+
+    if limit is not None:
+        stmt = stmt.offset(max(int(offset), 0)).limit(limit)
+
     return stmt
 
 
@@ -96,7 +133,6 @@ def publication_query_for_user(
             Publication.citation_count,
             Publication.venue_text,
             Publication.pub_url,
-            Publication.doi,
             Publication.pdf_url,
             ScholarPublication.is_read,
             ScholarPublication.is_favorite,
@@ -121,7 +157,7 @@ async def get_publication_item_for_user(
     scholar_profile_id: int,
     publication_id: int,
 ) -> PublicationListItem | None:
-    latest_run_id = await get_latest_completed_run_id_for_user(db_session, user_id=user_id)
+    latest_run_id = await get_latest_run_id_for_user(db_session, user_id=user_id)
     result = await db_session.execute(
         publication_query_for_user(
             user_id=user_id,
@@ -150,7 +186,6 @@ def publication_list_item_from_row(
         citation_count,
         venue_text,
         pub_url,
-        doi,
         pdf_url,
         is_read,
         is_favorite,
@@ -166,7 +201,6 @@ def publication_list_item_from_row(
         citation_count=_normalized_citation_count(citation_count),
         venue_text=venue_text,
         pub_url=pub_url,
-        doi=doi,
         pdf_url=pdf_url,
         is_read=bool(is_read),
         is_favorite=bool(is_favorite),
@@ -188,7 +222,6 @@ def unread_item_from_row(row: tuple) -> UnreadPublicationItem:
         citation_count,
         venue_text,
         pub_url,
-        doi,
         pdf_url,
         _is_read,
         _is_favorite,
@@ -204,6 +237,5 @@ def unread_item_from_row(row: tuple) -> UnreadPublicationItem:
         citation_count=_normalized_citation_count(citation_count),
         venue_text=venue_text,
         pub_url=pub_url,
-        doi=doi,
         pdf_url=pdf_url,
     )

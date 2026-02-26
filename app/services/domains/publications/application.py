@@ -24,7 +24,7 @@ from app.services.domains.publications.modes import (
     resolve_publication_view_mode,
 )
 from app.services.domains.publications.queries import (
-    get_latest_completed_run_id_for_user,
+    get_latest_run_id_for_user,
     get_publication_item_for_user,
     publications_query,
 )
@@ -50,7 +50,7 @@ __all__ = [
     "PublicationListItem",
     "UnreadPublicationItem",
     "resolve_publication_view_mode",
-    "get_latest_completed_run_id_for_user",
+    "get_latest_run_id_for_user",
     "publications_query",
     "get_publication_item_for_user",
     "list_for_user",

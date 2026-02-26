@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.services.domains.publications.types import PublicationListItem
+from app.services.domains.publication_identifiers.types import DisplayIdentifier
 from app.services.domains.unpaywall import application as unpaywall_app
 
 
@@ -31,7 +32,7 @@ def _item(publication_id: int) -> PublicationListItem:
         citation_count=1000,
         venue_text="Cell",
         pub_url="https://doi.org/10.1016/j.cell.2007.11.019",
-        doi=None,
+        display_identifier=None,
         pdf_url=None,
         is_read=False,
         first_seen_at=datetime.now(timezone.utc),
@@ -44,7 +45,13 @@ def test_publication_doi_uses_stored_value_when_metadata_has_no_doi() -> None:
         _item(99),
         pub_url="https://scholar.google.com/citations?view_op=view_citation&citation_for_view=abc:123",
         venue_text="Cell 130 (5), 2007",
-        doi="10.1016/j.cell.2007.11.019",
+        display_identifier=DisplayIdentifier(
+            kind="doi",
+            value="10.1016/j.cell.2007.11.019",
+            label="DOI",
+            url=None,
+            confidence_score=1.0,
+        ),
     )
     assert unpaywall_app._publication_doi(item) == "10.1016/j.cell.2007.11.019"
 
@@ -54,7 +61,13 @@ def test_publication_doi_prefers_explicit_metadata_doi_over_stored_value() -> No
         _item(100),
         pub_url="https://doi.org/10.2000/fresh-value",
         venue_text="Cell",
-        doi="10.1000/stale-value",
+        display_identifier=DisplayIdentifier(
+            kind="doi",
+            value="10.1000/stale-value",
+            label="DOI",
+            url=None,
+            confidence_score=1.0,
+        ),
     )
     assert unpaywall_app._publication_doi(item) == "10.2000/fresh-value"
 

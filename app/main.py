@@ -66,6 +66,18 @@ def _log_startup_build_marker() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     _log_startup_build_marker()
+    
+    from app.db.session import get_session_factory
+    from sqlalchemy import text
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            await session.execute(text("UPDATE crawl_runs SET status = 'failed' WHERE status::text IN ('running', 'resolving')"))
+            await session.commit()
+            logger.info("app.startup_orphaned_runs_cleaned", extra={"event": "app.startup_orphaned_runs_cleaned"})
+    except Exception as e:
+        logger.error(f"Failed to clean orphaned runs at startup: {e}")
+
     await scheduler_service.start()
     yield
     await scheduler_service.stop()

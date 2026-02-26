@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 
-from sqlalchemy import Select, func, literal, or_, select, union_all
+from sqlalchemy import Select, and_, func, literal, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
@@ -20,7 +20,6 @@ from app.db.session import get_session_factory
 from app.services.domains.publication_identifiers import application as identifier_service
 from app.services.domains.publication_identifiers.types import DisplayIdentifier
 from app.services.domains.publications.pdf_resolution_pipeline import (
-    PDF_SOURCE_SCHOLAR_PUBLICATION_PAGE,
     resolve_publication_pdf_outcome_for_row,
 )
 from app.services.domains.publications.types import PublicationListItem
@@ -49,7 +48,6 @@ _scheduled_tasks: set[asyncio.Task[None]] = set()
 class PdfQueueListItem:
     publication_id: int
     title: str
-    doi: str | None
     pdf_url: str | None
     status: str
     attempt_count: int
@@ -114,7 +112,6 @@ def _item_from_row_and_job(
         citation_count=row.citation_count,
         venue_text=row.venue_text,
         pub_url=row.pub_url,
-        doi=row.doi,
         pdf_url=row.pdf_url,
         is_read=row.is_read,
         is_favorite=row.is_favorite,
@@ -360,7 +357,7 @@ def _failed_outcome(
 ) -> OaResolutionOutcome:
     return OaResolutionOutcome(
         publication_id=row.publication_id,
-        doi=row.doi,
+        doi=None,
         pdf_url=None,
         failure_reason=FAILURE_RESOLUTION_EXCEPTION,
         source=None,
@@ -372,10 +369,12 @@ async def _fetch_outcome_for_row(
     *,
     row: PublicationListItem,
     request_email: str | None,
+    openalex_api_key: str | None = None,
 ) -> OaResolutionOutcome:
     pipeline_result = await resolve_publication_pdf_outcome_for_row(
         row=row,
         request_email=request_email,
+        openalex_api_key=openalex_api_key,
     )
     outcome = pipeline_result.outcome
     if outcome is not None:
@@ -386,11 +385,8 @@ async def _fetch_outcome_for_row(
 def _apply_publication_update(
     publication: Publication,
     *,
-    doi: str | None,
     pdf_url: str | None,
 ) -> None:
-    if doi and publication.doi != doi:
-        publication.doi = doi
     if pdf_url and publication.pdf_url != pdf_url:
         publication.pdf_url = pdf_url
 
@@ -426,7 +422,7 @@ async def _persist_outcome(
         job = await db_session.get(PublicationPdfJob, publication_id)
         if publication is None or job is None:
             return
-        _apply_publication_update(publication, doi=outcome.doi, pdf_url=outcome.pdf_url)
+        _apply_publication_update(publication, pdf_url=outcome.pdf_url)
         await identifier_service.sync_identifiers_for_publication_resolution(
             db_session,
             publication=publication,
@@ -453,10 +449,26 @@ async def _resolve_publication_row(
     user_id: int,
     request_email: str | None,
     row: PublicationListItem,
+    openalex_api_key: str | None = None,
 ) -> None:
+    from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
+    from app.services.domains.arxiv.application import ArxivRateLimitError
     await _mark_attempt_started(publication_id=row.publication_id, user_id=user_id)
     try:
-        outcome = await _fetch_outcome_for_row(row=row, request_email=request_email)
+        outcome = await _fetch_outcome_for_row(
+            row=row,
+            request_email=request_email,
+            openalex_api_key=openalex_api_key,
+        )
+    except (OpenAlexBudgetExhaustedError, ArxivRateLimitError):
+        # Persist a terminal outcome so jobs do not remain stuck in "running".
+        await _persist_outcome(
+            publication_id=row.publication_id,
+            user_id=user_id,
+            outcome=_failed_outcome(row=row),
+        )
+        # Propagate upward so the batch loop can stop immediately.
+        raise
     except Exception as exc:  # pragma: no cover - defensive network boundary
         logger.warning(
             "publications.pdf_queue.resolve_failed",
@@ -480,12 +492,44 @@ async def _run_resolution_task(
     request_email: str | None,
     rows: list[PublicationListItem],
 ) -> None:
+    from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
+    from app.services.domains.arxiv.application import ArxivRateLimitError
+    from app.services.domains.settings import application as user_settings_service
+
+    # Resolve the best available API key: per-user setting → env var fallback.
+    openalex_api_key: str | None = None
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as key_session:
+            user_settings = await user_settings_service.get_or_create_settings(key_session, user_id=user_id)
+            openalex_api_key = getattr(user_settings, "openalex_api_key", None) or settings.openalex_api_key
+    except Exception:
+        openalex_api_key = settings.openalex_api_key
+
     for row in rows:
-        await _resolve_publication_row(
-            user_id=user_id,
-            request_email=request_email,
-            row=row,
-        )
+        try:
+            await _resolve_publication_row(
+                user_id=user_id,
+                request_email=request_email,
+                row=row,
+                openalex_api_key=openalex_api_key,
+            )
+        except OpenAlexBudgetExhaustedError:
+            logger.warning(
+                "publications.pdf_queue.budget_exhausted",
+                extra={"event": "publications.pdf_queue.budget_exhausted",
+                       "detail": "Stopping PDF resolution batch — OpenAlex daily budget exhausted"},
+            )
+            break
+        except ArxivRateLimitError:
+            logger.warning(
+                "publications.pdf_queue.arxiv_rate_limited",
+                extra={
+                    "event": "publications.pdf_queue.arxiv_rate_limited",
+                    "detail": "Stopping PDF resolution batch — arXiv rate limit hit (429)",
+                },
+            )
+            break
 
 
 def _schedule_rows(
@@ -571,7 +615,6 @@ def _retry_item_from_publication(
         citation_count=int(publication.citation_count or 0),
         venue_text=publication.venue_text,
         pub_url=publication.pub_url,
-        doi=publication.doi,
         pdf_url=publication.pdf_url,
         is_read=is_read,
         first_seen_at=first_seen_at,
@@ -629,13 +672,12 @@ def _queue_candidate_from_publication(publication: Publication) -> PublicationLi
     return PublicationListItem(
         publication_id=int(publication.id),
         scholar_profile_id=0,
-        scholar_label="admin",
+        scholar_label="",
         title=publication.title_raw,
         year=publication.year,
         citation_count=int(publication.citation_count or 0),
         venue_text=publication.venue_text,
         pub_url=publication.pub_url,
-        doi=publication.doi,
         pdf_url=publication.pdf_url,
         is_read=True,
         first_seen_at=publication.created_at or _utcnow(),
@@ -649,6 +691,9 @@ async def _missing_pdf_candidates(
     limit: int,
 ) -> list[PublicationListItem]:
     bounded_limit = max(1, min(int(limit), 5000))
+    now = datetime.now(timezone.utc)
+    cooldown_threshold = now - timedelta(days=7)
+
     result = await db_session.execute(
         select(Publication)
         .outerjoin(PublicationPdfJob, PublicationPdfJob.publication_id == Publication.id)
@@ -656,7 +701,13 @@ async def _missing_pdf_candidates(
         .where(
             or_(
                 PublicationPdfJob.publication_id.is_(None),
-                PublicationPdfJob.status.notin_([PDF_STATUS_QUEUED, PDF_STATUS_RUNNING]),
+                and_(
+                    PublicationPdfJob.status.notin_([PDF_STATUS_QUEUED, PDF_STATUS_RUNNING]),
+                    or_(
+                        PublicationPdfJob.last_attempt_at.is_(None),
+                        PublicationPdfJob.last_attempt_at < cooldown_threshold,
+                    ),
+                ),
             )
         )
         .order_by(Publication.updated_at.desc(), Publication.id.desc())
@@ -694,7 +745,6 @@ def _tracked_queue_select_base(*, status: str | None) -> Select[tuple]:
         select(
             PublicationPdfJob.publication_id,
             Publication.title_raw,
-            Publication.doi,
             Publication.pdf_url,
             PublicationPdfJob.status,
             PublicationPdfJob.attempt_count,
@@ -730,7 +780,6 @@ def _untracked_queue_select_base() -> Select[tuple]:
         select(
             Publication.id,
             Publication.title_raw,
-            Publication.doi,
             Publication.pdf_url,
             literal(PDF_STATUS_UNTRACKED),
             literal(0),
@@ -793,19 +842,18 @@ def _queue_item_from_row(row: tuple) -> PdfQueueListItem:
     return PdfQueueListItem(
         publication_id=int(row[0]),
         title=str(row[1] or ""),
-        doi=row[2],
-        pdf_url=row[3],
-        status=str(row[4] or PDF_STATUS_UNTRACKED),
-        attempt_count=int(row[5] or 0),
-        last_failure_reason=row[6],
-        last_failure_detail=row[7],
-        last_source=row[8],
-        requested_by_user_id=int(row[9]) if row[9] is not None else None,
-        requested_by_email=row[10],
-        queued_at=row[11],
-        last_attempt_at=row[12],
-        resolved_at=row[13],
-        updated_at=row[14],
+        pdf_url=row[2],
+        status=str(row[3] or PDF_STATUS_UNTRACKED),
+        attempt_count=int(row[4] or 0),
+        last_failure_reason=row[5],
+        last_failure_detail=row[6],
+        last_source=row[7],
+        requested_by_user_id=int(row[8]) if row[8] is not None else None,
+        requested_by_email=row[9],
+        queued_at=row[10],
+        last_attempt_at=row[11],
+        resolved_at=row[12],
+        updated_at=row[13],
     )
 
 
@@ -902,3 +950,25 @@ async def list_pdf_queue_page(
         limit=bounded_limit,
         offset=bounded_offset,
     )
+
+
+async def drain_ready_jobs(
+    db_session: AsyncSession,
+    *,
+    limit: int,
+    max_attempts: int,
+) -> int:
+    result = await db_session.execute(
+        select(User.id).where(User.is_active.is_(True)).order_by(User.id.asc()).limit(1)
+    )
+    system_user_id = result.scalar_one_or_none()
+    if system_user_id is None:
+        return 0
+
+    bulk_result = await enqueue_all_missing_pdf_jobs(
+        db_session,
+        user_id=system_user_id,
+        request_email=settings.unpaywall_email,
+        limit=limit,
+    )
+    return bulk_result.queued_count

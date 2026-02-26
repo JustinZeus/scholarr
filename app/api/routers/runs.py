@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_api_current_user
 from app.api.errors import ApiException
 from app.api.responses import success_payload
+from fastapi.responses import StreamingResponse
 from app.api.schemas import (
     ManualRunEnvelope,
     QueueClearEnvelope,
@@ -24,6 +25,7 @@ from app.db.session import get_db_session
 from app.services.domains.ingestion import application as ingestion_service
 from app.services.domains.ingestion import safety as run_safety_service
 from app.services.domains.runs import application as run_service
+from app.services.domains.runs.events import event_generator
 from app.services.domains.settings import application as user_settings_service
 from app.settings import settings
 from app.api.runtime_deps import get_ingestion_service
@@ -31,6 +33,7 @@ from app.api.runtime_deps import get_ingestion_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/runs", tags=["api-runs"])
+ACTIVE_RUN_STATUSES = {RunStatus.RUNNING, RunStatus.RESOLVING}
 
 IDEMPOTENCY_HEADER = "Idempotency-Key"
 IDEMPOTENCY_MAX_LENGTH = 128
@@ -338,7 +341,7 @@ async def _reused_manual_run_payload(
     )
     if previous_run is None:
         return None
-    if previous_run.status == RunStatus.RUNNING:
+    if previous_run.status in (RunStatus.RUNNING, RunStatus.RESOLVING):
         raise ApiException(
             status_code=409,
             code="run_in_progress",
@@ -410,7 +413,7 @@ async def _recover_integrity_error(
             extra={"event": "api.runs.manual_integrity_error", "user_id": user_id},
         )
         raise ApiException(status_code=500, code="manual_run_failed", message="Manual run failed.") from original_exc
-    if existing_run.status == RunStatus.RUNNING:
+    if existing_run.status in (RunStatus.RUNNING, RunStatus.RESOLVING):
         raise ApiException(
             status_code=409,
             code="run_in_progress",
@@ -587,6 +590,61 @@ async def get_run(
 
 
 @router.post(
+    "/{run_id}/cancel",
+    response_model=RunDetailEnvelope,
+)
+async def cancel_run(
+    run_id: int,
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_api_current_user),
+):
+    run = await run_service.get_run_for_user(
+        db_session,
+        user_id=current_user.id,
+        run_id=run_id,
+    )
+    if run is None:
+        raise ApiException(
+            status_code=404,
+            code="run_not_found",
+            message="Run not found.",
+        )
+
+    if run.status in ACTIVE_RUN_STATUSES:
+        run.status = RunStatus.CANCELED
+        await db_session.commit()
+        await db_session.refresh(run)
+    else:
+        raise ApiException(
+            status_code=409,
+            code="run_not_cancelable",
+            message="Run is already terminal and cannot be canceled.",
+            details={"run_id": int(run.id), "status": run.status.value},
+        )
+
+    error_log = run.error_log if isinstance(run.error_log, dict) else {}
+    scholar_results = error_log.get("scholar_results")
+    if not isinstance(scholar_results, list):
+        scholar_results = []
+        
+    safety_state = await _load_safety_state(
+        db_session,
+        user_id=current_user.id,
+    )
+    
+    return success_payload(
+        request,
+        data={
+            "run": _serialize_run(run),
+            "summary": run_service.extract_run_summary(error_log),
+            "scholar_results": [_normalize_scholar_result(item) for item in scholar_results],
+            "safety_state": safety_state,
+        },
+    )
+
+
+@router.post(
     "/manual",
     response_model=ManualRunEnvelope,
 )
@@ -596,10 +654,7 @@ async def run_manual(
     current_user: User = Depends(get_api_current_user),
     ingest_service: ingestion_service.ScholarIngestionService = Depends(get_ingestion_service),
 ):
-    safety_state = await _load_safety_state(
-        db_session,
-        user_id=current_user.id,
-    )
+    safety_state = await _load_safety_state(db_session, user_id=current_user.id)
     if not settings.ingestion_manual_run_allowed:
         _raise_manual_runs_disabled(user_id=current_user.id, safety_state=safety_state)
 
@@ -614,28 +669,90 @@ async def run_manual(
     if reused_payload is not None:
         return reused_payload
 
-    run_summary = await _execute_manual_run(
-        db_session,
-        request=request,
-        ingest_service=ingest_service,
-        user_id=current_user.id,
-        idempotency_key=idempotency_key,
-    )
-    if isinstance(run_summary, dict):
-        return run_summary
-
-    current_safety_state = await _load_safety_state(
-        db_session,
-        user_id=current_user.id,
-    )
-    return success_payload(
-        request,
-        data=_manual_run_success_payload(
-            run_summary=run_summary,
+    try:
+        user_settings = await user_settings_service.get_or_create_settings(db_session, user_id=current_user.id)
+        
+        # Initialize run (creates the record and performs safety checks)
+        run, scholars, start_cstart_map = await ingest_service.initialize_run(
+            db_session,
+            user_id=current_user.id,
+            trigger_type=RunTriggerType.MANUAL,
+            request_delay_seconds=user_settings.request_delay_seconds,
+            network_error_retries=settings.ingestion_network_error_retries,
+            retry_backoff_seconds=settings.ingestion_retry_backoff_seconds,
+            max_pages_per_scholar=settings.ingestion_max_pages_per_scholar,
+            page_size=settings.ingestion_page_size,
             idempotency_key=idempotency_key,
-            safety_state=current_safety_state,
-        ),
-    )
+            alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
+            alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
+            alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
+        )
+        
+        await db_session.commit()
+        
+        # Kick off background execution
+        from app.db.session import get_session_factory
+        import asyncio
+        
+        asyncio.create_task(
+            ingest_service.execute_run(
+                session_factory=get_session_factory(),
+                run_id=run.id,
+                user_id=current_user.id,
+                scholars=scholars,
+                start_cstart_map=start_cstart_map,
+                request_delay_seconds=user_settings.request_delay_seconds,
+                network_error_retries=settings.ingestion_network_error_retries,
+                retry_backoff_seconds=settings.ingestion_retry_backoff_seconds,
+                max_pages_per_scholar=settings.ingestion_max_pages_per_scholar,
+                page_size=settings.ingestion_page_size,
+                auto_queue_continuations=settings.ingestion_continuation_queue_enabled,
+                queue_delay_seconds=settings.ingestion_continuation_base_delay_seconds,
+                alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
+                alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
+                alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
+                idempotency_key=idempotency_key,
+            )
+        )
+        
+        return success_payload(
+            request,
+            data={
+                "run_id": int(run.id),
+                "status": run.status.value,
+                "scholar_count": int(run.scholar_count or 0),
+                "succeeded_count": 0,
+                "failed_count": 0,
+                "partial_count": 0,
+                "new_publication_count": 0,
+                "reused_existing_run": False,
+                "idempotency_key": idempotency_key,
+                "safety_state": await _load_safety_state(db_session, user_id=current_user.id),
+            }
+        )
+    except ingestion_service.RunBlockedBySafetyPolicyError as exc:
+        await db_session.rollback()
+        _raise_manual_blocked_safety(exc=exc, user_id=current_user.id)
+    except ingestion_service.RunAlreadyInProgressError as exc:
+        await db_session.rollback()
+        raise ApiException(
+            status_code=409,
+            code="run_in_progress",
+            message="A run is already in progress for this account.",
+        ) from exc
+    except IntegrityError as exc:
+        await db_session.rollback()
+        return await _recover_integrity_error(
+            db_session,
+            request=request,
+            user_id=current_user.id,
+            idempotency_key=idempotency_key,
+            original_exc=exc,
+        )
+    except Exception as exc:
+        await db_session.rollback()
+        _raise_manual_failed(exc=exc, user_id=current_user.id)
+
 
 
 @router.get(
@@ -768,4 +885,27 @@ async def clear_queue_item(
             "status": "cleared",
             "message": "Queue item cleared.",
         },
+    )
+
+
+@router.get("/{run_id}/stream")
+async def stream_run_events(
+    run_id: int,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_api_current_user),
+):
+    run = await run_service.get_run_for_user(
+        db_session,
+        user_id=current_user.id,
+        run_id=run_id,
+    )
+    if run is None:
+        raise ApiException(
+            status_code=404,
+            code="run_not_found",
+            message="Run not found.",
+        )
+    return StreamingResponse(
+        event_generator(run_id),
+        media_type="text/event-stream"
     )

@@ -140,6 +140,11 @@ class Settings:
         "INGESTION_RETRY_BACKOFF_SECONDS",
         1.0,
     )
+    ingestion_rate_limit_retries: int = _env_int("INGESTION_RATE_LIMIT_RETRIES", 3)
+    ingestion_rate_limit_backoff_seconds: float = _env_float(
+        "INGESTION_RATE_LIMIT_BACKOFF_SECONDS",
+        30.0,
+    )
     ingestion_max_pages_per_scholar: int = _env_int(
         "INGESTION_MAX_PAGES_PER_SCHOLAR",
         30,
@@ -182,6 +187,7 @@ class Settings:
         6,
     )
     scheduler_queue_batch_size: int = _env_int("SCHEDULER_QUEUE_BATCH_SIZE", 10)
+    scheduler_pdf_queue_batch_size: int = _env_int("SCHEDULER_PDF_QUEUE_BATCH_SIZE", 15)
     frontend_enabled: bool = _env_bool("FRONTEND_ENABLED", True)
     frontend_dist_dir: str = _env_str("FRONTEND_DIST_DIR", "/app/frontend/dist")
     scholar_image_upload_dir: str = _env_str(
@@ -241,9 +247,9 @@ class Settings:
     )
     pdf_auto_retry_first_interval_seconds: int = _env_int(
         "PDF_AUTO_RETRY_FIRST_INTERVAL_SECONDS",
-        3_600,
+        86_400,
     )
-    pdf_auto_retry_max_attempts: int = _env_int("PDF_AUTO_RETRY_MAX_ATTEMPTS", 3)
+    pdf_auto_retry_max_attempts: int = _env_int("PDF_AUTO_RETRY_MAX_ATTEMPTS", 2)
     unpaywall_pdf_discovery_enabled: bool = _env_bool("UNPAYWALL_PDF_DISCOVERY_ENABLED", True)
     unpaywall_pdf_discovery_max_candidates: int = _env_int("UNPAYWALL_PDF_DISCOVERY_MAX_CANDIDATES", 5)
     unpaywall_pdf_discovery_max_html_bytes: int = _env_int("UNPAYWALL_PDF_DISCOVERY_MAX_HTML_BYTES", 500_000)
@@ -252,6 +258,10 @@ class Settings:
     crossref_timeout_seconds: float = _env_float("CROSSREF_TIMEOUT_SECONDS", 8.0)
     crossref_min_interval_seconds: float = _env_float("CROSSREF_MIN_INTERVAL_SECONDS", 0.6)
     crossref_max_lookups_per_request: int = _env_int("CROSSREF_MAX_LOOKUPS_PER_REQUEST", 8)
+    
+    openalex_api_key: str | None = os.getenv("OPENALEX_API_KEY")
+    crossref_api_token: str | None = os.getenv("CROSSREF_API_TOKEN")
+    crossref_api_mailto: str | None = os.getenv("CROSSREF_API_MAILTO")
 
 
 settings = Settings()

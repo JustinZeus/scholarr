@@ -20,8 +20,14 @@ const toneClass = computed(() => {
   if (props.status === "running") {
     return "border-state-info-border bg-state-info-bg text-state-info-text";
   }
+  if (props.status === "resolving") {
+    return "border-state-info-border bg-state-info-bg text-state-info-text";
+  }
   if (props.status === "starting") {
     return "border-state-info-border bg-state-info-bg text-state-info-text";
+  }
+  if (props.status === "canceled") {
+    return "border-state-warning-border bg-state-warning-bg text-state-warning-text";
   }
   return "border-stroke-default bg-surface-card-muted text-ink-secondary";
 });

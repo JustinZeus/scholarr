@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.db.models import PublicationPdfJob
+from app.services.domains.arxiv.application import ArxivRateLimitError
 from app.services.domains.publications import pdf_queue
 from app.services.domains.publications.pdf_resolution_pipeline import PipelineOutcome
 from app.services.domains.unpaywall.application import OaResolutionOutcome
@@ -133,7 +134,7 @@ def test_pdf_queue_manual_requeue_still_blocks_when_inflight() -> None:
 
 @pytest.mark.asyncio
 async def test_fetch_outcome_for_row_uses_pipeline_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _fake_pipeline(*, row, request_email=None):
+    async def _fake_pipeline(*, row, request_email=None, openalex_api_key=None):
         assert request_email == "user@example.com"
         return PipelineOutcome(
             outcome=OaResolutionOutcome(
@@ -141,7 +142,7 @@ async def test_fetch_outcome_for_row_uses_pipeline_outcome(monkeypatch: pytest.M
                 doi=None,
                 pdf_url="https://arxiv.org/pdf/1703.06103",
                 failure_reason=None,
-                source=pdf_queue.PDF_SOURCE_SCHOLAR_PUBLICATION_PAGE,
+                source="openalex",
                 used_crossref=False,
             ),
             scholar_candidates=None,
@@ -152,7 +153,7 @@ async def test_fetch_outcome_for_row_uses_pipeline_outcome(monkeypatch: pytest.M
     outcome = await pdf_queue._fetch_outcome_for_row(row=_row(), request_email="user@example.com")
 
     assert outcome.pdf_url == "https://arxiv.org/pdf/1703.06103"
-    assert outcome.source == pdf_queue.PDF_SOURCE_SCHOLAR_PUBLICATION_PAGE
+    assert outcome.source == "openalex"
     assert outcome.used_crossref is False
 
 
@@ -160,7 +161,7 @@ async def test_fetch_outcome_for_row_uses_pipeline_outcome(monkeypatch: pytest.M
 async def test_fetch_outcome_for_row_returns_failed_outcome_when_pipeline_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _fake_pipeline(*, row, request_email=None):
+    async def _fake_pipeline(*, row, request_email=None, openalex_api_key=None):
         assert request_email == "user@example.com"
         return PipelineOutcome(outcome=None, scholar_candidates=None)
 
@@ -170,3 +171,66 @@ async def test_fetch_outcome_for_row_returns_failed_outcome_when_pipeline_return
 
     assert outcome.pdf_url is None
     assert outcome.failure_reason == pdf_queue.FAILURE_RESOLUTION_EXCEPTION
+
+
+@pytest.mark.asyncio
+async def test_resolve_publication_row_persists_failed_outcome_before_reraising_arxiv_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[tuple[int, int, OaResolutionOutcome]] = []
+
+    async def _noop_mark_attempt_started(*, publication_id: int, user_id: int) -> None:
+        return None
+
+    async def _raise_rate_limit(*, row, request_email=None, openalex_api_key=None):
+        raise ArxivRateLimitError("arXiv rate limit hit (429) — stopping batch")
+
+    async def _capture_persist_outcome(*, publication_id: int, user_id: int, outcome: OaResolutionOutcome) -> None:
+        captured.append((publication_id, user_id, outcome))
+
+    monkeypatch.setattr(pdf_queue, "_mark_attempt_started", _noop_mark_attempt_started)
+    monkeypatch.setattr(pdf_queue, "_fetch_outcome_for_row", _raise_rate_limit)
+    monkeypatch.setattr(pdf_queue, "_persist_outcome", _capture_persist_outcome)
+
+    with pytest.raises(ArxivRateLimitError):
+        await pdf_queue._resolve_publication_row(
+            user_id=42,
+            request_email="user@example.com",
+            row=_row(),
+            openalex_api_key="key",
+        )
+
+    assert len(captured) == 1
+    publication_id, user_id, outcome = captured[0]
+    assert publication_id == 1
+    assert user_id == 42
+    assert outcome.pdf_url is None
+    assert outcome.failure_reason == pdf_queue.FAILURE_RESOLUTION_EXCEPTION
+
+
+@pytest.mark.asyncio
+async def test_run_resolution_task_stops_batch_on_arxiv_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[int] = []
+    first = _row()
+    second = SimpleNamespace(**{**first.__dict__, "publication_id": 2})
+
+    def _raise_session_factory_error():
+        raise RuntimeError("skip user settings lookup in test")
+
+    async def _fake_resolve_publication_row(*, user_id: int, request_email: str | None, row, openalex_api_key=None):
+        calls.append(int(row.publication_id))
+        if row.publication_id == 1:
+            raise ArxivRateLimitError("arXiv rate limit hit (429) — stopping batch")
+
+    monkeypatch.setattr(pdf_queue, "get_session_factory", _raise_session_factory_error)
+    monkeypatch.setattr(pdf_queue, "_resolve_publication_row", _fake_resolve_publication_row)
+
+    await pdf_queue._run_resolution_task(
+        user_id=42,
+        request_email="user@example.com",
+        rows=[first, second],
+    )
+
+    assert calls == [1]

@@ -145,6 +145,13 @@ export async function triggerManualRun(): Promise<{
   return response.data;
 }
 
+export async function cancelRun(runId: number): Promise<RunDetail> {
+  const response = await apiRequest<RunDetail>(`/runs/${runId}/cancel`, {
+    method: "POST",
+  });
+  return response.data;
+}
+
 export async function listQueueItems(limit = 200): Promise<QueueItem[]> {
   const response = await apiRequest<QueueListData>(`/runs/queue/items?limit=${limit}`, {
     method: "GET",

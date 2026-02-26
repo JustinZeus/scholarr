@@ -41,7 +41,6 @@ export interface AdminDbRepairJob {
 export interface AdminPdfQueueItem {
   publication_id: number;
   title: string;
-  doi: string | null;
   display_identifier: DisplayIdentifier | null;
   pdf_url: string | null;
   status: string;
@@ -157,6 +156,22 @@ export async function requeueAllAdminPdfLookups(limit = 1000): Promise<AdminPdfQ
   const response = await apiRequest<AdminPdfQueueBulkEnqueueResult>(
     `/admin/db/pdf-queue/requeue-all?limit=${parsedLimit}`,
     { method: "POST" },
+  );
+  return response.data;
+}
+
+export interface DropAllPublicationsResult {
+  deleted_count: number;
+  message: string;
+}
+
+export async function dropAllPublications(confirmationText: string): Promise<DropAllPublicationsResult> {
+  const response = await apiRequest<DropAllPublicationsResult>(
+    "/admin/db/drop-all-publications",
+    {
+      method: "POST",
+      body: { confirmation_text: confirmationText },
+    },
   );
   return response.data;
 }

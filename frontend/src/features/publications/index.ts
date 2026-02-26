@@ -19,7 +19,6 @@ export interface PublicationItem {
   citation_count: number;
   venue_text: string | null;
   pub_url: string | null;
-  doi: string | null;
   display_identifier: DisplayIdentifier | null;
   pdf_url: string | null;
   pdf_status: "untracked" | "queued" | "running" | "resolved" | "failed";
@@ -44,6 +43,7 @@ export interface PublicationsResult {
   total_count: number;
   page: number;
   page_size: number;
+  snapshot: string;
   has_next: boolean;
   has_prev: boolean;
   publications: PublicationItem[];
@@ -53,8 +53,12 @@ export interface PublicationsQuery {
   mode?: PublicationMode;
   favoriteOnly?: boolean;
   scholarProfileId?: number;
+  search?: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
   page?: number;
   pageSize?: number;
+  snapshot?: string;
 }
 
 export interface PublicationSelection {
@@ -74,12 +78,24 @@ export async function listPublications(query: PublicationsQuery = {}): Promise<P
   if (query.scholarProfileId) {
     params.set("scholar_profile_id", String(query.scholarProfileId));
   }
+  if (query.search && query.search.trim().length > 0) {
+    params.set("search", query.search.trim());
+  }
+  if (query.sortBy) {
+    params.set("sort_by", query.sortBy);
+  }
+  if (query.sortDir) {
+    params.set("sort_dir", query.sortDir);
+  }
   const parsedPage = Number.isFinite(query.page) ? Math.max(1, Math.trunc(Number(query.page))) : 1;
   const parsedPageSize = Number.isFinite(query.pageSize)
     ? Math.max(1, Math.min(500, Math.trunc(Number(query.pageSize))))
     : 100;
   params.set("page", String(parsedPage));
   params.set("page_size", String(parsedPageSize));
+  if (query.snapshot && query.snapshot.trim().length > 0) {
+    params.set("snapshot", query.snapshot.trim());
+  }
 
   const suffix = params.toString();
   const response = await apiRequest<PublicationsResult>(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -64,6 +65,31 @@ def _assert_safety_state_contract(payload: dict[str, object]) -> None:
     counters = payload["counters"]
     assert isinstance(counters, dict)
     assert set(counters.keys()) == SAFETY_COUNTER_KEYS
+
+
+_ACTIVE_RUN_STATUSES = {"running", "resolving"}
+
+
+async def _wait_for_run_complete(
+    client: TestClient,
+    run_id: int,
+    *,
+    max_retries: int = 300,
+    poll_interval: float = 0.2,
+) -> dict:
+    """Poll GET /api/v1/runs/{run_id} until the run is in a terminal state.
+
+    Returns the final run detail data dict.
+    """
+    for _ in range(max_retries):
+        await asyncio.sleep(poll_interval)
+        r = client.get(f"/api/v1/runs/{run_id}")
+        assert r.status_code == 200
+        data = r.json()["data"]
+        if data["run"]["status"] not in _ACTIVE_RUN_STATUSES:
+            return data
+    r = client.get(f"/api/v1/runs/{run_id}")
+    return r.json()["data"]
 
 
 async def _seed_publication_link_for_user(
@@ -1041,44 +1067,42 @@ async def test_api_manual_run_skips_unchanged_initial_page_for_scholar(
 
     app.dependency_overrides[get_scholar_source] = lambda: StubScholarSource()
     try:
-        client = TestClient(app)
-        login_user(client, email="api-skip-unchanged@example.com", password="api-password")
-        headers = _api_csrf_headers(client)
+        with TestClient(app) as client:
+            login_user(client, email="api-skip-unchanged@example.com", password="api-password")
+            headers = _api_csrf_headers(client)
 
-        create_response = client.post(
-            "/api/v1/scholars",
-            json={"scholar_id": "abcDEF123456"},
-            headers=headers,
-        )
-        assert create_response.status_code == 201
+            create_response = client.post(
+                "/api/v1/scholars",
+                json={"scholar_id": "abcDEF123456"},
+                headers=headers,
+            )
+            assert create_response.status_code == 201
 
-        first_run_response = client.post(
-            "/api/v1/runs/manual",
-            headers={**headers, "Idempotency-Key": "skip-unchanged-run-001"},
-        )
-        assert first_run_response.status_code == 200
-        first_run_id = int(first_run_response.json()["data"]["run_id"])
+            first_run_response = client.post(
+                "/api/v1/runs/manual",
+                headers={**headers, "Idempotency-Key": "skip-unchanged-run-001"},
+            )
+            assert first_run_response.status_code == 200
+            first_run_id = int(first_run_response.json()["data"]["run_id"])
 
-        first_run_detail = client.get(f"/api/v1/runs/{first_run_id}")
-        assert first_run_detail.status_code == 200
-        first_results = first_run_detail.json()["data"]["scholar_results"]
-        assert len(first_results) == 1
-        assert first_results[0]["state_reason"] != "no_change_initial_page_signature"
+            first_detail_data = await _wait_for_run_complete(client, first_run_id)
+            first_results = first_detail_data["scholar_results"]
+            assert len(first_results) == 1
+            assert first_results[0]["state_reason"] != "no_change_initial_page_signature"
 
-        second_run_response = client.post(
-            "/api/v1/runs/manual",
-            headers={**headers, "Idempotency-Key": "skip-unchanged-run-002"},
-        )
-        assert second_run_response.status_code == 200
-        second_run_id = int(second_run_response.json()["data"]["run_id"])
+            second_run_response = client.post(
+                "/api/v1/runs/manual",
+                headers={**headers, "Idempotency-Key": "skip-unchanged-run-002"},
+            )
+            assert second_run_response.status_code == 200
+            second_run_id = int(second_run_response.json()["data"]["run_id"])
 
-        second_run_detail = client.get(f"/api/v1/runs/{second_run_id}")
-        assert second_run_detail.status_code == 200
-        second_results = second_run_detail.json()["data"]["scholar_results"]
-        assert len(second_results) == 1
-        assert second_results[0]["state_reason"] == "no_change_initial_page_signature"
-        assert second_results[0]["publication_count"] == 0
-        assert second_results[0]["outcome"] == "success"
+            second_detail_data = await _wait_for_run_complete(client, second_run_id)
+            second_results = second_detail_data["scholar_results"]
+            assert len(second_results) == 1
+            assert second_results[0]["state_reason"] == "no_change_initial_page_signature"
+            assert second_results[0]["publication_count"] == 0
+            assert second_results[0]["outcome"] == "success"
     finally:
         app.dependency_overrides.pop(get_scholar_source, None)
 
@@ -1227,7 +1251,7 @@ async def test_api_runs_manual_and_queue_actions(db_session: AsyncSession) -> No
     assert run_response.status_code == 200
     run_payload = run_response.json()["data"]
     assert "run_id" in run_payload
-    assert run_payload["status"] in {"success", "partial_failure", "failed"}
+    assert run_payload["status"] in {"running", "resolving", "success", "partial_failure", "failed"}
     assert run_payload["reused_existing_run"] is False
     assert run_payload["idempotency_key"] == "manual-run-0001"
     _assert_safety_state_contract(run_payload["safety_state"])
@@ -1243,11 +1267,15 @@ async def test_api_runs_manual_and_queue_actions(db_session: AsyncSession) -> No
         "/api/v1/runs/manual",
         headers={**headers, "Idempotency-Key": "manual-run-0001"},
     )
-    assert replay_response.status_code == 200
-    replay_payload = replay_response.json()["data"]
-    assert replay_payload["run_id"] == run_payload["run_id"]
-    assert replay_payload["reused_existing_run"] is True
-    _assert_safety_state_contract(replay_payload["safety_state"])
+    assert replay_response.status_code in {200, 409}
+    if replay_response.status_code == 200:
+        replay_payload = replay_response.json()["data"]
+        assert replay_payload["run_id"] == run_payload["run_id"]
+        assert replay_payload["reused_existing_run"] is True
+        _assert_safety_state_contract(replay_payload["safety_state"])
+    else:
+        replay_error = replay_response.json()["error"]
+        assert replay_error["code"] == "run_in_progress"
 
     runs_response = client.get("/api/v1/runs")
     assert runs_response.status_code == 200
@@ -1429,43 +1457,45 @@ async def test_api_manual_run_enforces_scrape_safety_cooldown(db_session: AsyncS
     object.__setattr__(settings, "ingestion_safety_cooldown_blocked_seconds", 600)
 
     try:
-        client = TestClient(app)
-        login_user(client, email="api-runs-safety@example.com", password="api-password")
-        headers = _api_csrf_headers(client)
+        with TestClient(app) as client:
+            login_user(client, email="api-runs-safety@example.com", password="api-password")
+            headers = _api_csrf_headers(client)
 
-        first_run_response = client.post(
-            "/api/v1/runs/manual",
-            headers={**headers, "Idempotency-Key": "safety-cooldown-run-1"},
-        )
-        assert first_run_response.status_code == 200
+            first_run_response = client.post(
+                "/api/v1/runs/manual",
+                headers={**headers, "Idempotency-Key": "safety-cooldown-run-1"},
+            )
+            assert first_run_response.status_code == 200
+            first_run_id = int(first_run_response.json()["data"]["run_id"])
+            await _wait_for_run_complete(client, first_run_id)
 
-        settings_response = client.get("/api/v1/settings")
-        assert settings_response.status_code == 200
-        safety_state = settings_response.json()["data"]["safety_state"]
-        _assert_safety_state_contract(safety_state)
-        assert safety_state["cooldown_active"] is True
-        assert safety_state["cooldown_reason"] == "blocked_failure_threshold_exceeded"
-        assert int(safety_state["cooldown_remaining_seconds"]) > 0
-        assert int(safety_state["counters"]["cooldown_entry_count"]) >= 1
-        assert int(safety_state["counters"]["last_blocked_failure_count"]) >= 1
+            settings_response = client.get("/api/v1/settings")
+            assert settings_response.status_code == 200
+            safety_state = settings_response.json()["data"]["safety_state"]
+            _assert_safety_state_contract(safety_state)
+            assert safety_state["cooldown_active"] is True
+            assert safety_state["cooldown_reason"] == "blocked_failure_threshold_exceeded"
+            assert int(safety_state["cooldown_remaining_seconds"]) > 0
+            assert int(safety_state["counters"]["cooldown_entry_count"]) >= 1
+            assert int(safety_state["counters"]["last_blocked_failure_count"]) >= 1
 
-        blocked_start_response = client.post(
-            "/api/v1/runs/manual",
-            headers={**headers, "Idempotency-Key": "safety-cooldown-run-2"},
-        )
-        assert blocked_start_response.status_code == 429
-        blocked_payload = blocked_start_response.json()
-        assert blocked_payload["error"]["code"] == "scrape_cooldown_active"
-        blocked_state = blocked_payload["error"]["details"]["safety_state"]
-        _assert_safety_state_contract(blocked_state)
-        assert blocked_state["cooldown_active"] is True
-        assert blocked_state["cooldown_reason"] == "blocked_failure_threshold_exceeded"
-        assert int(blocked_state["counters"]["blocked_start_count"]) >= 1
+            blocked_start_response = client.post(
+                "/api/v1/runs/manual",
+                headers={**headers, "Idempotency-Key": "safety-cooldown-run-2"},
+            )
+            assert blocked_start_response.status_code == 429
+            blocked_payload = blocked_start_response.json()
+            assert blocked_payload["error"]["code"] == "scrape_cooldown_active"
+            blocked_state = blocked_payload["error"]["details"]["safety_state"]
+            _assert_safety_state_contract(blocked_state)
+            assert blocked_state["cooldown_active"] is True
+            assert blocked_state["cooldown_reason"] == "blocked_failure_threshold_exceeded"
+            assert int(blocked_state["counters"]["blocked_start_count"]) >= 1
 
-        runs_response = client.get("/api/v1/runs")
-        assert runs_response.status_code == 200
-        _assert_safety_state_contract(runs_response.json()["data"]["safety_state"])
-        assert runs_response.json()["data"]["safety_state"]["cooldown_active"] is True
+            runs_response = client.get("/api/v1/runs")
+            assert runs_response.status_code == 200
+            _assert_safety_state_contract(runs_response.json()["data"]["safety_state"])
+            assert runs_response.json()["data"]["safety_state"]["cooldown_active"] is True
     finally:
         object.__setattr__(settings, "ingestion_alert_blocked_failure_threshold", previous_blocked_threshold)
         object.__setattr__(settings, "ingestion_safety_cooldown_blocked_seconds", previous_blocked_cooldown_seconds)
@@ -1535,37 +1565,39 @@ async def test_api_manual_run_enforces_network_failure_safety_cooldown(
     object.__setattr__(settings, "ingestion_retry_backoff_seconds", 0.0)
 
     try:
-        client = TestClient(app)
-        login_user(client, email="api-runs-safety-network@example.com", password="api-password")
-        headers = _api_csrf_headers(client)
+        with TestClient(app) as client:
+            login_user(client, email="api-runs-safety-network@example.com", password="api-password")
+            headers = _api_csrf_headers(client)
 
-        first_run_response = client.post(
-            "/api/v1/runs/manual",
-            headers={**headers, "Idempotency-Key": "safety-network-cooldown-run-1"},
-        )
-        assert first_run_response.status_code == 200
+            first_run_response = client.post(
+                "/api/v1/runs/manual",
+                headers={**headers, "Idempotency-Key": "safety-network-cooldown-run-1"},
+            )
+            assert first_run_response.status_code == 200
+            first_run_id = int(first_run_response.json()["data"]["run_id"])
+            await _wait_for_run_complete(client, first_run_id)
 
-        settings_response = client.get("/api/v1/settings")
-        assert settings_response.status_code == 200
-        safety_state = settings_response.json()["data"]["safety_state"]
-        _assert_safety_state_contract(safety_state)
-        assert safety_state["cooldown_active"] is True
-        assert safety_state["cooldown_reason"] == "network_failure_threshold_exceeded"
-        assert int(safety_state["cooldown_remaining_seconds"]) > 0
-        assert int(safety_state["counters"]["last_network_failure_count"]) >= 1
+            settings_response = client.get("/api/v1/settings")
+            assert settings_response.status_code == 200
+            safety_state = settings_response.json()["data"]["safety_state"]
+            _assert_safety_state_contract(safety_state)
+            assert safety_state["cooldown_active"] is True
+            assert safety_state["cooldown_reason"] == "network_failure_threshold_exceeded"
+            assert int(safety_state["cooldown_remaining_seconds"]) > 0
+            assert int(safety_state["counters"]["last_network_failure_count"]) >= 1
 
-        blocked_start_response = client.post(
-            "/api/v1/runs/manual",
-            headers={**headers, "Idempotency-Key": "safety-network-cooldown-run-2"},
-        )
-        assert blocked_start_response.status_code == 429
-        blocked_payload = blocked_start_response.json()
-        assert blocked_payload["error"]["code"] == "scrape_cooldown_active"
-        blocked_state = blocked_payload["error"]["details"]["safety_state"]
-        _assert_safety_state_contract(blocked_state)
-        assert blocked_state["cooldown_active"] is True
-        assert blocked_state["cooldown_reason"] == "network_failure_threshold_exceeded"
-        assert int(blocked_state["counters"]["blocked_start_count"]) >= 1
+            blocked_start_response = client.post(
+                "/api/v1/runs/manual",
+                headers={**headers, "Idempotency-Key": "safety-network-cooldown-run-2"},
+            )
+            assert blocked_start_response.status_code == 429
+            blocked_payload = blocked_start_response.json()
+            assert blocked_payload["error"]["code"] == "scrape_cooldown_active"
+            blocked_state = blocked_payload["error"]["details"]["safety_state"]
+            _assert_safety_state_contract(blocked_state)
+            assert blocked_state["cooldown_active"] is True
+            assert blocked_state["cooldown_reason"] == "network_failure_threshold_exceeded"
+            assert int(blocked_state["counters"]["blocked_start_count"]) >= 1
     finally:
         object.__setattr__(settings, "ingestion_alert_network_failure_threshold", previous_network_threshold)
         object.__setattr__(settings, "ingestion_safety_cooldown_network_seconds", previous_network_cooldown_seconds)
@@ -2152,7 +2184,6 @@ async def test_api_publication_retry_pdf_queues_resolution_job(
                 citation_count=item.citation_count,
                 venue_text=item.venue_text,
                 pub_url=item.pub_url,
-                doi=item.doi,
                 pdf_url=item.pdf_url,
                 is_read=item.is_read,
                 first_seen_at=item.first_seen_at,
@@ -2189,11 +2220,10 @@ async def test_api_publication_retry_pdf_queues_resolution_job(
     assert payload["publication"]["pdf_failure_reason"] == "no_pdf_found"
 
     stored = await db_session.execute(
-        text("SELECT doi, pdf_url FROM publications WHERE id = :publication_id"),
+        text("SELECT pdf_url FROM publications WHERE id = :publication_id"),
         {"publication_id": publication_id},
     )
-    stored_doi, stored_pdf_url = stored.one()
-    assert stored_doi is None
+    stored_pdf_url = stored.scalar_one()
     assert stored_pdf_url is None
 
 

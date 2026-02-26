@@ -19,6 +19,9 @@ export interface UserSettings {
   nav_visible_pages: string[];
   policy: UserSettingsPolicy;
   safety_state: ScrapeSafetyState;
+  openalex_api_key: string | null;
+  crossref_api_token: string | null;
+  crossref_api_mailto: string | null;
 }
 
 export interface UserSettingsUpdate {
@@ -26,6 +29,9 @@ export interface UserSettingsUpdate {
   run_interval_minutes: number;
   request_delay_seconds: number;
   nav_visible_pages: string[];
+  openalex_api_key: string | null;
+  crossref_api_token: string | null;
+  crossref_api_mailto: string | null;
 }
 
 export interface ChangePasswordPayload {

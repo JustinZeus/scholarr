@@ -205,7 +205,6 @@ class PublicationExportItemData(BaseModel):
     author_text: str | None = None
     venue_text: str | None = None
     pub_url: str | None = None
-    doi: str | None = None
     pdf_url: str | None = None
     is_read: bool = False
 
@@ -594,7 +593,6 @@ class DisplayIdentifierData(BaseModel):
 class AdminPdfQueueItemData(BaseModel):
     publication_id: int
     title: str
-    doi: str | None
     display_identifier: DisplayIdentifierData | None = None
     pdf_url: str | None
     status: str
@@ -725,6 +723,10 @@ class SettingsData(BaseModel):
     nav_visible_pages: list[str]
     policy: SettingsPolicyData
     safety_state: ScrapeSafetyStateData
+    
+    openalex_api_key: str | None = None
+    crossref_api_token: str | None = None
+    crossref_api_mailto: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -742,6 +744,10 @@ class SettingsUpdateRequest(BaseModel):
     request_delay_seconds: int
     nav_visible_pages: list[str] | None = None
 
+    openalex_api_key: str | None = None
+    crossref_api_token: str | None = None
+    crossref_api_mailto: str | None = None
+
     model_config = ConfigDict(extra="forbid")
 
 
@@ -754,7 +760,6 @@ class PublicationItemData(BaseModel):
     citation_count: int
     venue_text: str | None
     pub_url: str | None
-    doi: str | None
     display_identifier: DisplayIdentifierData | None = None
     pdf_url: str | None
     pdf_status: str = "untracked"
@@ -780,6 +785,7 @@ class PublicationsListData(BaseModel):
     total_count: int
     page: int
     page_size: int
+    snapshot: str
     has_next: bool = False
     has_prev: bool = False
     publications: list[PublicationItemData]
