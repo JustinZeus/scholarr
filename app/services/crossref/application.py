@@ -5,16 +5,19 @@ import logging
 import re
 import threading
 import time
+from importlib.metadata import version as pkg_version
 from typing import TYPE_CHECKING
 
 from crossref.restful import Etiquette, Works
 
 from app.logging_utils import structured_log
-from app.services.domains.doi.normalize import normalize_doi
+from app.services.doi.normalize import normalize_doi
 from app.settings import settings
 
+_APP_VERSION = pkg_version("scholarr")
+
 if TYPE_CHECKING:
-    from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
+    from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 NON_ALNUM_RE = re.compile(r"[^a-z0-9\\s]+")
@@ -292,7 +295,7 @@ def _best_candidate_doi(
 
 def _works_client(email: str | None) -> Works:
     if email:
-        etiquette = Etiquette(settings.app_name, "0.1.0", "https://scholarr.local", email)
+        etiquette = Etiquette(settings.app_name, _APP_VERSION, "https://scholarr.local", email)
         return Works(etiquette=etiquette)
     return Works()
 

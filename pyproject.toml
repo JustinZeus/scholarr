@@ -27,6 +27,7 @@ dependencies = [
 dev = [
   "pytest>=8.3,<9.0",
   "pytest-asyncio>=0.25,<0.26",
+  "python-semantic-release>=9.0,<10.0",
   "ruff>=0.9",
   "mypy>=1.14",
 ]
@@ -60,6 +61,13 @@ python_version = "3.12"
 ignore_missing_imports = true
 check_untyped_defs = false
 warn_unused_ignores = true
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["frontend/package.json:version"]
+branch = "main"
+build_command = ""
+commit_message = "chore(release): v{version}"
 
 [tool.setuptools]
 include-package-data = true
