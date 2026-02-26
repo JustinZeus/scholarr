@@ -1,2 +1,0 @@
-"""Authentication package for scholarr."""
-

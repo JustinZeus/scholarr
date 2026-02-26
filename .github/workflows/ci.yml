@@ -91,7 +91,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci
 
       - name: Frontend theme token policy
         working-directory: frontend
@@ -124,7 +124,7 @@ jobs:
           node-version: "20"
 
       - name: Install docs dependencies
-        run: npm install --prefix docs/website
+        run: npm ci --prefix docs/website
 
       - name: Docs build
         run: npm --prefix docs/website run build

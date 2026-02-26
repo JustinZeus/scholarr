@@ -12,9 +12,9 @@ htmlcov/
 *.log
 .DS_Store
 planning/
+build/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 docs/website/node_modules/
 docs/website/build/
-AGENTS.MD
