@@ -66,6 +66,7 @@ from app.services.domains.scholar.parser import (
     parse_profile_page,
 )
 from app.services.domains.scholar.source import FetchResult, ScholarSource
+from app.logging_utils import structured_log
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -119,28 +120,6 @@ class ScholarIngestionService:
         )
         return max(policy_minimum, _int_or_default(value, policy_minimum))
 
-    @staticmethod
-    def _log_request_delay_coercion(
-        *,
-        user_id: int,
-        requested_request_delay_seconds: int,
-        effective_request_delay_seconds: int,
-    ) -> None:
-        logger.warning(
-            "ingestion.request_delay_coerced_to_policy_floor",
-            extra={
-                "event": "ingestion.request_delay_coerced_to_policy_floor",
-                "user_id": user_id,
-                "requested_request_delay_seconds": requested_request_delay_seconds,
-                "effective_request_delay_seconds": effective_request_delay_seconds,
-                "policy_minimum_request_delay_seconds": user_settings_service.resolve_request_delay_minimum(
-                    settings.ingestion_min_request_delay_seconds
-                ),
-                "metric_name": "ingestion_request_delay_coerced_total",
-                "metric_value": 1,
-            },
-        )
-
     async def _load_user_settings_for_run(
         self,
         db_session: AsyncSession,
@@ -173,16 +152,11 @@ class ScholarIngestionService:
         if run_safety_service.clear_expired_cooldown(user_settings, now_utc=now_utc):
             await db_session.commit()
             await db_session.refresh(user_settings)
-            logger.info(
-                "ingestion.safety_cooldown_cleared",
-                extra={
-                    "event": "ingestion.safety_cooldown_cleared",
-                    "user_id": user_id,
-                    "reason": previous.get("cooldown_reason"),
-                    "cooldown_until": previous.get("cooldown_until"),
-                    "metric_name": "ingestion_safety_cooldown_cleared_total",
-                    "metric_value": 1,
-                },
+            structured_log(
+                logger, "info", "ingestion.safety_cooldown_cleared",
+                user_id=user_id,
+                reason=previous.get("cooldown_reason"),
+                cooldown_until=previous.get("cooldown_until"),
             )
             now_utc = datetime.now(timezone.utc)
         if run_safety_service.is_cooldown_active(user_settings, now_utc=now_utc):
@@ -208,19 +182,14 @@ class ScholarIngestionService:
             now_utc=now_utc,
         )
         await db_session.commit()
-        logger.warning(
-            "ingestion.safety_policy_blocked_run_start",
-            extra={
-                "event": "ingestion.safety_policy_blocked_run_start",
-                "user_id": user_id,
-                "trigger_type": trigger_type.value,
-                "reason": safety_state.get("cooldown_reason"),
-                "cooldown_until": safety_state.get("cooldown_until"),
-                "cooldown_remaining_seconds": safety_state.get("cooldown_remaining_seconds"),
-                "blocked_start_count": ((safety_state.get("counters") or {}).get("blocked_start_count")),
-                "metric_name": "ingestion_safety_run_start_blocked_total",
-                "metric_value": 1,
-            },
+        structured_log(
+            logger, "warning", "ingestion.safety_policy_blocked_run_start",
+            user_id=user_id,
+            trigger_type=trigger_type.value,
+            reason=safety_state.get("cooldown_reason"),
+            cooldown_until=safety_state.get("cooldown_until"),
+            cooldown_remaining_seconds=safety_state.get("cooldown_remaining_seconds"),
+            blocked_start_count=((safety_state.get("counters") or {}).get("blocked_start_count")),
         )
         raise RunBlockedBySafetyPolicyError(
             code="scrape_cooldown_active",
@@ -307,43 +276,6 @@ class ScholarIngestionService:
         )
 
     @staticmethod
-    def _log_run_started(
-        *,
-        user_id: int,
-        trigger_type: RunTriggerType,
-        scholar_count: int,
-        filtered: bool,
-        request_delay_seconds: int,
-        network_error_retries: int,
-        retry_backoff_seconds: float,
-        max_pages_per_scholar: int,
-        page_size: int,
-        idempotency_key: str | None,
-        alert_blocked_failure_threshold: int,
-        alert_network_failure_threshold: int,
-        alert_retry_scheduled_threshold: int,
-    ) -> None:
-        logger.info(
-            "ingestion.run_started",
-            extra={
-                "event": "ingestion.run_started",
-                "user_id": user_id,
-                "trigger_type": trigger_type.value,
-                "scholar_count": scholar_count,
-                "is_filtered_run": filtered,
-                "request_delay_seconds": request_delay_seconds,
-                "network_error_retries": network_error_retries,
-                "retry_backoff_seconds": retry_backoff_seconds,
-                "max_pages_per_scholar": max_pages_per_scholar,
-                "page_size": page_size,
-                "idempotency_key": idempotency_key,
-                "alert_blocked_failure_threshold": alert_blocked_failure_threshold,
-                "alert_network_failure_threshold": alert_network_failure_threshold,
-                "alert_retry_scheduled_threshold": alert_retry_scheduled_threshold,
-            },
-        )
-
-    @staticmethod
     async def _wait_between_scholars(*, index: int, request_delay_seconds: int) -> None:
         if index <= 0 or request_delay_seconds <= 0:
             return
@@ -378,35 +310,6 @@ class ScholarIngestionService:
         if first_page.profile_image_url:
             scholar.profile_image_url = first_page.profile_image_url
         scholar.last_initial_page_checked_at = run_dt
-
-    @staticmethod
-    def _log_scholar_parsed(
-        *,
-        user_id: int,
-        run_id: int,
-        scholar: ScholarProfile,
-        paged_parse_result: PagedParseResult,
-    ) -> None:
-        parsed_page = paged_parse_result.parsed_page
-        logger.info(
-            "ingestion.scholar_parsed",
-            extra={
-                "event": "ingestion.scholar_parsed",
-                "user_id": user_id,
-                "crawl_run_id": run_id,
-                "scholar_profile_id": scholar.id,
-                "scholar_id": scholar.scholar_id,
-                "state": parsed_page.state.value,
-                "publication_count": len(paged_parse_result.publications),
-                "has_show_more_button": parsed_page.has_show_more_button,
-                "pages_fetched": paged_parse_result.pages_fetched,
-                "pages_attempted": paged_parse_result.pages_attempted,
-                "has_more_remaining": paged_parse_result.has_more_remaining,
-                "pagination_truncated_reason": paged_parse_result.pagination_truncated_reason,
-                "warning_count": len(parsed_page.warnings),
-                "skipped_no_change": paged_parse_result.skipped_no_change,
-            },
-        )
 
     @staticmethod
     def _build_result_entry(
@@ -594,7 +497,6 @@ class ScholarIngestionService:
         logger.exception(
             "ingestion.scholar_failed",
             extra={
-                "event": "ingestion.scholar_failed",
                 "crawl_run_id": run.id,
                 "scholar_profile_id": scholar.id,
                 "scholar_id": scholar.scholar_id,
@@ -618,16 +520,13 @@ class ScholarIngestionService:
             attempt_log=paged_parse_result.attempt_log,
             page_logs=paged_parse_result.page_logs,
         )
-        logger.warning(
-            "ingestion.scholar_parse_failed",
-            extra={
-                "event": "ingestion.scholar_parse_failed",
-                "scholar_profile_id": scholar.id,
-                "scholar_id": scholar.scholar_id,
-                "state": paged_parse_result.parsed_page.state.value,
-                "state_reason": paged_parse_result.parsed_page.state_reason,
-                "status_code": paged_parse_result.fetch_result.status_code,
-            },
+        structured_log(
+            logger, "warning", "ingestion.scholar_parse_failed",
+            scholar_profile_id=scholar.id,
+            scholar_id=scholar.scholar_id,
+            state=paged_parse_result.parsed_page.state.value,
+            state_reason=paged_parse_result.parsed_page.state_reason,
+            status_code=paged_parse_result.fetch_result.status_code,
         )
         return ScholarProcessingOutcome(result_entry, 0, 1, 0, 0)
 
@@ -797,7 +696,23 @@ class ScholarIngestionService:
         )
         self._assert_valid_paged_parse_result(scholar_id=scholar.scholar_id, paged_parse_result=paged_parse_result)
         self._apply_first_page_profile_metadata(scholar=scholar, paged_parse_result=paged_parse_result, run_dt=run_dt)
-        self._log_scholar_parsed(user_id=user_id, run_id=run.id, scholar=scholar, paged_parse_result=paged_parse_result)
+        parsed_page = paged_parse_result.parsed_page
+        structured_log(
+            logger, "info", "ingestion.scholar_parsed",
+            user_id=user_id,
+            crawl_run_id=run.id,
+            scholar_profile_id=scholar.id,
+            scholar_id=scholar.scholar_id,
+            state=parsed_page.state.value,
+            publication_count=len(paged_parse_result.publications),
+            has_show_more_button=parsed_page.has_show_more_button,
+            pages_fetched=paged_parse_result.pages_fetched,
+            pages_attempted=paged_parse_result.pages_attempted,
+            has_more_remaining=paged_parse_result.has_more_remaining,
+            pagination_truncated_reason=paged_parse_result.pagination_truncated_reason,
+            warning_count=len(parsed_page.warnings),
+            skipped_no_change=paged_parse_result.skipped_no_change,
+        )
         result_entry = self._build_result_entry(
             scholar=scholar,
             start_cstart=start_cstart,
@@ -918,7 +833,6 @@ class ScholarIngestionService:
         logger.exception(
             "ingestion.scholar_unexpected_failure",
             extra={
-                "event": "ingestion.scholar_unexpected_failure",
                 "crawl_run_id": run.id,
                 "scholar_profile_id": scholar.id,
                 "scholar_id": scholar.scholar_id,
@@ -1010,54 +924,6 @@ class ScholarIngestionService:
         )
 
     @staticmethod
-    def _log_alert_thresholds(
-        *,
-        user_id: int,
-        run_id: int,
-        failure_summary: RunFailureSummary,
-        alert_summary: RunAlertSummary,
-    ) -> None:
-        if alert_summary.alert_flags["blocked_failure_threshold_exceeded"]:
-            logger.warning(
-                "ingestion.alert_blocked_failure_threshold_exceeded",
-                extra={
-                    "event": "ingestion.alert_blocked_failure_threshold_exceeded",
-                    "user_id": user_id,
-                    "crawl_run_id": run_id,
-                    "blocked_failure_count": alert_summary.blocked_failure_count,
-                    "threshold": alert_summary.blocked_failure_threshold,
-                    "metric_name": "ingestion_blocked_failure_threshold_exceeded_total",
-                    "metric_value": 1,
-                },
-            )
-        if alert_summary.alert_flags["network_failure_threshold_exceeded"]:
-            logger.warning(
-                "ingestion.alert_network_failure_threshold_exceeded",
-                extra={
-                    "event": "ingestion.alert_network_failure_threshold_exceeded",
-                    "user_id": user_id,
-                    "crawl_run_id": run_id,
-                    "network_failure_count": alert_summary.network_failure_count,
-                    "threshold": alert_summary.network_failure_threshold,
-                    "metric_name": "ingestion_network_failure_threshold_exceeded_total",
-                    "metric_value": 1,
-                },
-            )
-        if alert_summary.alert_flags["retry_scheduled_threshold_exceeded"]:
-            logger.warning(
-                "ingestion.alert_retry_scheduled_threshold_exceeded",
-                extra={
-                    "event": "ingestion.alert_retry_scheduled_threshold_exceeded",
-                    "user_id": user_id,
-                    "crawl_run_id": run_id,
-                    "retries_scheduled_count": failure_summary.retries_scheduled_count,
-                    "threshold": alert_summary.retry_scheduled_threshold,
-                    "metric_name": "ingestion_retry_scheduled_threshold_exceeded_total",
-                    "metric_value": 1,
-                },
-            )
-
-    @staticmethod
     def _apply_safety_outcome(
         *,
         user_settings,
@@ -1080,56 +946,27 @@ class ScholarIngestionService:
             network_cooldown_seconds=settings.ingestion_safety_cooldown_network_seconds,
             now_utc=datetime.now(timezone.utc),
         )
-        ScholarIngestionService._log_safety_transition(
-            user_id=user_id,
-            run_id=int(run.id),
-            alert_summary=alert_summary,
-            pre_apply_state=pre_apply_state,
-            safety_state=safety_state,
-            cooldown_trigger_reason=cooldown_trigger_reason,
-        )
-
-    @staticmethod
-    def _log_safety_transition(
-        *,
-        user_id: int,
-        run_id: int,
-        alert_summary: RunAlertSummary,
-        pre_apply_state: dict[str, Any],
-        safety_state: dict[str, Any],
-        cooldown_trigger_reason: str | None,
-    ) -> None:
         if cooldown_trigger_reason is not None:
-            logger.warning(
-                "ingestion.safety_cooldown_entered",
-                extra={
-                    "event": "ingestion.safety_cooldown_entered",
-                    "user_id": user_id,
-                    "crawl_run_id": run_id,
-                    "reason": cooldown_trigger_reason,
-                    "blocked_failure_count": alert_summary.blocked_failure_count,
-                    "network_failure_count": alert_summary.network_failure_count,
-                    "blocked_failure_threshold": alert_summary.blocked_failure_threshold,
-                    "network_failure_threshold": alert_summary.network_failure_threshold,
-                    "cooldown_until": safety_state.get("cooldown_until"),
-                    "cooldown_remaining_seconds": safety_state.get("cooldown_remaining_seconds"),
-                    "safety_counters": safety_state.get("counters", {}),
-                    "metric_name": "ingestion_safety_cooldown_entered_total",
-                    "metric_value": 1,
-                },
+            structured_log(
+                logger, "warning", "ingestion.safety_cooldown_entered",
+                user_id=user_id,
+                crawl_run_id=int(run.id),
+                reason=cooldown_trigger_reason,
+                blocked_failure_count=alert_summary.blocked_failure_count,
+                network_failure_count=alert_summary.network_failure_count,
+                blocked_failure_threshold=alert_summary.blocked_failure_threshold,
+                network_failure_threshold=alert_summary.network_failure_threshold,
+                cooldown_until=safety_state.get("cooldown_until"),
+                cooldown_remaining_seconds=safety_state.get("cooldown_remaining_seconds"),
+                safety_counters=safety_state.get("counters", {}),
             )
         elif pre_apply_state.get("cooldown_active") and not safety_state.get("cooldown_active"):
-            logger.info(
-                "ingestion.safety_cooldown_cleared",
-                extra={
-                    "event": "ingestion.safety_cooldown_cleared",
-                    "user_id": user_id,
-                    "crawl_run_id": run_id,
-                    "reason": pre_apply_state.get("cooldown_reason"),
-                    "cooldown_until": pre_apply_state.get("cooldown_until"),
-                    "metric_name": "ingestion_safety_cooldown_cleared_total",
-                    "metric_value": 1,
-                },
+            structured_log(
+                logger, "info", "ingestion.safety_cooldown_cleared",
+                user_id=user_id,
+                crawl_run_id=int(run.id),
+                reason=pre_apply_state.get("cooldown_reason"),
+                cooldown_until=pre_apply_state.get("cooldown_until"),
             )
 
     def _finalize_run_record(
@@ -1173,35 +1010,6 @@ class ScholarIngestionService:
             },
             "meta": {"idempotency_key": idempotency_key} if idempotency_key else {},
         }
-
-    @staticmethod
-    def _log_run_completed(
-        *,
-        user_id: int,
-        run: CrawlRun,
-        scholars: list[ScholarProfile],
-        progress: RunProgress,
-        alert_summary: RunAlertSummary,
-        failure_summary: RunFailureSummary,
-    ) -> None:
-        logger.info(
-            "ingestion.run_completed",
-            extra={
-                "event": "ingestion.run_completed",
-                "user_id": user_id,
-                "crawl_run_id": run.id,
-                "status": run.status.value,
-                "scholar_count": len(scholars),
-                "succeeded_count": progress.succeeded_count,
-                "failed_count": progress.failed_count,
-                "partial_count": progress.partial_count,
-                "new_publication_count": run.new_pub_count,
-                "blocked_failure_count": alert_summary.blocked_failure_count,
-                "network_failure_count": alert_summary.network_failure_count,
-                "retries_scheduled_count": failure_summary.retries_scheduled_count,
-                "alert_flags": alert_summary.alert_flags,
-            },
-        )
 
     @staticmethod
     def _paging_kwargs(
@@ -1307,11 +1115,12 @@ class ScholarIngestionService:
         alert_network_failure_threshold: int,
         alert_retry_scheduled_threshold: int,
     ) -> CrawlRun:
-        self._log_run_started(
+        structured_log(
+            logger, "info", "ingestion.run_started",
             user_id=user_id,
-            trigger_type=trigger_type,
+            trigger_type=trigger_type.value,
             scholar_count=len(scholars),
-            filtered=filtered,
+            is_filtered_run=filtered,
             request_delay_seconds=request_delay_seconds,
             network_error_retries=network_error_retries,
             retry_backoff_seconds=retry_backoff_seconds,
@@ -1367,9 +1176,9 @@ class ScholarIngestionService:
         for index, scholar in enumerate(scholars):
             await db_session.refresh(run)
             if run.status == RunStatus.CANCELED:
-                logger.info(
-                    "ingestion.run_canceled",
-                    extra={"event": "ingestion.run_canceled", "run_id": run.id, "user_id": user_id},
+                structured_log(
+                    logger, "info", "ingestion.run_canceled",
+                    run_id=run.id, user_id=user_id,
                 )
                 return progress
             await self._wait_between_scholars(index=index, request_delay_seconds=request_delay_seconds)
@@ -1407,9 +1216,9 @@ class ScholarIngestionService:
                 continue  # first page failed, had no continuation, or was skipped
             await db_session.refresh(run)
             if run.status == RunStatus.CANCELED:
-                logger.info(
-                    "ingestion.run_canceled",
-                    extra={"event": "ingestion.run_canceled", "run_id": run.id, "user_id": user_id},
+                structured_log(
+                    logger, "info", "ingestion.run_canceled",
+                    run_id=run.id, user_id=user_id,
                 )
                 break
             await self._wait_between_scholars(index=index, request_delay_seconds=request_delay_seconds)
@@ -1452,12 +1261,30 @@ class ScholarIngestionService:
             alert_network_failure_threshold=alert_network_failure_threshold,
             alert_retry_scheduled_threshold=alert_retry_scheduled_threshold,
         )
-        self._log_alert_thresholds(
-            user_id=user_id,
-            run_id=int(run.id),
-            failure_summary=failure_summary,
-            alert_summary=alert_summary,
-        )
+        if alert_summary.alert_flags["blocked_failure_threshold_exceeded"]:
+            structured_log(
+                logger, "warning", "ingestion.alert_blocked_failure_threshold_exceeded",
+                user_id=user_id,
+                crawl_run_id=int(run.id),
+                blocked_failure_count=alert_summary.blocked_failure_count,
+                threshold=alert_summary.blocked_failure_threshold,
+            )
+        if alert_summary.alert_flags["network_failure_threshold_exceeded"]:
+            structured_log(
+                logger, "warning", "ingestion.alert_network_failure_threshold_exceeded",
+                user_id=user_id,
+                crawl_run_id=int(run.id),
+                network_failure_count=alert_summary.network_failure_count,
+                threshold=alert_summary.network_failure_threshold,
+            )
+        if alert_summary.alert_flags["retry_scheduled_threshold_exceeded"]:
+            structured_log(
+                logger, "warning", "ingestion.alert_retry_scheduled_threshold_exceeded",
+                user_id=user_id,
+                crawl_run_id=int(run.id),
+                retries_scheduled_count=failure_summary.retries_scheduled_count,
+                threshold=alert_summary.retry_scheduled_threshold,
+            )
         self._apply_safety_outcome(user_settings=user_settings, run=run, user_id=user_id, alert_summary=alert_summary)
         self._finalize_run_record(
             run=run,
@@ -1491,10 +1318,14 @@ class ScholarIngestionService:
     ) -> tuple[CrawlRun, list[ScholarProfile], dict[int, int]]:
         effective_delay = self._effective_request_delay_seconds(request_delay_seconds)
         if effective_delay != _int_or_default(request_delay_seconds, effective_delay):
-            self._log_request_delay_coercion(
+            structured_log(
+                logger, "warning", "ingestion.request_delay_coerced_to_policy_floor",
                 user_id=user_id,
                 requested_request_delay_seconds=_int_or_default(request_delay_seconds, 0),
                 effective_request_delay_seconds=effective_delay,
+                policy_minimum_request_delay_seconds=user_settings_service.resolve_request_delay_minimum(
+                    settings.ingestion_min_request_delay_seconds
+                ),
             )
 
         paging_kwargs = self._paging_kwargs(
@@ -1595,7 +1426,21 @@ class ScholarIngestionService:
                 if intended_final_status not in (RunStatus.CANCELED,):
                     run.status = RunStatus.RESOLVING
                 await db_session.commit()
-                self._log_run_completed(user_id=user_id, run=run, scholars=attached_scholars, progress=progress, alert_summary=alert_summary, failure_summary=failure_summary)
+                structured_log(
+                    logger, "info", "ingestion.run_completed",
+                    user_id=user_id,
+                    crawl_run_id=run.id,
+                    status=run.status.value,
+                    scholar_count=len(attached_scholars),
+                    succeeded_count=progress.succeeded_count,
+                    failed_count=progress.failed_count,
+                    partial_count=progress.partial_count,
+                    new_publication_count=run.new_pub_count,
+                    blocked_failure_count=alert_summary.blocked_failure_count,
+                    network_failure_count=alert_summary.network_failure_count,
+                    retries_scheduled_count=failure_summary.retries_scheduled_count,
+                    alert_flags=alert_summary.alert_flags,
+                )
 
                 # Fire-and-forget enrichment in a separate background task
                 if intended_final_status not in (RunStatus.CANCELED,):
@@ -1609,7 +1454,7 @@ class ScholarIngestionService:
                     )
             except Exception as exc:
                 await db_session.rollback()
-                logger.exception("ingestion.background_run_failed", extra={"event": "ingestion.background_run_failed", "run_id": run_id, "user_id": user_id})
+                logger.exception("ingestion.background_run_failed", extra={"run_id": run_id, "user_id": user_id})
                 await self._fail_run_in_background(session_factory, run_id, exc)
 
     async def _prepare_execute_run(
@@ -1782,7 +1627,21 @@ class ScholarIngestionService:
             run.status = intended_final_status
         await db_session.commit()
 
-        self._log_run_completed(user_id=user_id, run=run, scholars=scholars, progress=progress, alert_summary=alert_summary, failure_summary=failure_summary)
+        structured_log(
+            logger, "info", "ingestion.run_completed",
+            user_id=user_id,
+            crawl_run_id=run.id,
+            status=run.status.value,
+            scholar_count=len(scholars),
+            succeeded_count=progress.succeeded_count,
+            failed_count=progress.failed_count,
+            partial_count=progress.partial_count,
+            new_publication_count=run.new_pub_count,
+            blocked_failure_count=alert_summary.blocked_failure_count,
+            network_failure_count=alert_summary.network_failure_count,
+            retries_scheduled_count=failure_summary.retries_scheduled_count,
+            alert_flags=alert_summary.alert_flags,
+        )
         return self._run_execution_summary(run=run, scholars=scholars, progress=progress)
 
     async def _fetch_profile_page(
@@ -1816,7 +1675,6 @@ class ScholarIngestionService:
             logger.exception(
                 "ingestion.fetch_unexpected_error",
                 extra={
-                    "event": "ingestion.fetch_unexpected_error",
                     "scholar_id": scholar_id,
                     "cstart": cstart,
                     "page_size": page_size,
@@ -1832,23 +1690,6 @@ class ScholarIngestionService:
                 body="",
                 error=str(exc),
             )
-
-    @staticmethod
-    def _attempt_log_entry(
-        *,
-        attempt: int,
-        cstart: int,
-        fetch_result: FetchResult,
-        parsed_page: ParsedProfilePage,
-    ) -> dict[str, Any]:
-        return {
-            "attempt": attempt,
-            "cstart": cstart,
-            "state": parsed_page.state.value,
-            "state_reason": parsed_page.state_reason,
-            "status_code": fetch_result.status_code,
-            "fetch_error": fetch_result.error,
-        }
 
     @staticmethod
     def _should_retry_page_fetch(
@@ -1883,16 +1724,13 @@ class ScholarIngestionService:
             sleep_seconds = retry_backoff_seconds * (2 ** (network_attempt_count - 1))
             attempt_label = network_attempt_count
 
-        logger.warning(
-            "ingestion.scholar_retry_scheduled",
-            extra={
-                "event": "ingestion.scholar_retry_scheduled",
-                "scholar_id": scholar_id,
-                "cstart": cstart,
-                "attempt_count": attempt_label,
-                "sleep_seconds": sleep_seconds,
-                "state_reason": state_reason,
-            },
+        structured_log(
+            logger, "warning", "ingestion.scholar_retry_scheduled",
+            scholar_id=scholar_id,
+            cstart=cstart,
+            attempt_count=attempt_label,
+            sleep_seconds=sleep_seconds,
+            state_reason=state_reason,
         )
         if sleep_seconds > 0:
             await asyncio.sleep(sleep_seconds)
@@ -1931,14 +1769,14 @@ class ScholarIngestionService:
             else:
                 total_attempts = network_attempts + rate_limit_attempts + 1
 
-            attempt_log.append(
-                self._attempt_log_entry(
-                    attempt=total_attempts,
-                    cstart=cstart,
-                    fetch_result=fetch_result,
-                    parsed_page=parsed_page,
-                )
-            )
+            attempt_log.append({
+                "attempt": total_attempts,
+                "cstart": cstart,
+                "state": parsed_page.state.value,
+                "state_reason": parsed_page.state_reason,
+                "status_code": fetch_result.status_code,
+                "fetch_error": fetch_result.error,
+            })
 
             if not self._should_retry_page_fetch(
                 parsed_page=parsed_page,
@@ -1994,28 +1832,6 @@ class ScholarIngestionService:
             has_operation_error_banner=False,
             articles_range=None,
         )
-
-    @staticmethod
-    def _page_log_entry(
-        *,
-        page_number: int,
-        cstart: int,
-        fetch_result: FetchResult,
-        parsed_page: ParsedProfilePage,
-        attempt_count: int,
-    ) -> dict[str, Any]:
-        return {
-            "page": page_number,
-            "cstart": cstart,
-            "state": parsed_page.state.value,
-            "state_reason": parsed_page.state_reason,
-            "status_code": fetch_result.status_code,
-            "publication_count": len(parsed_page.publications),
-            "articles_range": parsed_page.articles_range,
-            "has_show_more_button": parsed_page.has_show_more_button,
-            "warning_codes": parsed_page.warnings,
-            "attempt_count": attempt_count,
-        }
 
     @staticmethod
     def _should_skip_no_change(
@@ -2179,15 +1995,18 @@ class ScholarIngestionService:
     ) -> None:
         state.pages_attempted += 1
         state.attempt_log.extend(page_attempt_log)
-        state.page_logs.append(
-            ScholarIngestionService._page_log_entry(
-                page_number=state.pages_attempted,
-                cstart=state.current_cstart,
-                fetch_result=fetch_result,
-                parsed_page=parsed_page,
-                attempt_count=len(page_attempt_log),
-            )
-        )
+        state.page_logs.append({
+            "page": state.pages_attempted,
+            "cstart": state.current_cstart,
+            "state": parsed_page.state.value,
+            "state_reason": parsed_page.state_reason,
+            "status_code": fetch_result.status_code,
+            "publication_count": len(parsed_page.publications),
+            "articles_range": parsed_page.articles_range,
+            "has_show_more_button": parsed_page.has_show_more_button,
+            "warning_codes": parsed_page.warnings,
+            "attempt_count": len(page_attempt_log),
+        })
         state.fetch_result = fetch_result
         state.parsed_page = parsed_page
 
@@ -2233,15 +2052,18 @@ class ScholarIngestionService:
         )
         first_page_fingerprint_sha256 = build_initial_page_fingerprint(parsed_page)
         attempt_log = list(first_attempt_log)
-        page_logs = [
-            self._page_log_entry(
-                page_number=1,
-                cstart=start_cstart,
-                fetch_result=fetch_result,
-                parsed_page=parsed_page,
-                attempt_count=len(first_attempt_log),
-            )
-        ]
+        page_logs = [{
+            "page": 1,
+            "cstart": start_cstart,
+            "state": parsed_page.state.value,
+            "state_reason": parsed_page.state_reason,
+            "status_code": fetch_result.status_code,
+            "publication_count": len(parsed_page.publications),
+            "articles_range": parsed_page.articles_range,
+            "has_show_more_button": parsed_page.has_show_more_button,
+            "warning_codes": parsed_page.warnings,
+            "attempt_count": len(first_attempt_log),
+        }]
         return fetch_result, parsed_page, first_page_fingerprint_sha256, attempt_log, page_logs
 
     async def _paginate_loop(
@@ -2275,9 +2097,9 @@ class ScholarIngestionService:
         while state.parsed_page.has_show_more_button:
             await db_session.refresh(run)
             if run.status == RunStatus.CANCELED:
-                logger.info(
-                    "ingestion.pagination_canceled",
-                    extra={"event": "ingestion.pagination_canceled", "run_id": run.id},
+                structured_log(
+                    logger, "info", "ingestion.pagination_canceled",
+                    run_id=run.id,
                 )
                 self._set_truncated_state(
                     state=state,
@@ -2532,22 +2354,22 @@ class ScholarIngestionService:
                     {"title.search": "|".join(titles)}, limit=batch_size * 3
                 )
             except OpenAlexBudgetExhaustedError:
-                logger.warning(
-                    "ingestion.openalex_budget_exhausted",
-                    extra={"event": "ingestion.openalex_budget_exhausted", "run_id": run_id},
+                structured_log(
+                    logger, "warning", "ingestion.openalex_budget_exhausted",
+                    run_id=run_id,
                 )
                 break  # Stop all enrichment — budget won't reset until midnight UTC
             except OpenAlexRateLimitError:
-                logger.warning(
-                    "ingestion.openalex_rate_limited",
-                    extra={"event": "ingestion.openalex_rate_limited", "run_id": run_id},
+                structured_log(
+                    logger, "warning", "ingestion.openalex_rate_limited",
+                    run_id=run_id,
                 )
                 await asyncio.sleep(60)
                 continue
             except Exception as e:
-                logger.warning(
-                    "ingestion.openalex_enrichment_failed",
-                    extra={"event": "ingestion.openalex_enrichment_failed", "error": str(e), "run_id": run_id},
+                structured_log(
+                    logger, "warning", "ingestion.openalex_enrichment_failed",
+                    error=str(e), run_id=run_id,
                 )
                 continue
 
@@ -2583,13 +2405,10 @@ class ScholarIngestionService:
 
         merge_count = await sweep_identifier_duplicates(db_session)
         if merge_count:
-            logger.info(
-                "ingestion.identifier_dedup_sweep",
-                extra={
-                    "event": "ingestion.identifier_dedup_sweep",
-                    "merged_count": merge_count,
-                    "run_id": run_id,
-                },
+            structured_log(
+                logger, "info", "ingestion.identifier_dedup_sweep",
+                merged_count=merge_count,
+                run_id=run_id,
             )
 
     async def _discover_identifiers_for_enrichment(
@@ -2624,14 +2443,11 @@ class ScholarIngestionService:
             )
             return True
         except ArxivRateLimitError:
-            logger.warning(
-                "ingestion.arxiv_rate_limited",
-                extra={
-                    "event": "ingestion.arxiv_rate_limited",
-                    "run_id": run_id,
-                    "publication_id": int(publication.id),
-                    "detail": "arXiv temporarily disabled for remaining enrichment pass",
-                },
+            structured_log(
+                logger, "warning", "ingestion.arxiv_rate_limited",
+                run_id=run_id,
+                publication_id=int(publication.id),
+                detail="arXiv temporarily disabled for remaining enrichment pass",
             )
             await identifier_service.sync_identifiers_for_publication_fields(
                 db_session,
@@ -2780,14 +2596,11 @@ class ScholarIngestionService:
             db_session.add(link)
             discovered_count += 1
 
-            logger.debug(
-                "ingestion.publication_discovered",
-                extra={
-                    "event": "ingestion.publication_discovered",
-                    "scholar_profile_id": scholar.id,
-                    "publication_id": publication.id,
-                    "crawl_run_id": run.id,
-                },
+            structured_log(
+                logger, "debug", "ingestion.publication_discovered",
+                scholar_profile_id=scholar.id,
+                publication_id=publication.id,
+                crawl_run_id=run.id,
             )
             
             await self._commit_discovered_publication(
@@ -2907,13 +2720,10 @@ class ScholarIngestionService:
         )
         db_session.add(publication)
         await db_session.flush()
-        logger.debug(
-            "ingestion.publication_created",
-            extra={
-                "event": "ingestion.publication_created",
-                "publication_id": publication.id,
-                "cluster_id": publication.cluster_id,
-            },
+        structured_log(
+            logger, "debug", "ingestion.publication_created",
+            publication_id=publication.id,
+            cluster_id=publication.cluster_id,
         )
         return publication
 
