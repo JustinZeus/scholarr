@@ -1,6 +1,6 @@
 export default {
   "id": "deutan-blue-75",
-  "label": "Deutan Colorblind - Blue",
+  "label": "Deutan (Colorblind)",
   "description": "Colorblind-oriented theme with blue-led emphasis and deutan-safer state separation.",
   "modes": {
     "light": {
