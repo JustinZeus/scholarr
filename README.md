@@ -14,7 +14,11 @@ Track Google Scholar profiles, discover new papers automatically,
 resolve open-access PDFs, and stay on top of the literature you care about.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/justinzeus/scholarr/ci.yml?style=for-the-badge)](https://github.com/JustinZeus/scholarr/actions/workflows/ci.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/justinzeus/scholarr/codeql.yml?style=for-the-badge&label=CodeQL)](https://github.com/JustinZeus/scholarr/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/justinzeus/scholarr?style=for-the-badge)](https://github.com/JustinZeus/scholarr/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/justinzeus/scholarr?style=for-the-badge&logo=docker)](https://hub.docker.com/r/justinzeus/scholarr)
+[![Python](https://img.shields.io/badge/python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/github/license/justinzeus/scholarr?style=for-the-badge)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-scholarr-2e8555?style=for-the-badge)](https://justinzeus.github.io/scholarr/)
 
 </div>
