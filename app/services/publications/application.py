@@ -24,9 +24,11 @@ from app.services.publications.modes import (
     resolve_publication_view_mode,
 )
 from app.services.publications.pdf_queue import (
-    count_pdf_queue_items,
     enqueue_all_missing_pdf_jobs,
     enqueue_retry_pdf_job_for_publication_id,
+)
+from app.services.publications.pdf_queue_queries import (
+    count_pdf_queue_items,
     list_pdf_queue_items,
     list_pdf_queue_page,
 )

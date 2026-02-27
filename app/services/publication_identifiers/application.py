@@ -21,7 +21,7 @@ from app.services.publication_identifiers.types import (
 )
 
 if TYPE_CHECKING:
-    from app.services.publications.pdf_queue import PdfQueueListItem
+    from app.services.publications.pdf_queue_queries import PdfQueueListItem
     from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 CONFIDENCE_HIGH = 0.98

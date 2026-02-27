@@ -28,7 +28,7 @@ This file contains self-contained decomposition prompts ("slices") to bring the 
 | 1 | Schema split | **DONE** |
 | 2 | Ingestion: pagination + publication upsert | **DONE** |
 | 3 | Ingestion: enrichment + scholar processing + run completion | **DONE** |
-| 4 | Scholars service + PDF queue | pending |
+| 4 | Scholars service + PDF queue | **DONE** |
 | 5 | Routers + scheduler | pending |
 
 ---
@@ -132,13 +132,20 @@ Commit message: `refactor: extract enrichment, scholar processing, and run compl
 
 ---
 
-## Slice 4: Decompose `app/services/scholars/application.py` (996 lines) and `app/services/publications/pdf_queue.py` (969 lines)
+## Slice 4: Decompose `app/services/scholars/application.py` (996 lines) and `app/services/publications/pdf_queue.py` (969 lines) — DONE
 
-**Why:** Two service files nearly 2x the hard ceiling. Each has clear internal seams.
+Completed. Extracted four modules from two oversized service files:
 
-**Files to create:** `app/services/scholars/author_search.py`, `app/services/scholars/author_search_cache.py`, `app/services/publications/pdf_queue_queries.py`, `app/services/publications/pdf_queue_resolution.py`
+| File | Lines | Contents |
+|---|---|---|
+| `app/services/scholars/author_search_cache.py` | 239 | Serialize/deserialize cache entries, cache get/set/prune |
+| `app/services/scholars/author_search.py` | 580 | Cooldown, throttle, retry, circuit breaker, `search_author_candidates` |
+| `app/services/scholars/application.py` | 221 | Scholar CRUD only (list, create, get, toggle, delete, image ops) |
+| `app/services/publications/pdf_queue_queries.py` | 395 | SQL builders, row hydration, listing/counting/pagination, retry item builders |
+| `app/services/publications/pdf_queue_resolution.py` | 311 | Task execution, outcome persistence, scheduling (`schedule_rows`) |
+| `app/services/publications/pdf_queue.py` | 364 | Dataclasses, constants, enqueueing logic, public API |
 
-**Files to modify:** `app/services/scholars/application.py`, `app/services/publications/pdf_queue.py`
+Also updated one test file (`test_publication_pdf_queue_policy.py`) to monkeypatch `pdf_queue_resolution` instead of `pdf_queue` for the 4 resolution-related tests, and updated `publications/application.py` and `publication_identifiers/application.py` imports.
 
 **Prompt:**
 
