@@ -35,7 +35,7 @@ from app.settings import settings
 logger = logging.getLogger(__name__)
 
 
-def _int_or_default(value: Any, default: int = 0) -> int:
+def int_or_default(value: Any, default: int = 0) -> int:
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -68,7 +68,7 @@ def summarize_failures(
     scholars_with_retries_count = 0
     retry_exhausted_count = 0
     for entry in scholar_results:
-        retries_for_entry = max(0, _int_or_default(entry.get("attempt_count"), 0) - 1)
+        retries_for_entry = max(0, int_or_default(entry.get("attempt_count"), 0) - 1)
         if retries_for_entry > 0:
             retries_scheduled_count += retries_for_entry
             scholars_with_retries_count += 1
@@ -347,7 +347,7 @@ def find_scholar_result_index(
     scholar_profile_id: int,
 ) -> int | None:
     for index, result_entry in enumerate(scholar_results):
-        current_scholar_id = _int_or_default(result_entry.get("scholar_profile_id"), 0)
+        current_scholar_id = int_or_default(result_entry.get("scholar_profile_id"), 0)
         if current_scholar_id == scholar_profile_id:
             return index
     return None
@@ -372,7 +372,7 @@ def apply_outcome_to_progress(
     progress: RunProgress,
     outcome: ScholarProcessingOutcome,
 ) -> None:
-    scholar_profile_id = _int_or_default(outcome.result_entry.get("scholar_profile_id"), 0)
+    scholar_profile_id = int_or_default(outcome.result_entry.get("scholar_profile_id"), 0)
     if scholar_profile_id <= 0:
         raise RuntimeError("Scholar outcome missing valid scholar_profile_id.")
     prior_index = find_scholar_result_index(

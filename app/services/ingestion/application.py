@@ -22,7 +22,7 @@ from app.services.ingestion.constants import RUN_LOCK_NAMESPACE
 from app.services.ingestion.enrichment import EnrichmentRunner
 from app.services.ingestion.pagination import PaginationEngine
 from app.services.ingestion.run_completion import (
-    _int_or_default,
+    int_or_default,
     complete_run_for_user,
     run_execution_summary,
 )
@@ -135,7 +135,7 @@ class ScholarIngestionService:
         policy_minimum = user_settings_service.resolve_request_delay_minimum(
             settings.ingestion_min_request_delay_seconds
         )
-        return max(policy_minimum, _int_or_default(value, policy_minimum))
+        return max(policy_minimum, int_or_default(value, policy_minimum))
 
     async def _load_user_settings_for_run(
         self,
@@ -333,13 +333,13 @@ class ScholarIngestionService:
         alert_retry_scheduled_threshold: int = 3,
     ) -> tuple[CrawlRun, list[ScholarProfile], dict[int, int]]:
         effective_delay = self._effective_request_delay_seconds(request_delay_seconds)
-        if effective_delay != _int_or_default(request_delay_seconds, effective_delay):
+        if effective_delay != int_or_default(request_delay_seconds, effective_delay):
             structured_log(
                 logger,
                 "warning",
                 "ingestion.delay_coerced",
                 user_id=user_id,
-                requested_request_delay_seconds=_int_or_default(request_delay_seconds, 0),
+                requested_request_delay_seconds=int_or_default(request_delay_seconds, 0),
                 effective_request_delay_seconds=effective_delay,
                 policy_minimum_request_delay_seconds=user_settings_service.resolve_request_delay_minimum(
                     settings.ingestion_min_request_delay_seconds

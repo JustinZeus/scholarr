@@ -2,15 +2,23 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     PublicationPdfJob,
-    PublicationPdfJobEvent,
     User,
+)
+from app.services.publications.pdf_queue_common import (
+    PDF_STATUS_FAILED,
+    PDF_STATUS_QUEUED,
+    PDF_STATUS_RESOLVED,
+    PDF_STATUS_RUNNING,
+    event_row,
+    queued_job,
+    utcnow,
 )
 from app.services.publications.pdf_queue_queries import (
     missing_pdf_candidates,
@@ -21,10 +29,6 @@ from app.services.publications.types import PublicationListItem
 from app.settings import settings
 
 PDF_STATUS_UNTRACKED = "untracked"
-PDF_STATUS_QUEUED = "queued"
-PDF_STATUS_RUNNING = "running"
-PDF_STATUS_RESOLVED = "resolved"
-PDF_STATUS_FAILED = "failed"
 
 PDF_EVENT_QUEUED = "queued"
 
@@ -41,10 +45,6 @@ class PdfRequeueResult:
 class PdfBulkQueueResult:
     requested_count: int
     queued_count: int
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 def _publication_ids(rows: list[PublicationListItem]) -> list[int]:
@@ -122,7 +122,7 @@ def _cooldown_active(
 ) -> bool:
     if last_attempt_at is None:
         return False
-    elapsed = (_utcnow() - last_attempt_at).total_seconds()
+    elapsed = (utcnow() - last_attempt_at).total_seconds()
     return elapsed < _retry_interval_seconds_for_attempt_count(int(attempt_count))
 
 
@@ -147,37 +147,8 @@ def _can_enqueue_job(
     )
 
 
-def _event_row(
-    *,
-    publication_id: int,
-    user_id: int | None,
-    event_type: str,
-    status: str | None,
-) -> PublicationPdfJobEvent:
-    return PublicationPdfJobEvent(
-        publication_id=publication_id,
-        user_id=user_id,
-        event_type=event_type,
-        status=status,
-    )
-
-
-def _queued_job(
-    *,
-    publication_id: int,
-    user_id: int,
-) -> PublicationPdfJob:
-    now = _utcnow()
-    return PublicationPdfJob(
-        publication_id=publication_id,
-        status=PDF_STATUS_QUEUED,
-        queued_at=now,
-        last_requested_by_user_id=user_id,
-    )
-
-
 def _mark_job_queued(job: PublicationPdfJob, *, user_id: int) -> None:
-    now = _utcnow()
+    now = utcnow()
     job.status = PDF_STATUS_QUEUED
     job.queued_at = now
     job.last_requested_by_user_id = user_id
@@ -236,13 +207,13 @@ async def _enqueue_rows(
         if not _can_enqueue_job(job, force_retry=force_retry):
             continue
         if job is None:
-            job = _queued_job(publication_id=row.publication_id, user_id=user_id)
+            job = queued_job(publication_id=row.publication_id, user_id=user_id)
             jobs[row.publication_id] = job
             db_session.add(job)
         else:
             _mark_job_queued(job, user_id=user_id)
         db_session.add(
-            _event_row(
+            event_row(
                 publication_id=row.publication_id,
                 user_id=user_id,
                 event_type=PDF_EVENT_QUEUED,

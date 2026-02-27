@@ -20,7 +20,7 @@ from app.settings import settings
 logger = logging.getLogger(__name__)
 
 
-def _effective_request_delay_seconds(value: int | None, *, floor: int) -> int:
+def effective_request_delay_seconds(value: int | None, *, floor: int) -> int:
     try:
         parsed = int(value) if value is not None else floor
     except (TypeError, ValueError):
@@ -238,7 +238,7 @@ class QueueJobRunner:
                 select(UserSetting.request_delay_seconds).where(UserSetting.user_id == user_id)
             )
             delay = result.scalar_one_or_none()
-        return _effective_request_delay_seconds(delay, floor=floor)
+        return effective_request_delay_seconds(delay, floor=floor)
 
     async def _run_ingestion_for_queue_job(
         self,

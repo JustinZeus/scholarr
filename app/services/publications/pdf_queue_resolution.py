@@ -3,10 +3,19 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from app.db.models import Publication, PublicationPdfJob, PublicationPdfJobEvent
+from app.db.models import Publication, PublicationPdfJob
 from app.db.session import get_session_factory
 from app.logging_utils import structured_log
 from app.services.publication_identifiers import application as identifier_service
+from app.services.publications.pdf_queue_common import (
+    PDF_STATUS_FAILED,
+    PDF_STATUS_QUEUED,
+    PDF_STATUS_RESOLVED,
+    PDF_STATUS_RUNNING,
+    event_row,
+    queued_job,
+    utcnow,
+)
 from app.services.publications.pdf_resolution_pipeline import (
     resolve_publication_pdf_outcome_for_row,
 )
@@ -17,58 +26,12 @@ from app.services.unpaywall.application import (
 )
 from app.settings import settings
 
-PDF_STATUS_QUEUED = "queued"
-PDF_STATUS_RUNNING = "running"
-PDF_STATUS_RESOLVED = "resolved"
-PDF_STATUS_FAILED = "failed"
-
 PDF_EVENT_ATTEMPT_STARTED = "attempt_started"
 PDF_EVENT_RESOLVED = "resolved"
 PDF_EVENT_FAILED = "failed"
 
 logger = logging.getLogger(__name__)
 _scheduled_tasks: set[asyncio.Task[None]] = set()
-
-
-def _utcnow():
-    from datetime import UTC, datetime
-
-    return datetime.now(UTC)
-
-
-def _event_row(
-    *,
-    publication_id: int,
-    user_id: int | None,
-    event_type: str,
-    status: str | None,
-    source: str | None = None,
-    failure_reason: str | None = None,
-    message: str | None = None,
-) -> PublicationPdfJobEvent:
-    return PublicationPdfJobEvent(
-        publication_id=publication_id,
-        user_id=user_id,
-        event_type=event_type,
-        status=status,
-        source=source,
-        failure_reason=failure_reason,
-        message=message,
-    )
-
-
-def _queued_job(
-    *,
-    publication_id: int,
-    user_id: int,
-) -> PublicationPdfJob:
-    now = _utcnow()
-    return PublicationPdfJob(
-        publication_id=publication_id,
-        status=PDF_STATUS_QUEUED,
-        queued_at=now,
-        last_requested_by_user_id=user_id,
-    )
 
 
 async def _mark_attempt_started(
@@ -80,13 +43,13 @@ async def _mark_attempt_started(
     async with session_factory() as db_session:
         job = await db_session.get(PublicationPdfJob, publication_id)
         if job is None:
-            job = _queued_job(publication_id=publication_id, user_id=user_id)
+            job = queued_job(publication_id=publication_id, user_id=user_id)
             db_session.add(job)
         job.status = PDF_STATUS_RUNNING
-        job.last_attempt_at = _utcnow()
+        job.last_attempt_at = utcnow()
         job.attempt_count = int(job.attempt_count) + 1
         db_session.add(
-            _event_row(
+            event_row(
                 publication_id=publication_id,
                 user_id=user_id,
                 event_type=PDF_EVENT_ATTEMPT_STARTED,
@@ -142,7 +105,7 @@ def _apply_job_outcome(job: PublicationPdfJob, *, outcome: OaResolutionOutcome) 
     job.last_source = outcome.source
     if outcome.pdf_url:
         job.status = PDF_STATUS_RESOLVED
-        job.resolved_at = _utcnow()
+        job.resolved_at = utcnow()
         job.last_failure_reason = None
         job.last_failure_detail = None
         return
@@ -178,7 +141,7 @@ async def _persist_outcome(
         _apply_job_outcome(job, outcome=outcome)
         event_type, status = _result_event(outcome)
         db_session.add(
-            _event_row(
+            event_row(
                 publication_id=publication_id,
                 user_id=user_id,
                 event_type=event_type,

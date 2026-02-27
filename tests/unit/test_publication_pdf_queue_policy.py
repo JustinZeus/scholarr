@@ -48,7 +48,7 @@ def _row(
 
 def test_pdf_queue_auto_enqueue_blocks_recent_attempt(monkeypatch: pytest.MonkeyPatch) -> None:
     now = datetime(2026, 2, 21, 12, 0, tzinfo=UTC)
-    monkeypatch.setattr(pdf_queue, "_utcnow", lambda: now)
+    monkeypatch.setattr(pdf_queue, "utcnow", lambda: now)
     monkeypatch.setattr(pdf_queue, "_auto_retry_first_interval_seconds", lambda: 3_600)
     monkeypatch.setattr(pdf_queue, "_auto_retry_interval_seconds", lambda: 86_400)
     monkeypatch.setattr(pdf_queue, "_auto_retry_max_attempts", lambda: 3)
@@ -62,7 +62,7 @@ def test_pdf_queue_auto_enqueue_blocks_recent_attempt(monkeypatch: pytest.Monkey
 
 def test_pdf_queue_auto_enqueue_blocks_recent_first_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     now = datetime(2026, 2, 21, 12, 0, tzinfo=UTC)
-    monkeypatch.setattr(pdf_queue, "_utcnow", lambda: now)
+    monkeypatch.setattr(pdf_queue, "utcnow", lambda: now)
     monkeypatch.setattr(pdf_queue, "_auto_retry_first_interval_seconds", lambda: 3_600)
     monkeypatch.setattr(pdf_queue, "_auto_retry_interval_seconds", lambda: 86_400)
     monkeypatch.setattr(pdf_queue, "_auto_retry_max_attempts", lambda: 3)
@@ -76,7 +76,7 @@ def test_pdf_queue_auto_enqueue_blocks_recent_first_retry(monkeypatch: pytest.Mo
 
 def test_pdf_queue_auto_enqueue_blocks_after_max_attempts(monkeypatch: pytest.MonkeyPatch) -> None:
     now = datetime(2026, 2, 21, 12, 0, tzinfo=UTC)
-    monkeypatch.setattr(pdf_queue, "_utcnow", lambda: now)
+    monkeypatch.setattr(pdf_queue, "utcnow", lambda: now)
     monkeypatch.setattr(pdf_queue, "_auto_retry_first_interval_seconds", lambda: 3_600)
     monkeypatch.setattr(pdf_queue, "_auto_retry_interval_seconds", lambda: 86_400)
     monkeypatch.setattr(pdf_queue, "_auto_retry_max_attempts", lambda: 3)
@@ -90,7 +90,7 @@ def test_pdf_queue_auto_enqueue_blocks_after_max_attempts(monkeypatch: pytest.Mo
 
 def test_pdf_queue_auto_enqueue_blocks_second_retry_within_day(monkeypatch: pytest.MonkeyPatch) -> None:
     now = datetime(2026, 2, 21, 12, 0, tzinfo=UTC)
-    monkeypatch.setattr(pdf_queue, "_utcnow", lambda: now)
+    monkeypatch.setattr(pdf_queue, "utcnow", lambda: now)
     monkeypatch.setattr(pdf_queue, "_auto_retry_first_interval_seconds", lambda: 3_600)
     monkeypatch.setattr(pdf_queue, "_auto_retry_interval_seconds", lambda: 86_400)
     monkeypatch.setattr(pdf_queue, "_auto_retry_max_attempts", lambda: 3)
@@ -106,7 +106,7 @@ def test_pdf_queue_manual_requeue_bypasses_cooldown_and_max_attempts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now = datetime(2026, 2, 21, 12, 0, tzinfo=UTC)
-    monkeypatch.setattr(pdf_queue, "_utcnow", lambda: now)
+    monkeypatch.setattr(pdf_queue, "utcnow", lambda: now)
     monkeypatch.setattr(pdf_queue, "_auto_retry_first_interval_seconds", lambda: 3_600)
     monkeypatch.setattr(pdf_queue, "_auto_retry_interval_seconds", lambda: 86_400)
     monkeypatch.setattr(pdf_queue, "_auto_retry_max_attempts", lambda: 3)
