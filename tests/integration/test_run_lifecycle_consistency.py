@@ -326,7 +326,6 @@ async def test_partial_discovery_exception_keeps_new_pub_count_consistent(
     db_session.add_all([run, publication])
     await db_session.commit()
 
-    service = ScholarIngestionService(source=object())
     call_count = 0
 
     async def _resolve_publication_stub(*_args: Any, **_kwargs: Any) -> Publication:
@@ -336,7 +335,9 @@ async def test_partial_discovery_exception_keeps_new_pub_count_consistent(
             return publication
         raise RuntimeError("mid_page_failure")
 
-    monkeypatch.setattr(service, "_resolve_publication", _resolve_publication_stub)
+    from app.services.ingestion import publication_upsert
+
+    monkeypatch.setattr(publication_upsert, "resolve_publication", _resolve_publication_stub)
 
     from app.db.models import ScholarProfile
     from app.services.scholar.parser_types import PublicationCandidate
@@ -368,7 +369,7 @@ async def test_partial_discovery_exception_keeps_new_pub_count_consistent(
     ]
 
     with pytest.raises(RuntimeError, match="mid_page_failure"):
-        await service._upsert_profile_publications(
+        await publication_upsert.upsert_profile_publications(
             db_session,
             run=run,
             scholar=scholar,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-from app.services.ingestion.application import normalize_title
+from app.services.ingestion.fingerprints import normalize_title
 from app.services.portability.constants import (
     MAX_IMPORT_PUBLICATIONS,
     MAX_IMPORT_SCHOLARS,

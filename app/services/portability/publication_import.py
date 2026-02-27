@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication, ScholarProfile, ScholarPublication
 from app.services.doi.normalize import normalize_doi
-from app.services.ingestion.application import build_publication_url, normalize_title
+from app.services.ingestion.fingerprints import build_publication_url, normalize_title
 from app.services.portability.normalize import (
     _normalize_citation_count,
     _normalize_optional_text,
