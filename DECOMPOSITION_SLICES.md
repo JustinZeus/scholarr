@@ -6,6 +6,7 @@ This file contains self-contained decomposition prompts ("slices") to bring the 
 
 **Rules from `agents.md`:**
 - File length: 400 lines target, 600 lines hard ceiling
+- Slightly exceeding the 600-line ceiling is acceptable when the excess is driven by verbose keyword-argument signatures (named parameters), not by business logic density
 - Function length: 50 lines max
 - All business logic in `app/services/<domain>/`
 - Read `agents.md` fully before starting any slice
