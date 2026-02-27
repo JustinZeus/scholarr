@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { fetchDashboardSnapshot, type DashboardSnapshot } from "@/features/dashboard";
+import { formatCooldownCountdown } from "@/features/safety";
 import { ApiRequestError } from "@/lib/api/errors";
 import AppPage from "@/components/layout/AppPage.vue";
 import AsyncStateGate from "@/components/patterns/AsyncStateGate.vue";
@@ -53,6 +54,10 @@ const startCheckLabel = computed(() => {
     return "Manual checks disabled";
   }
   if (runStatus.safetyState.cooldown_active) {
+    const remaining = runStatus.safetyState.cooldown_remaining_seconds;
+    if (remaining > 0) {
+      return `Cooldown (${formatCooldownCountdown(remaining)})`;
+    }
     return "Safety cooldown";
   }
   if (runStatus.isLikelyRunning) {

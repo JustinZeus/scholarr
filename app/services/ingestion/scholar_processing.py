@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from datetime import UTC, datetime
 from typing import Any
 
@@ -27,6 +28,7 @@ from app.services.ingestion.types import (
     ScholarProcessingOutcome,
 )
 from app.services.scholar.parser import ParseState
+from app.services.scholar.state_detection import is_hard_challenge_reason
 
 logger = logging.getLogger(__name__)
 
@@ -528,6 +530,13 @@ def unexpected_scholar_exception_outcome(
     )
 
 
+def _is_hard_challenge_outcome(outcome: ScholarProcessingOutcome) -> bool:
+    entry = outcome.result_entry
+    return str(entry.get("state", "")) == ParseState.BLOCKED_OR_CAPTCHA.value and is_hard_challenge_reason(
+        str(entry.get("state_reason", ""))
+    )
+
+
 async def _run_first_pass(
     db_session: AsyncSession,
     *,
@@ -548,7 +557,8 @@ async def _run_first_pass(
             structured_log(logger, "info", "ingestion.run_canceled", run_id=run.id, user_id=user_id)
             return first_pass_cstarts
         if index > 0 and request_delay_seconds > 0:
-            await asyncio.sleep(float(request_delay_seconds))
+            jitter = random.uniform(0.0, min(float(request_delay_seconds), 2.0))
+            await asyncio.sleep(float(request_delay_seconds) + jitter)
         start_cstart = int(start_cstart_map.get(int(scholar.id), 0))
         outcome = await process_scholar(
             db_session,
@@ -563,6 +573,18 @@ async def _run_first_pass(
             **scholar_kwargs,
         )
         apply_outcome_to_progress(progress=progress, outcome=outcome)
+        if _is_hard_challenge_outcome(outcome):
+            structured_log(
+                logger,
+                "warning",
+                "ingestion.run_aborted_hard_challenge",
+                run_id=run.id,
+                user_id=user_id,
+                scholar_id=scholar.scholar_id,
+                state_reason=outcome.result_entry.get("state_reason"),
+                scholars_remaining=len(scholars) - index - 1,
+            )
+            return first_pass_cstarts
         resume_cstart = outcome.result_entry.get("continuation_cstart")
         if resume_cstart is not None and int(resume_cstart) > start_cstart:
             first_pass_cstarts[int(scholar.id)] = int(resume_cstart)
@@ -593,7 +615,8 @@ async def _run_depth_pass(
             structured_log(logger, "info", "ingestion.run_canceled", run_id=run.id, user_id=user_id)
             break
         if index > 0 and request_delay_seconds > 0:
-            await asyncio.sleep(float(request_delay_seconds))
+            jitter = random.uniform(0.0, min(float(request_delay_seconds), 2.0))
+            await asyncio.sleep(float(request_delay_seconds) + jitter)
         outcome = await process_scholar(
             db_session,
             pagination=pagination,
@@ -607,6 +630,18 @@ async def _run_depth_pass(
             **scholar_kwargs,
         )
         apply_outcome_to_progress(progress=progress, outcome=outcome)
+        if _is_hard_challenge_outcome(outcome):
+            structured_log(
+                logger,
+                "warning",
+                "ingestion.run_aborted_hard_challenge",
+                run_id=run.id,
+                user_id=user_id,
+                scholar_id=scholar.scholar_id,
+                state_reason=outcome.result_entry.get("state_reason"),
+                scholars_remaining=len(scholars) - index - 1,
+            )
+            break
 
 
 async def run_scholar_iteration(

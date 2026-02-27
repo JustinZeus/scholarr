@@ -30,6 +30,11 @@ def classify_network_error_reason(fetch_error: str | None) -> str:
     return "network_error_missing_status_code"
 
 
+def is_hard_challenge_reason(state_reason: str) -> bool:
+    """True if the block reason indicates an active Scholar challenge (not retryable in short loops)."""
+    return state_reason.startswith("blocked_") and state_reason != "blocked_http_429_rate_limited"
+
+
 def classify_block_or_captcha_reason(
     *,
     status_code: int,

@@ -21,6 +21,7 @@ from app.services.ingestion import safety as run_safety_service
 from app.services.ingestion.constants import RUN_LOCK_NAMESPACE
 from app.services.ingestion.enrichment import EnrichmentRunner
 from app.services.ingestion.pagination import PaginationEngine
+from app.services.ingestion.preflight import check_scholar_reachable
 from app.services.ingestion.run_completion import (
     complete_run_for_user,
     int_or_default,
@@ -231,6 +232,49 @@ class ScholarIngestionService:
                 await queue_service.clear_job_for_scholar(db_session, user_id=user_id, scholar_profile_id=sid)
         return scholars
 
+    async def _run_preflight_guard(
+        self,
+        db_session: AsyncSession,
+        *,
+        user_settings: Any,
+        user_id: int,
+        scholars: list[ScholarProfile],
+    ) -> None:
+        if not scholars:
+            return
+        result = await check_scholar_reachable(
+            self._source,
+            scholar_id=scholars[0].scholar_id,
+        )
+        if result.passed:
+            return
+        now_utc = datetime.now(UTC)
+        safety_state, _ = run_safety_service.apply_run_safety_outcome(
+            user_settings,
+            run_id=0,
+            blocked_failure_count=1,
+            network_failure_count=0,
+            blocked_failure_threshold=1,
+            network_failure_threshold=1,
+            blocked_cooldown_seconds=settings.ingestion_safety_cooldown_blocked_seconds,
+            network_cooldown_seconds=settings.ingestion_safety_cooldown_network_seconds,
+            now_utc=now_utc,
+        )
+        await db_session.commit()
+        structured_log(
+            logger,
+            "warning",
+            "ingestion.cooldown_entered_preflight",
+            user_id=user_id,
+            block_reason=result.block_reason,
+            cooldown_until=safety_state.get("cooldown_until"),
+        )
+        raise RunBlockedBySafetyPolicyError(
+            code="scrape_cooldown_active",
+            message=f"Preflight detected Scholar block ({result.block_reason}). Cooldown activated.",
+            safety_state=safety_state,
+        )
+
     async def _initialize_run_for_user(
         self,
         db_session: AsyncSession,
@@ -256,6 +300,12 @@ class ScholarIngestionService:
             db_session,
             user_id=user_id,
             filtered_scholar_ids=filtered_scholar_ids,
+        )
+        await self._run_preflight_guard(
+            db_session,
+            user_settings=user_settings,
+            user_id=user_id,
+            scholars=scholars,
         )
         run = await self._start_run_record(
             db_session,

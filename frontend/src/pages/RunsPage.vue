@@ -22,6 +22,7 @@ import {
   type QueueItem,
   type RunListItem,
 } from "@/features/runs";
+import { formatCooldownCountdown } from "@/features/safety";
 import { ApiRequestError } from "@/lib/api/errors";
 import { useAuthStore } from "@/stores/auth";
 import { useRunStatusStore } from "@/stores/run_status";
@@ -89,6 +90,10 @@ const runButtonLabel = computed(() => {
     return "Manual checks disabled";
   }
   if (runStatus.safetyState.cooldown_active) {
+    const remaining = runStatus.safetyState.cooldown_remaining_seconds;
+    if (remaining > 0) {
+      return `Cooldown (${formatCooldownCountdown(remaining)})`;
+    }
     return "Safety cooldown";
   }
   if (runStatus.isLikelyRunning) {
