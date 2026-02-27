@@ -23,7 +23,7 @@ def _serialize_export_scholar(profile: ScholarProfile) -> dict[str, Any]:
     }
 
 
-def _serialize_export_publication(row: tuple[Any, ...]) -> dict[str, Any]:
+def _serialize_export_publication(row: Any) -> dict[str, Any]:
     (
         scholar_id,
         cluster_id,

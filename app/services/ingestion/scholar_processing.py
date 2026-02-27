@@ -547,7 +547,7 @@ async def run_scholar_iteration(
     queue_delay_seconds: int,
 ) -> RunProgress:
     progress = RunProgress()
-    scholar_kwargs = {
+    scholar_kwargs: dict[str, Any] = {
         "request_delay_seconds": request_delay_seconds,
         "network_error_retries": network_error_retries,
         "retry_backoff_seconds": retry_backoff_seconds,

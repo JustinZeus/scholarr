@@ -4,6 +4,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 
@@ -158,7 +159,7 @@ class SchedulerService:
                 continue
             await self._run_candidate(candidate)
 
-    async def _load_candidate_rows(self) -> list[tuple]:
+    async def _load_candidate_rows(self) -> list[Any]:
         session_factory = get_session_factory()
         async with session_factory() as session:
             result = await session.execute(
@@ -173,10 +174,10 @@ class SchedulerService:
                 .where(User.is_active.is_(True), UserSetting.auto_run_enabled.is_(True))
                 .order_by(UserSetting.user_id.asc())
             )
-            return result.all()
+            return list(result.all())
 
     @staticmethod
-    def _candidate_from_row(row: tuple, *, now_utc: datetime) -> _AutoRunCandidate | None:
+    def _candidate_from_row(row: Any, *, now_utc: datetime) -> _AutoRunCandidate | None:
         user_id, run_interval_minutes, request_delay_seconds, cooldown_until, cooldown_reason = row
         if cooldown_until is not None and cooldown_until.tzinfo is None:
             cooldown_until = cooldown_until.replace(tzinfo=UTC)

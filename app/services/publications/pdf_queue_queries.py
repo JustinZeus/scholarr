@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import Select, and_, func, literal, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +44,7 @@ def _retry_item_label(display_name: str | None, scholar_id: str | None) -> str:
 def _retry_item_from_publication(
     publication: Publication,
     *,
-    link_row: tuple | None,
+    link_row: Any | None,
 ) -> PublicationListItem:
     if link_row is None:
         scholar_profile_id = 0
@@ -270,7 +271,7 @@ class PdfQueueListItem:
     display_identifier: DisplayIdentifier | None = None
 
 
-def _queue_item_from_row(row: tuple) -> PdfQueueListItem:
+def _queue_item_from_row(row: Any) -> PdfQueueListItem:
     return PdfQueueListItem(
         publication_id=int(row[0]),
         title=str(row[1] or ""),
@@ -292,7 +293,7 @@ def _queue_item_from_row(row: tuple) -> PdfQueueListItem:
 async def _hydrated_queue_items(
     db_session: AsyncSession,
     *,
-    rows: list[tuple],
+    rows: list[Any],
 ) -> list[PdfQueueListItem]:
     items = [_queue_item_from_row(row) for row in rows]
     return await identifier_service.overlay_pdf_queue_items_with_display_identifiers(

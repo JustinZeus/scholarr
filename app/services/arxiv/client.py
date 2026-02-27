@@ -232,7 +232,7 @@ async def _request_arxiv_feed(
         timeout_value = _timeout_seconds(timeout_seconds)
         headers = {"User-Agent": f"scholar-scraper/1.0 (mailto:{_contact_email(request_email)})"}
         async with httpx.AsyncClient(timeout=timeout_value, follow_redirects=True, headers=headers) as client:
-            return await client.get(_ARXIV_API_URL, params=params)
+            return await client.get(_ARXIV_API_URL, params=params)  # type: ignore[arg-type]
 
     return await run_with_global_arxiv_limit(
         fetch=_fetch,

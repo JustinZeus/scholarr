@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import Select, case, false as sa_false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
@@ -124,7 +125,7 @@ def publications_query(
         stmt = stmt.where(ScholarPublication.is_read.is_(False))
     if mode == MODE_LATEST:
         if latest_run_id is None:
-            return stmt.where(False)
+            return stmt.where(sa_false())
         stmt = stmt.where(ScholarPublication.first_seen_run_id == latest_run_id)
     if snapshot_before is not None:
         stmt = stmt.where(ScholarPublication.created_at <= snapshot_before)
@@ -195,7 +196,7 @@ async def get_publication_item_for_user(
 
 
 def publication_list_item_from_row(
-    row: tuple,
+    row: Any,
     *,
     latest_run_id: int | None,
 ) -> PublicationListItem:
@@ -232,7 +233,7 @@ def publication_list_item_from_row(
     )
 
 
-def unread_item_from_row(row: tuple) -> UnreadPublicationItem:
+def unread_item_from_row(row: Any) -> UnreadPublicationItem:
     (
         publication_id,
         scholar_profile_id,

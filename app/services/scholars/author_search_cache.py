@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,14 +137,14 @@ def _deserialize_parsed_author_search_page(payload: object) -> ParsedAuthorSearc
         state_reason=str(payload.get("state_reason", "")).strip() or "unknown",
         candidates=[
             ScholarSearchCandidate(
-                scholar_id=item["scholar_id"],
-                display_name=item["display_name"],
-                affiliation=item["affiliation"],
-                email_domain=item["email_domain"],
-                cited_by_count=item["cited_by_count"],
-                interests=item["interests"],
-                profile_url=item["profile_url"],
-                profile_image_url=item["profile_image_url"],
+                scholar_id=cast(str, item["scholar_id"]),
+                display_name=cast(str, item["display_name"]),
+                affiliation=cast("str | None", item["affiliation"]),
+                email_domain=cast("str | None", item["email_domain"]),
+                cited_by_count=cast("int | None", item["cited_by_count"]),
+                interests=cast("list[str]", item["interests"]),
+                profile_url=cast(str, item["profile_url"]),
+                profile_image_url=cast("str | None", item["profile_image_url"]),
             )
             for item in normalized_candidates
         ],

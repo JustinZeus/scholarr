@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import delete, exists, func, select, update
+from sqlalchemy import CursorResult, delete, exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import DataRepairJob, IngestionQueueItem, Publication, ScholarProfile, ScholarPublication
@@ -152,7 +152,7 @@ def _job_summary(
 
 
 async def _delete_links_for_targets(db_session: AsyncSession, *, target_scholar_profile_ids: list[int]) -> int:
-    result = await db_session.execute(
+    result: CursorResult[Any] = await db_session.execute(  # type: ignore[assignment]
         delete(ScholarPublication).where(ScholarPublication.scholar_profile_id.in_(target_scholar_profile_ids))
     )
     return int(result.rowcount or 0)
@@ -167,7 +167,7 @@ async def _delete_queue_for_targets(
     stmt = delete(IngestionQueueItem).where(IngestionQueueItem.scholar_profile_id.in_(target_scholar_profile_ids))
     if user_id is not None:
         stmt = stmt.where(IngestionQueueItem.user_id == user_id)
-    result = await db_session.execute(stmt)
+    result: CursorResult[Any] = await db_session.execute(stmt)  # type: ignore[assignment]
     return int(result.rowcount or 0)
 
 
@@ -180,7 +180,7 @@ async def _reset_scholar_tracking_state(
     stmt = update(ScholarProfile).where(ScholarProfile.id.in_(target_scholar_profile_ids))
     if user_id is not None:
         stmt = stmt.where(ScholarProfile.user_id == user_id)
-    result = await db_session.execute(
+    result: CursorResult[Any] = await db_session.execute(  # type: ignore[assignment]
         stmt.values(
             baseline_completed=False,
             last_initial_page_fingerprint_sha256=None,
@@ -193,7 +193,7 @@ async def _reset_scholar_tracking_state(
 
 
 async def _delete_orphan_publications(db_session: AsyncSession) -> int:
-    result = await db_session.execute(
+    result: CursorResult[Any] = await db_session.execute(  # type: ignore[assignment]
         delete(Publication).where(~exists(select(1).where(ScholarPublication.publication_id == Publication.id)))
     )
     return int(result.rowcount or 0)

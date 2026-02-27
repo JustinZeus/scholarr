@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import select, tuple_, update
+from typing import Any
+
+from sqlalchemy import CursorResult, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ScholarProfile, ScholarPublication
@@ -34,7 +36,7 @@ async def mark_all_unread_as_read_for_user(
         )
         .values(is_read=True)
     )
-    result = await db_session.execute(stmt)
+    result: CursorResult[Any] = await db_session.execute(stmt)  # type: ignore[assignment]
     await db_session.commit()
     return int(result.rowcount or 0)
 
@@ -62,7 +64,7 @@ async def mark_selected_as_read_for_user(
         )
         .values(is_read=True)
     )
-    result = await db_session.execute(stmt)
+    result: CursorResult[Any] = await db_session.execute(stmt)  # type: ignore[assignment]
     await db_session.commit()
     return int(result.rowcount or 0)
 
@@ -85,6 +87,6 @@ async def set_publication_favorite_for_user(
         )
         .values(is_favorite=bool(is_favorite))
     )
-    result = await db_session.execute(stmt)
+    result: CursorResult[Any] = await db_session.execute(stmt)  # type: ignore[assignment]
     await db_session.commit()
     return int(result.rowcount or 0)

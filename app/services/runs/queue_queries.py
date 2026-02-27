@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import and_, select
 
 from app.db.models import IngestionQueueItem, ScholarProfile
@@ -38,7 +40,7 @@ def queue_item_select(*, user_id: int):
     )
 
 
-def queue_list_item_from_row(row: tuple) -> QueueListItem:
+def queue_list_item_from_row(row: Any) -> QueueListItem:
     (
         item_id,
         scholar_profile_id,
