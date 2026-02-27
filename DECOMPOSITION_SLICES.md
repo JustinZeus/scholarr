@@ -29,7 +29,7 @@ This file contains self-contained decomposition prompts ("slices") to bring the 
 | 2 | Ingestion: pagination + publication upsert | **DONE** |
 | 3 | Ingestion: enrichment + scholar processing + run completion | **DONE** |
 | 4 | Scholars service + PDF queue | **DONE** |
-| 5 | Routers + scheduler | pending |
+| 5 | Routers + scheduler | **DONE** |
 
 ---
 
@@ -177,9 +177,21 @@ Commit message: `refactor: decompose scholars service and pdf_queue into focused
 
 ---
 
-## Slice 5: Decompose router files and scheduler
+## Slice 5: Decompose router files and scheduler — DONE
 
-**Why:** Three files slightly over the 600-line ceiling. Each needs helper extraction.
+Completed. Extracted helpers from three oversized files:
+
+| File | Lines | Contents |
+|---|---|---|
+| `app/api/routers/run_serializers.py` | 238 | `serialize_run`, `serialize_queue_item`, `normalize_scholar_result`, `manual_run_payload_from_run`, `manual_run_success_payload`, value coercion helpers, idempotency key validation |
+| `app/api/routers/run_manual.py` | 237 | `load_safety_state`, `raise_manual_runs_disabled`, `reused_manual_run_payload`, `run_ingestion_for_manual`, `recover_integrity_error`, `execute_manual_run`, safety/failure raise helpers |
+| `app/api/routers/runs.py` | 440 | Route handlers only + imports |
+| `app/api/routers/scholar_helpers.py` | 234 | `serialize_scholar`, `hydrate_scholar_metadata_if_needed`, `enqueue_initial_scrape_job_for_scholar`, `search_kwargs`, `search_response_data`, `require_user_profile`, `read_uploaded_image` |
+| `app/api/routers/scholars.py` | 406 | Route handlers only + imports |
+| `app/services/ingestion/queue_runner.py` | 379 | `QueueJobRunner` class — drain continuation queue, job lifecycle (drop/retry/reschedule), ingestion dispatch, finalization |
+| `app/services/ingestion/scheduler.py` | 312 | `SchedulerService` — auto-run scheduling, `_run_loop`, `_tick_once`, candidate loading, PDF queue drain |
+
+Also updated one test file (`test_scholars_create_hydration.py`) to monkeypatch `scholar_helpers` instead of the `scholars` router for the 4 helper-related tests.
 
 **Files to create:** `app/api/routers/run_serializers.py`, `app/api/routers/run_manual.py`, `app/api/routers/scholar_helpers.py`, `app/services/ingestion/queue_runner.py`
 

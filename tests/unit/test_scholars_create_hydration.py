@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.routers import scholars as scholars_router
+from app.api.routers import scholar_helpers
 
 
 class _FakeSession:
@@ -31,17 +31,17 @@ async def test_create_hydration_skips_when_global_throttle_active(
         raise AssertionError("hydrate_profile_metadata should not run when throttle is active")
 
     monkeypatch.setattr(
-        scholars_router.scholar_rate_limit,
+        scholar_helpers.scholar_rate_limit,
         "remaining_scholar_slot_seconds",
         lambda **_kwargs: 3.5,
     )
     monkeypatch.setattr(
-        scholars_router.scholar_service,
+        scholar_helpers.scholar_service,
         "hydrate_profile_metadata",
         _fail_hydration,
     )
 
-    result = await scholars_router._hydrate_scholar_metadata_if_needed(
+    result = await scholar_helpers.hydrate_scholar_metadata_if_needed(
         db_session=None,
         profile=profile,
         source=object(),
@@ -66,17 +66,17 @@ async def test_create_hydration_runs_when_throttle_is_clear(
         return profile
 
     monkeypatch.setattr(
-        scholars_router.scholar_rate_limit,
+        scholar_helpers.scholar_rate_limit,
         "remaining_scholar_slot_seconds",
         lambda **_kwargs: 0.0,
     )
     monkeypatch.setattr(
-        scholars_router.scholar_service,
+        scholar_helpers.scholar_service,
         "hydrate_profile_metadata",
         _hydrate_profile_metadata,
     )
 
-    result = await scholars_router._hydrate_scholar_metadata_if_needed(
+    result = await scholar_helpers.hydrate_scholar_metadata_if_needed(
         db_session=None,
         profile=profile,
         source=object(),
@@ -98,17 +98,17 @@ async def test_initial_scrape_job_enqueued_on_create(
         upsert_calls.append(kwargs)
 
     monkeypatch.setattr(
-        scholars_router,
-        "_auto_enqueue_new_scholar_enabled",
+        scholar_helpers,
+        "auto_enqueue_new_scholar_enabled",
         lambda: True,
     )
     monkeypatch.setattr(
-        scholars_router.ingestion_queue_service,
+        scholar_helpers.ingestion_queue_service,
         "upsert_job",
         _fake_upsert_job,
     )
 
-    queued = await scholars_router._enqueue_initial_scrape_job_for_scholar(
+    queued = await scholar_helpers.enqueue_initial_scrape_job_for_scholar(
         session,
         profile=profile,
         user_id=9,
@@ -117,7 +117,7 @@ async def test_initial_scrape_job_enqueued_on_create(
     assert queued is True
     assert session.commits == 1
     assert session.rollbacks == 0
-    assert upsert_calls[0]["reason"] == scholars_router.INITIAL_SCHOLAR_SCRAPE_QUEUE_REASON
+    assert upsert_calls[0]["reason"] == scholar_helpers.INITIAL_SCHOLAR_SCRAPE_QUEUE_REASON
 
 
 @pytest.mark.asyncio
@@ -128,12 +128,12 @@ async def test_initial_scrape_job_not_enqueued_when_disabled(
     session = _FakeSession()
 
     monkeypatch.setattr(
-        scholars_router,
-        "_auto_enqueue_new_scholar_enabled",
+        scholar_helpers,
+        "auto_enqueue_new_scholar_enabled",
         lambda: False,
     )
 
-    queued = await scholars_router._enqueue_initial_scrape_job_for_scholar(
+    queued = await scholar_helpers.enqueue_initial_scrape_job_for_scholar(
         session,
         profile=profile,
         user_id=11,
