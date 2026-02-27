@@ -5,10 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication, PublicationIdentifier
-from app.services.domains.arxiv import application as arxiv_service
-from app.services.domains.publication_identifiers import application as identifier_service
-from app.services.domains.publication_identifiers.types import IdentifierKind
-from app.services.domains.publications.types import UnreadPublicationItem
+from app.services.arxiv import application as arxiv_service
+from app.services.publication_identifiers import application as identifier_service
+from app.services.publication_identifiers.types import IdentifierKind
+from app.services.publications.types import UnreadPublicationItem
 
 
 def test_derive_display_identifier_prefers_doi_over_arxiv() -> None:
@@ -47,7 +47,7 @@ def test_derive_display_identifier_uses_pmcid_when_present() -> None:
 
 
 def test_normalize_arxiv_id_handles_urls() -> None:
-    from app.services.domains.publication_identifiers.normalize import normalize_arxiv_id
+    from app.services.publication_identifiers.normalize import normalize_arxiv_id
 
     assert normalize_arxiv_id("https://arxiv.org/abs/1504.08025") == "1504.08025"
     assert normalize_arxiv_id("http://arxiv.org/pdf/1504.08025v2.pdf") == "1504.08025v2"
@@ -59,7 +59,7 @@ def test_normalize_arxiv_id_handles_urls() -> None:
 
 
 def test_normalize_arxiv_id_handles_raw_text() -> None:
-    from app.services.domains.publication_identifiers.normalize import normalize_arxiv_id
+    from app.services.publication_identifiers.normalize import normalize_arxiv_id
 
     assert normalize_arxiv_id("1504.08025v1") == "1504.08025v1"
     assert normalize_arxiv_id("arXiv:1504.08025") == "1504.08025"
@@ -69,7 +69,7 @@ def test_normalize_arxiv_id_handles_raw_text() -> None:
 
 
 def test_normalize_pmcid_handles_urls_and_text() -> None:
-    from app.services.domains.publication_identifiers.normalize import normalize_pmcid
+    from app.services.publication_identifiers.normalize import normalize_pmcid
 
     assert normalize_pmcid("https://pmc.ncbi.nlm.nih.gov/articles/PMC2175868/") == "PMC2175868"
     assert normalize_pmcid("http://www.ncbi.nlm.nih.gov/pmc/articles/PMC1234567") == "PMC1234567"
@@ -79,7 +79,7 @@ def test_normalize_pmcid_handles_urls_and_text() -> None:
 
 
 def test_normalize_pmid_handles_urls() -> None:
-    from app.services.domains.publication_identifiers.normalize import normalize_pmid
+    from app.services.publication_identifiers.normalize import normalize_pmid
 
     assert normalize_pmid("https://pubmed.ncbi.nlm.nih.gov/12345678/") == "12345678"
     assert normalize_pmid("http://pubmed.ncbi.nlm.nih.gov/12345678") == "12345678"
@@ -117,11 +117,11 @@ async def test_discover_and_sync_skips_arxiv_when_crossref_finds_doi(
         raise AssertionError("arXiv should be skipped after strong DOI evidence.")
 
     monkeypatch.setattr(
-        "app.services.domains.crossref.application.discover_doi_for_publication",
+        "app.services.crossref.application.discover_doi_for_publication",
         _fake_crossref,
     )
     monkeypatch.setattr(
-        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        "app.services.arxiv.application.discover_arxiv_id_for_publication",
         _fail_arxiv,
     )
 
@@ -158,11 +158,11 @@ async def test_discover_and_sync_skips_arxiv_for_low_quality_title(
         return "1234.5678"
 
     monkeypatch.setattr(
-        "app.services.domains.crossref.application.discover_doi_for_publication",
+        "app.services.crossref.application.discover_doi_for_publication",
         _fake_crossref,
     )
     monkeypatch.setattr(
-        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        "app.services.arxiv.application.discover_arxiv_id_for_publication",
         _fake_arxiv,
     )
 
@@ -190,11 +190,11 @@ async def test_discover_and_sync_calls_arxiv_when_item_is_eligible(
         return "2501.00001v2"
 
     monkeypatch.setattr(
-        "app.services.domains.crossref.application.discover_doi_for_publication",
+        "app.services.crossref.application.discover_doi_for_publication",
         _fake_crossref,
     )
     monkeypatch.setattr(
-        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        "app.services.arxiv.application.discover_arxiv_id_for_publication",
         _fake_arxiv,
     )
 

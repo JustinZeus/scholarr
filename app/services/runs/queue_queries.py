@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import and_, select
 
 from app.db.models import IngestionQueueItem, ScholarProfile
-from app.services.domains.runs.types import QueueListItem
+from app.services.runs.types import QueueListItem
 
 
 def queue_item_columns() -> tuple:

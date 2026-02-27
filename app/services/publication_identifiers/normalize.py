@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from urllib.parse import urlparse
 
-from app.services.domains.doi.normalize import normalize_doi
-from app.services.domains.publication_identifiers.types import IdentifierKind
+from app.services.doi.normalize import normalize_doi
+from app.services.publication_identifiers.types import IdentifierKind
 
 ARXIV_ABS_RE = re.compile(r"\barxiv:\s*([a-z-]+/\d{7}|\d{4}\.\d{4,5})(v\d+)?\b", re.I)
 ARXIV_RAW_RE = re.compile(r"^([a-z-]+/\d{7}|\d{4}\.\d{4,5})(v\d+)?$", re.I)

@@ -1,5 +1,5 @@
-from app.services.domains.openalex.matching import find_best_match
-from app.services.domains.openalex.types import OpenAlexWork
+from app.services.openalex.matching import find_best_match
+from app.services.openalex.types import OpenAlexWork
 
 
 def test_find_best_match_exact_title():

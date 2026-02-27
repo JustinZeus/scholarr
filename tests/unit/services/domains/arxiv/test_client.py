@@ -7,10 +7,10 @@ import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.domains.arxiv import client as arxiv_client_module
-from app.services.domains.arxiv.client import ArxivClient
-from app.services.domains.arxiv.errors import ArxivClientValidationError, ArxivRateLimitError
-from app.services.domains.arxiv.rate_limit import ArxivCooldownStatus
+from app.services.arxiv import client as arxiv_client_module
+from app.services.arxiv.client import ArxivClient
+from app.services.arxiv.errors import ArxivClientValidationError, ArxivRateLimitError
+from app.services.arxiv.rate_limit import ArxivCooldownStatus
 
 _CLIENT_FEED_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom"
@@ -160,7 +160,7 @@ async def test_client_logs_cache_hit_and_miss(
     def _capture_log(_msg: str, *args, **kwargs) -> None:
         logged.append({"event": _msg, **(kwargs.get("extra") or {})})
 
-    monkeypatch.setattr("app.services.domains.arxiv.client.logger.info", _capture_log)
+    monkeypatch.setattr("app.services.arxiv.client.logger.info", _capture_log)
     client = ArxivClient(request_fn=_request_fn, cache_enabled=True)
     await client.search(query="ti:test-cache")
     await client.search(query="ti:test-cache")
@@ -196,7 +196,7 @@ async def test_request_feed_skips_live_call_when_global_cooldown_is_active(
 
     monkeypatch.setattr(arxiv_client_module, "get_arxiv_cooldown_status", _cooldown_status)
     monkeypatch.setattr(arxiv_client_module, "run_with_global_arxiv_limit", _unexpected_limit_call)
-    monkeypatch.setattr("app.services.domains.arxiv.client.logger.warning", _capture_warning)
+    monkeypatch.setattr("app.services.arxiv.client.logger.warning", _capture_warning)
 
     with pytest.raises(ArxivRateLimitError):
         await arxiv_client_module._request_arxiv_feed(

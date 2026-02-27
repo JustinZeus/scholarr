@@ -26,7 +26,7 @@ from app.db.models import User
 from app.db.session import get_db_session
 from app.logging_utils import structured_log
 from app.security.csrf import ensure_csrf_token
-from app.services.domains.users import application as user_service
+from app.services.users import application as user_service
 
 logger = logging.getLogger(__name__)
 

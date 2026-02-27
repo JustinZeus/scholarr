@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.db.models import RunStatus
-from app.services.domains.scholar.parser import ParsedProfilePage, PublicationCandidate
-from app.services.domains.scholar.source import FetchResult
+from app.services.scholar.parser import ParsedProfilePage, PublicationCandidate
+from app.services.scholar.source import FetchResult
 
 
 @dataclass(frozen=True)

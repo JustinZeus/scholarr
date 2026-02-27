@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.api.runtime_deps import get_ingestion_service
 from app.db.models import CrawlRun, Publication, RunStatus, RunTriggerType
 from app.main import app
-from app.services.domains.ingestion.application import ScholarIngestionService
+from app.services.ingestion.application import ScholarIngestionService
 from tests.integration.helpers import insert_user, login_user
 
 
@@ -214,7 +214,7 @@ async def test_background_enrichment_preserves_canceled_status(
             return []
 
     monkeypatch.setattr(
-        "app.services.domains.openalex.client.OpenAlexClient",
+        "app.services.openalex.client.OpenAlexClient",
         _OpenAlexClientStub,
     )
 
@@ -339,7 +339,7 @@ async def test_partial_discovery_exception_keeps_new_pub_count_consistent(
     monkeypatch.setattr(service, "_resolve_publication", _resolve_publication_stub)
 
     from app.db.models import ScholarProfile
-    from app.services.domains.scholar.parser_types import PublicationCandidate
+    from app.services.scholar.parser_types import PublicationCandidate
 
     scholar = await db_session.get(ScholarProfile, scholar_profile_id)
     assert scholar is not None

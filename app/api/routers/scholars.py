@@ -25,12 +25,12 @@ from app.api.schemas import (
 from app.db.models import User
 from app.db.session import get_db_session
 from app.logging_utils import structured_log
-from app.services.domains.ingestion import queue as ingestion_queue_service
-from app.services.domains.portability import application as import_export_service
-from app.services.domains.scholar import rate_limit as scholar_rate_limit
-from app.services.domains.scholar.source import ScholarSource
-from app.services.domains.scholars import application as scholar_service
-from app.services.domains.scholars import search_hints as scholar_search_hints
+from app.services.ingestion import queue as ingestion_queue_service
+from app.services.portability import application as import_export_service
+from app.services.scholar import rate_limit as scholar_rate_limit
+from app.services.scholar.source import ScholarSource
+from app.services.scholars import application as scholar_service
+from app.services.scholars import search_hints as scholar_search_hints
 from app.settings import settings
 
 logger = logging.getLogger(__name__)

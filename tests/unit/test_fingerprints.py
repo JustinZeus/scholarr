@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from app.services.domains.ingestion.fingerprints import (
+from app.services.ingestion.fingerprints import (
     _dedupe_publication_candidates,
     canonical_title_for_dedup,
     fuzzy_titles_match,
     normalize_title,
 )
-from app.services.domains.scholar.parser import PublicationCandidate
+from app.services.scholar.parser import PublicationCandidate
 
 
 def _candidate(

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-from app.services.domains.scholars.constants import MAX_IMAGE_URL_LENGTH, SCHOLAR_ID_PATTERN
-from app.services.domains.scholars.exceptions import ScholarServiceError
+from app.services.scholars.constants import MAX_IMAGE_URL_LENGTH, SCHOLAR_ID_PATTERN
+from app.services.scholars.exceptions import ScholarServiceError
 
 
 def validate_scholar_id(value: str) -> str:

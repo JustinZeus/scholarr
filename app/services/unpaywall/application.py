@@ -7,17 +7,17 @@ from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 from app.logging_utils import structured_log
-from app.services.domains.crossref.application import discover_doi_for_publication
-from app.services.domains.doi.normalize import normalize_doi
-from app.services.domains.unpaywall.pdf_discovery import (
+from app.services.crossref.application import discover_doi_for_publication
+from app.services.doi.normalize import normalize_doi
+from app.services.unpaywall.pdf_discovery import (
     looks_like_pdf_url,
     resolve_pdf_from_landing_page,
 )
-from app.services.domains.unpaywall.rate_limit import wait_for_unpaywall_slot
+from app.services.unpaywall.rate_limit import wait_for_unpaywall_slot
 from app.settings import settings
 
 if TYPE_CHECKING:
-    from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
+    from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", re.I)
 DOI_PREFIX_RE = re.compile(r"\bdoi\s*[:=]\s*(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", re.I)

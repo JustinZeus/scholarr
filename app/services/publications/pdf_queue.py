@@ -18,13 +18,13 @@ from app.db.models import (
 )
 from app.db.session import get_session_factory
 from app.logging_utils import structured_log
-from app.services.domains.publication_identifiers import application as identifier_service
-from app.services.domains.publication_identifiers.types import DisplayIdentifier
-from app.services.domains.publications.pdf_resolution_pipeline import (
+from app.services.publication_identifiers import application as identifier_service
+from app.services.publication_identifiers.types import DisplayIdentifier
+from app.services.publications.pdf_resolution_pipeline import (
     resolve_publication_pdf_outcome_for_row,
 )
-from app.services.domains.publications.types import PublicationListItem
-from app.services.domains.unpaywall.application import (
+from app.services.publications.types import PublicationListItem
+from app.services.unpaywall.application import (
     FAILURE_RESOLUTION_EXCEPTION,
     OaResolutionOutcome,
 )
@@ -450,7 +450,7 @@ async def _resolve_publication_row(
     openalex_api_key: str | None = None,
     allow_arxiv_lookup: bool = True,
 ) -> bool:
-    from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
+    from app.services.openalex.client import OpenAlexBudgetExhaustedError
 
     await _mark_attempt_started(publication_id=row.publication_id, user_id=user_id)
     try:
@@ -493,8 +493,8 @@ async def _run_resolution_task(
     request_email: str | None,
     rows: list[PublicationListItem],
 ) -> None:
-    from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
-    from app.services.domains.settings import application as user_settings_service
+    from app.services.openalex.client import OpenAlexBudgetExhaustedError
+    from app.services.settings import application as user_settings_service
 
     # Resolve the best available API key: per-user setting → env var fallback.
     openalex_api_key: str | None = None

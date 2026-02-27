@@ -25,11 +25,11 @@ from app.api.schemas import (
 from app.db.models import RunStatus, RunTriggerType, User
 from app.db.session import get_db_session
 from app.logging_utils import structured_log
-from app.services.domains.ingestion import application as ingestion_service
-from app.services.domains.ingestion import safety as run_safety_service
-from app.services.domains.runs import application as run_service
-from app.services.domains.runs.events import event_generator
-from app.services.domains.settings import application as user_settings_service
+from app.services.ingestion import application as ingestion_service
+from app.services.ingestion import safety as run_safety_service
+from app.services.runs import application as run_service
+from app.services.runs.events import event_generator
+from app.services.settings import application as user_settings_service
 from app.settings import settings
 
 logger = logging.getLogger(__name__)

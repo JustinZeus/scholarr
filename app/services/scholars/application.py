@@ -15,15 +15,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import AuthorSearchCacheEntry, AuthorSearchRuntimeState, ScholarProfile
 from app.logging_utils import structured_log
-from app.services.domains.scholar.parser import (
+from app.services.scholar.parser import (
     ParsedAuthorSearchPage,
     ParseState,
     ScholarParserError,
     parse_author_search_page,
     parse_profile_page,
 )
-from app.services.domains.scholar.source import ScholarSource
-from app.services.domains.scholars.constants import (
+from app.services.scholar.source import ScholarSource
+from app.services.scholars.constants import (
     ALLOWED_IMAGE_UPLOAD_CONTENT_TYPES,
     AUTHOR_SEARCH_LOCK_KEY,
     AUTHOR_SEARCH_LOCK_NAMESPACE,
@@ -41,18 +41,18 @@ from app.services.domains.scholars.constants import (
     SEARCH_COOLDOWN_REASON,
     SEARCH_DISABLED_REASON,
 )
-from app.services.domains.scholars.exceptions import ScholarServiceError
-from app.services.domains.scholars.search_hints import (
+from app.services.scholars.exceptions import ScholarServiceError
+from app.services.scholars.search_hints import (
     _merge_warnings,
     _policy_blocked_author_search_result,
     _trim_author_search_result,
 )
-from app.services.domains.scholars.uploads import (
+from app.services.scholars.uploads import (
     _ensure_upload_root,
     _resolve_upload_path,
     _safe_remove_upload,
 )
-from app.services.domains.scholars.validators import (
+from app.services.scholars.validators import (
     normalize_display_name,
     normalize_profile_image_url,
     validate_scholar_id,
@@ -205,7 +205,7 @@ def _deserialize_parsed_author_search_page(payload: object) -> ParsedAuthorSearc
 
     marker_counts = _payload_marker_counts(payload)
     warnings = _payload_warnings(payload)
-    from app.services.domains.scholar.parser import ScholarSearchCandidate
+    from app.services.scholar.parser import ScholarSearchCandidate
 
     normalized_candidates = _deserialize_candidates(payload)
 

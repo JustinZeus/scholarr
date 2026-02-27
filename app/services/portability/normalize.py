@@ -3,14 +3,14 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-from app.services.domains.ingestion.application import normalize_title
-from app.services.domains.portability.constants import (
+from app.services.ingestion.application import normalize_title
+from app.services.portability.constants import (
     MAX_IMPORT_PUBLICATIONS,
     MAX_IMPORT_SCHOLARS,
     SHA256_RE,
     WORD_RE,
 )
-from app.services.domains.portability.types import ImportExportError
+from app.services.portability.types import ImportExportError
 
 
 def _normalize_optional_text(value: Any) -> str | None:

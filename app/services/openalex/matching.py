@@ -3,7 +3,7 @@ import re
 
 from rapidfuzz import fuzz
 
-from app.services.domains.openalex.types import OpenAlexWork
+from app.services.openalex.types import OpenAlexWork
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-from app.services.domains.openalex.types import OpenAlexWork
+from app.services.openalex.types import OpenAlexWork
 
 
 def test_parse_openalex_work_from_api_dict() -> None:

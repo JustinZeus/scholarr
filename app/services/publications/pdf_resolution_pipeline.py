@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.logging_utils import structured_log
-from app.services.domains.arxiv.errors import ArxivRateLimitError
-from app.services.domains.arxiv.guards import arxiv_skip_reason_for_item
-from app.services.domains.openalex.client import OpenAlexBudgetExhaustedError
-from app.services.domains.publications.types import PublicationListItem
-from app.services.domains.unpaywall.application import OaResolutionOutcome, resolve_publication_oa_outcomes
+from app.services.arxiv.errors import ArxivRateLimitError
+from app.services.arxiv.guards import arxiv_skip_reason_for_item
+from app.services.openalex.client import OpenAlexBudgetExhaustedError
+from app.services.publications.types import PublicationListItem
+from app.services.unpaywall.application import OaResolutionOutcome, resolve_publication_oa_outcomes
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -59,8 +59,8 @@ async def _openalex_outcome(
     request_email: str | None,
     openalex_api_key: str | None = None,
 ) -> OaResolutionOutcome | None:
-    from app.services.domains.openalex.client import OpenAlexClient
-    from app.services.domains.openalex.matching import find_best_match
+    from app.services.openalex.client import OpenAlexClient
+    from app.services.openalex.matching import find_best_match
 
     if not row.title:
         return None
@@ -105,7 +105,7 @@ async def _arxiv_outcome(
     request_email: str | None,
     allow_lookup: bool = True,
 ) -> OaResolutionOutcome | None:
-    from app.services.domains.arxiv.application import discover_arxiv_id_for_publication
+    from app.services.arxiv.application import discover_arxiv_id_for_publication
 
     if not allow_lookup:
         structured_log(

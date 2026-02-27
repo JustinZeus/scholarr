@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from app.services.domains.arxiv.errors import ArxivParseError
-from app.services.domains.arxiv.types import ArxivEntry, ArxivFeed, ArxivOpenSearchMeta
-from app.services.domains.publication_identifiers.normalize import normalize_arxiv_id
+from app.services.arxiv.errors import ArxivParseError
+from app.services.arxiv.types import ArxivEntry, ArxivFeed, ArxivOpenSearchMeta
+from app.services.publication_identifiers.normalize import normalize_arxiv_id
 
 _NAMESPACES = {
     "atom": "http://www.w3.org/2005/Atom",

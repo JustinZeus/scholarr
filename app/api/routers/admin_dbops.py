@@ -22,13 +22,13 @@ from app.api.schemas import (
 from app.db.models import DataRepairJob, User
 from app.db.session import get_db_session
 from app.logging_utils import structured_log
-from app.services.domains.dbops import (
+from app.services.dbops import (
     collect_integrity_report,
     list_repair_jobs,
     run_publication_link_repair,
     run_publication_near_duplicate_repair,
 )
-from app.services.domains.publications import application as publication_service
+from app.services.publications import application as publication_service
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-from app.services.domains.publication_identifiers.application import (
+from app.services.publication_identifiers.application import (
     DisplayIdentifier,
     derive_display_identifier_from_values,
     display_identifier_for_publication_id,

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.services.domains.arxiv.gateway import (
+from app.services.arxiv.gateway import (
     build_arxiv_query,
     get_arxiv_gateway,
 )
 
 if TYPE_CHECKING:
-    from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
+    from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 
 def _build_arxiv_query(title: str, author_surname: str | None) -> str | None:

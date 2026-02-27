@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app.services.domains.arxiv.guards import arxiv_skip_reason_for_item
-from app.services.domains.publication_identifiers.types import DisplayIdentifier
-from app.services.domains.publications.types import PublicationListItem
+from app.services.arxiv.guards import arxiv_skip_reason_for_item
+from app.services.publication_identifiers.types import DisplayIdentifier
+from app.services.publications.types import PublicationListItem
 
 
 def _item(

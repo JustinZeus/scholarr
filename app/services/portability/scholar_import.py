@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ScholarProfile
-from app.services.domains.portability.normalize import _normalize_optional_text
-from app.services.domains.scholars import application as scholar_service
+from app.services.portability.normalize import _normalize_optional_text
+from app.services.scholars import application as scholar_service
 
 
 async def _load_user_scholar_map(

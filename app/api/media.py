@@ -10,8 +10,8 @@ from app.api.deps import get_api_current_user
 from app.api.errors import ApiException
 from app.db.models import User
 from app.db.session import get_db_session
-from app.services.domains.scholars import application as scholar_service
-from app.services.domains.scholars import uploads as scholar_uploads
+from app.services.scholars import application as scholar_service
+from app.services.scholars import uploads as scholar_uploads
 from app.settings import settings
 
 router = APIRouter(tags=["media"])

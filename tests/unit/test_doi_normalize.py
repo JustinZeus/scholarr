@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.domains.doi.normalize import first_doi_from_texts, normalize_doi
+from app.services.doi.normalize import first_doi_from_texts, normalize_doi
 
 
 def test_normalize_doi_extracts_and_lowercases() -> None:

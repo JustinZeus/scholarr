@@ -20,11 +20,11 @@ from app.db.models import (
     ScholarPublication,
 )
 from app.logging_utils import structured_log
-from app.services.domains.arxiv.errors import ArxivRateLimitError
-from app.services.domains.doi.normalize import first_doi_from_texts
-from app.services.domains.ingestion import queue as queue_service
-from app.services.domains.ingestion import safety as run_safety_service
-from app.services.domains.ingestion.constants import (
+from app.services.arxiv.errors import ArxivRateLimitError
+from app.services.doi.normalize import first_doi_from_texts
+from app.services.ingestion import queue as queue_service
+from app.services.ingestion import safety as run_safety_service
+from app.services.ingestion.constants import (
     FAILED_STATES,
     FAILURE_BUCKET_BLOCKED,
     FAILURE_BUCKET_INGESTION,
@@ -35,7 +35,7 @@ from app.services.domains.ingestion.constants import (
     RESUMABLE_PARTIAL_REASONS,
     RUN_LOCK_NAMESPACE,
 )
-from app.services.domains.ingestion.fingerprints import (
+from app.services.ingestion.fingerprints import (
     _build_body_excerpt,
     _dedupe_publication_candidates,
     _next_cstart_value,
@@ -45,7 +45,7 @@ from app.services.domains.ingestion.fingerprints import (
     canonical_title_for_dedup,
     normalize_title,
 )
-from app.services.domains.ingestion.types import (
+from app.services.ingestion.types import (
     PagedLoopState,
     PagedParseResult,
     RunAlertSummary,
@@ -56,17 +56,17 @@ from app.services.domains.ingestion.types import (
     RunProgress,
     ScholarProcessingOutcome,
 )
-from app.services.domains.publication_identifiers import application as identifier_service
-from app.services.domains.runs.events import run_events
-from app.services.domains.scholar.parser import (
+from app.services.publication_identifiers import application as identifier_service
+from app.services.runs.events import run_events
+from app.services.scholar.parser import (
     ParsedProfilePage,
     ParseState,
     PublicationCandidate,
     ScholarParserError,
     parse_profile_page,
 )
-from app.services.domains.scholar.source import FetchResult, ScholarSource
-from app.services.domains.settings import application as user_settings_service
+from app.services.scholar.source import FetchResult, ScholarSource
+from app.services.settings import application as user_settings_service
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -2369,12 +2369,12 @@ class ScholarIngestionService:
         Stops immediately on budget exhaustion (429 with $0 remaining).
         Sleeps 60s and continues on transient rate limits.
         """
-        from app.services.domains.openalex.client import (
+        from app.services.openalex.client import (
             OpenAlexBudgetExhaustedError,
             OpenAlexClient,
             OpenAlexRateLimitError,
         )
-        from app.services.domains.openalex.matching import find_best_match
+        from app.services.openalex.matching import find_best_match
 
         run_result = await db_session.execute(select(CrawlRun.user_id).where(CrawlRun.id == run_id))
         user_id = run_result.scalar_one()
@@ -2480,7 +2480,7 @@ class ScholarIngestionService:
 
         await db_session.flush()
 
-        from app.services.domains.publications.dedup import sweep_identifier_duplicates
+        from app.services.publications.dedup import sweep_identifier_duplicates
 
         merge_count = await sweep_identifier_duplicates(db_session)
         if merge_count:
@@ -2579,8 +2579,8 @@ class ScholarIngestionService:
         if not publications:
             return publications
 
-        from app.services.domains.openalex.client import OpenAlexClient
-        from app.services.domains.openalex.matching import find_best_match
+        from app.services.openalex.client import OpenAlexClient
+        from app.services.openalex.matching import find_best_match
 
         client = OpenAlexClient(api_key=settings.openalex_api_key, mailto=settings.crossref_api_mailto)
 

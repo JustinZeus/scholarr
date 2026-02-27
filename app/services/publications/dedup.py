@@ -11,7 +11,7 @@ from sqlalchemy.orm import aliased
 
 from app.db.models import Publication, PublicationIdentifier, ScholarPublication
 from app.logging_utils import structured_log
-from app.services.domains.ingestion.fingerprints import (
+from app.services.ingestion.fingerprints import (
     canonical_title_text_for_dedup,
     canonical_title_tokens_for_dedup,
     normalize_title,

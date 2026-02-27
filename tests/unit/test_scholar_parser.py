@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from app.services.domains.scholar.parser import (
+from app.services.scholar.parser import (
     ParseState,
     ScholarDomInvariantError,
     parse_author_search_page,
     parse_profile_page,
 )
-from app.services.domains.scholar.source import FetchResult
+from app.services.scholar.source import FetchResult
 
 
 def _fixture(name: str) -> str:

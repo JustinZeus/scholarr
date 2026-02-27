@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.domains.crossref import application as crossref_app
+from app.services.crossref import application as crossref_app
 
 
 def _item(*, title: str, year: int | None, scholar_label: str = "Shinya Yamanaka"):

@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.domains.arxiv import application as arxiv_application
-from app.services.domains.arxiv import gateway as arxiv_gateway
-from app.services.domains.arxiv.types import ArxivEntry, ArxivFeed, ArxivOpenSearchMeta
+from app.services.arxiv import application as arxiv_application
+from app.services.arxiv import gateway as arxiv_gateway
+from app.services.arxiv.types import ArxivEntry, ArxivFeed, ArxivOpenSearchMeta
 from app.settings import settings
 
 

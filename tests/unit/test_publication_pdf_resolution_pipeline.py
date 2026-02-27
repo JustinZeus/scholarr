@@ -5,10 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.domains.arxiv.errors import ArxivRateLimitError
-from app.services.domains.publication_identifiers.types import DisplayIdentifier
-from app.services.domains.publications import pdf_resolution_pipeline as pipeline
-from app.services.domains.unpaywall.application import OaResolutionOutcome
+from app.services.arxiv.errors import ArxivRateLimitError
+from app.services.publication_identifiers.types import DisplayIdentifier
+from app.services.publications import pdf_resolution_pipeline as pipeline
+from app.services.unpaywall.application import OaResolutionOutcome
 
 
 def _row(*, display_identifier: DisplayIdentifier | None = None) -> SimpleNamespace:
@@ -165,7 +165,7 @@ async def test_arxiv_outcome_skips_when_strong_doi_identifier(
         raise AssertionError("arXiv lookup should be skipped when DOI evidence is strong.")
 
     monkeypatch.setattr(
-        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        "app.services.arxiv.application.discover_arxiv_id_for_publication",
         _fail_discover,
     )
     outcome = await pipeline._arxiv_outcome(row, request_email="user@example.com")
@@ -183,7 +183,7 @@ async def test_arxiv_outcome_skips_when_title_quality_is_low(
         raise AssertionError("arXiv lookup should be skipped for low-quality titles.")
 
     monkeypatch.setattr(
-        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        "app.services.arxiv.application.discover_arxiv_id_for_publication",
         _fail_discover,
     )
     outcome = await pipeline._arxiv_outcome(row, request_email="user@example.com")
@@ -198,7 +198,7 @@ async def test_arxiv_outcome_calls_arxiv_when_eligible(
         return "1234.5678"
 
     monkeypatch.setattr(
-        "app.services.domains.arxiv.application.discover_arxiv_id_for_publication",
+        "app.services.arxiv.application.discover_arxiv_id_for_publication",
         _fake_discover,
     )
     row = _row()

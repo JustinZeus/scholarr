@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.services.domains.publication_identifiers.types import DisplayIdentifier
+from app.services.publication_identifiers.types import DisplayIdentifier
 
 
 @dataclass(frozen=True)

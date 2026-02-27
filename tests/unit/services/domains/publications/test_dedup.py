@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.db.models import ScholarPublication
-from app.services.domains.publications import dedup as dedup_service
-from app.services.domains.publications.dedup import (
+from app.services.publications import dedup as dedup_service
+from app.services.publications.dedup import (
     NearDuplicateCluster,
     NearDuplicateMember,
     find_identifier_duplicate_pairs,
@@ -87,15 +87,15 @@ async def test_merge_duplicate_publication_migrates_links_and_identifiers() -> N
 
     with (
         patch(
-            "app.services.domains.publications.dedup._load_publication",
+            "app.services.publications.dedup._load_publication",
             new=AsyncMock(side_effect=[winner, dup]),
         ),
         patch(
-            "app.services.domains.publications.dedup._migrate_scholar_links",
+            "app.services.publications.dedup._migrate_scholar_links",
             new=AsyncMock(),
         ) as mock_links,
         patch(
-            "app.services.domains.publications.dedup._migrate_identifiers",
+            "app.services.publications.dedup._migrate_identifiers",
             new=AsyncMock(),
         ) as mock_identifiers,
     ):
@@ -112,7 +112,7 @@ async def test_merge_duplicate_publication_rejects_missing_publications() -> Non
 
     with (
         patch(
-            "app.services.domains.publications.dedup._load_publication",
+            "app.services.publications.dedup._load_publication",
             new=AsyncMock(side_effect=[None, None]),
         ),
         pytest.raises(ValueError),
@@ -160,7 +160,7 @@ async def test_migrate_scholar_links_drops_conflicts() -> None:
 @pytest.mark.asyncio
 async def test_sweep_returns_zero_when_no_pairs() -> None:
     with patch(
-        "app.services.domains.publications.dedup.find_identifier_duplicate_pairs",
+        "app.services.publications.dedup.find_identifier_duplicate_pairs",
         new=AsyncMock(return_value=[]),
     ):
         session = AsyncMock()
@@ -174,11 +174,11 @@ async def test_sweep_returns_zero_when_no_pairs() -> None:
 async def test_sweep_returns_merge_count() -> None:
     with (
         patch(
-            "app.services.domains.publications.dedup.find_identifier_duplicate_pairs",
+            "app.services.publications.dedup.find_identifier_duplicate_pairs",
             new=AsyncMock(return_value=[(1, 2), (3, 4)]),
         ),
         patch(
-            "app.services.domains.publications.dedup.merge_duplicate_publication",
+            "app.services.publications.dedup.merge_duplicate_publication",
             new=AsyncMock(),
         ) as mock_merge,
     ):
@@ -194,11 +194,11 @@ async def test_sweep_returns_merge_count() -> None:
 async def test_sweep_merges_each_dup_only_once() -> None:
     with (
         patch(
-            "app.services.domains.publications.dedup.find_identifier_duplicate_pairs",
+            "app.services.publications.dedup.find_identifier_duplicate_pairs",
             new=AsyncMock(return_value=[(1, 2), (1, 2)]),
         ),
         patch(
-            "app.services.domains.publications.dedup.merge_duplicate_publication",
+            "app.services.publications.dedup.merge_duplicate_publication",
             new=AsyncMock(),
         ) as mock_merge,
     ):
@@ -227,7 +227,7 @@ async def test_find_near_duplicate_clusters_groups_similar_titles() -> None:
     assert second is not None
 
     with patch(
-        "app.services.domains.publications.dedup._load_near_duplicate_candidates",
+        "app.services.publications.dedup._load_near_duplicate_candidates",
         new=AsyncMock(return_value=[first, second]),
     ):
         clusters = await find_near_duplicate_clusters(AsyncMock())
@@ -255,7 +255,7 @@ async def test_find_near_duplicate_clusters_skips_unrelated_titles() -> None:
     assert second is not None
 
     with patch(
-        "app.services.domains.publications.dedup._load_near_duplicate_candidates",
+        "app.services.publications.dedup._load_near_duplicate_candidates",
         new=AsyncMock(return_value=[first, second]),
     ):
         clusters = await find_near_duplicate_clusters(AsyncMock())
@@ -277,7 +277,7 @@ async def test_merge_near_duplicate_cluster_merges_non_winner_members() -> None:
     )
 
     with patch(
-        "app.services.domains.publications.dedup.merge_duplicate_publication",
+        "app.services.publications.dedup.merge_duplicate_publication",
         new=AsyncMock(),
     ) as mock_merge:
         merged = await merge_near_duplicate_cluster(AsyncMock(), cluster=cluster)

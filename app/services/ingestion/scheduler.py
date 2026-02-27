@@ -18,14 +18,14 @@ from app.db.models import (
 )
 from app.db.session import get_session_factory
 from app.logging_utils import structured_log
-from app.services.domains.ingestion import queue as queue_service
-from app.services.domains.ingestion.application import (
+from app.services.ingestion import queue as queue_service
+from app.services.ingestion.application import (
     RunAlreadyInProgressError,
     RunBlockedBySafetyPolicyError,
     ScholarIngestionService,
 )
-from app.services.domains.scholar.source import LiveScholarSource
-from app.services.domains.settings import application as user_settings_service
+from app.services.scholar.source import LiveScholarSource
+from app.services.settings import application as user_settings_service
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -589,7 +589,7 @@ class SchedulerService:
         await self._finalize_queue_job_after_run(job, run_summary)
 
     async def _drain_pdf_queue(self) -> None:
-        from app.services.domains.publications.pdf_queue import drain_ready_jobs
+        from app.services.publications.pdf_queue import drain_ready_jobs
 
         session_factory = get_session_factory()
         async with session_factory() as session:

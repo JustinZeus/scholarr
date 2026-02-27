@@ -5,9 +5,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.services.domains.publication_identifiers.types import DisplayIdentifier
-from app.services.domains.publications.types import PublicationListItem
-from app.services.domains.unpaywall import application as unpaywall_app
+from app.services.publication_identifiers.types import DisplayIdentifier
+from app.services.publications.types import PublicationListItem
+from app.services.unpaywall import application as unpaywall_app
 
 
 class _DummyAsyncClient:

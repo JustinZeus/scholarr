@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import DataRepairJob
-from app.services.domains.publications import dedup as dedup_service
+from app.services.publications import dedup as dedup_service
 
 REPAIR_STATUS_PLANNED = "planned"
 REPAIR_STATUS_RUNNING = "running"

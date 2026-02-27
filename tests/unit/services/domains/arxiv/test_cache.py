@@ -9,13 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ArxivQueryCacheEntry
-from app.services.domains.arxiv.cache import (
+from app.services.arxiv.cache import (
     build_query_fingerprint,
     get_cached_feed,
     run_with_inflight_dedupe,
     set_cached_feed,
 )
-from app.services.domains.arxiv.types import ArxivEntry, ArxivFeed, ArxivOpenSearchMeta
+from app.services.arxiv.types import ArxivEntry, ArxivFeed, ArxivOpenSearchMeta
 
 
 def _sample_feed(arxiv_id: str = "1234.5678") -> ArxivFeed:

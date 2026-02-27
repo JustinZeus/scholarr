@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.services.domains.scholars.exceptions import ScholarServiceError
+from app.services.scholars.exceptions import ScholarServiceError
 
 
 def _ensure_upload_root(upload_dir: str, *, create: bool) -> Path:

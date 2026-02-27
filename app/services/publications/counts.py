@@ -6,13 +6,13 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication, ScholarProfile, ScholarPublication
-from app.services.domains.publications.modes import (
+from app.services.publications.modes import (
     MODE_ALL,
     MODE_LATEST,
     MODE_UNREAD,
     resolve_publication_view_mode,
 )
-from app.services.domains.publications.queries import get_latest_run_id_for_user
+from app.services.publications.queries import get_latest_run_id_for_user
 
 
 async def count_for_user(

@@ -6,13 +6,13 @@ import unicodedata
 from typing import TYPE_CHECKING, Protocol
 
 from app.logging_utils import structured_log
-from app.services.domains.arxiv.client import ArxivClient
-from app.services.domains.arxiv.errors import ArxivRateLimitError
-from app.services.domains.arxiv.types import ArxivFeed
+from app.services.arxiv.client import ArxivClient
+from app.services.arxiv.errors import ArxivRateLimitError
+from app.services.arxiv.types import ArxivFeed
 from app.settings import settings
 
 if TYPE_CHECKING:
-    from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
+    from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 logger = logging.getLogger(__name__)
 

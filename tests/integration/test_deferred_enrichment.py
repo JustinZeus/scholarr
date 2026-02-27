@@ -8,8 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import CrawlRun, Publication, RunStatus, RunTriggerType, ScholarProfile, ScholarPublication
-from app.services.domains.ingestion.application import ScholarIngestionService
-from app.services.domains.openalex.types import OpenAlexWork
+from app.services.ingestion.application import ScholarIngestionService
+from app.services.openalex.types import OpenAlexWork
 from tests.integration.helpers import insert_user
 
 
@@ -84,9 +84,9 @@ async def test_deferred_enrichment_sweeps_previous_runs(db_session: AsyncSession
 
     # We patch the client at its source, and also mock arXiv to avoid real HTTP calls
     with (
-        patch("app.services.domains.openalex.client.OpenAlexClient") as MockClient,
+        patch("app.services.openalex.client.OpenAlexClient") as MockClient,
         patch(
-            "app.services.domains.arxiv.application.discover_arxiv_id_for_publication", new=AsyncMock(return_value=None)
+            "app.services.arxiv.application.discover_arxiv_id_for_publication", new=AsyncMock(return_value=None)
         ),
     ):
         mock_instance = MockClient.return_value

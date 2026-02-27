@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from html import unescape
 
-from app.services.domains.scholar.parser_constants import TAG_RE
+from app.services.scholar.parser_constants import TAG_RE
 
 
 def normalize_space(value: str) -> str:

@@ -4,9 +4,9 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import IngestionQueueItem
-from app.services.domains.ingestion import queue as queue_mutations
-from app.services.domains.runs.queue_queries import queue_item_select, queue_list_item_from_row
-from app.services.domains.runs.types import (
+from app.services.ingestion import queue as queue_mutations
+from app.services.runs.queue_queries import queue_item_select, queue_list_item_from_row
+from app.services.runs.types import (
     QUEUE_STATUS_DROPPED,
     QUEUE_STATUS_QUEUED,
     QUEUE_STATUS_RETRYING,

@@ -5,12 +5,12 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging_utils import structured_log
-from app.services.domains.publications.pdf_queue import (
+from app.services.publications.pdf_queue import (
     enqueue_missing_pdf_jobs,
     enqueue_retry_pdf_job,
     overlay_pdf_job_state,
 )
-from app.services.domains.publications.types import PublicationListItem
+from app.services.publications.types import PublicationListItem
 
 logger = logging.getLogger(__name__)
 

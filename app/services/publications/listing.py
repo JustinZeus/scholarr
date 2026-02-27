@@ -4,20 +4,20 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.domains.publication_identifiers import application as identifier_service
-from app.services.domains.publications.modes import (
+from app.services.publication_identifiers import application as identifier_service
+from app.services.publications.modes import (
     MODE_ALL,
     MODE_UNREAD,
     resolve_publication_view_mode,
 )
-from app.services.domains.publications.queries import (
+from app.services.publications.queries import (
     get_latest_run_id_for_user,
     get_publication_item_for_user,
     publication_list_item_from_row,
     publications_query,
     unread_item_from_row,
 )
-from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
+from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 
 async def list_for_user(

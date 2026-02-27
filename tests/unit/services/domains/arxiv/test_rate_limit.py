@@ -9,9 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ArxivRuntimeState
-from app.services.domains.arxiv.constants import ARXIV_RUNTIME_STATE_KEY
-from app.services.domains.arxiv.errors import ArxivRateLimitError
-from app.services.domains.arxiv.rate_limit import get_arxiv_cooldown_status, run_with_global_arxiv_limit
+from app.services.arxiv.constants import ARXIV_RUNTIME_STATE_KEY
+from app.services.arxiv.errors import ArxivRateLimitError
+from app.services.arxiv.rate_limit import get_arxiv_cooldown_status, run_with_global_arxiv_limit
 from app.settings import settings
 
 
@@ -98,7 +98,7 @@ async def test_arxiv_rate_limit_logs_request_scheduled_and_completed(
     def _capture_log(_msg: str, *args, **kwargs) -> None:
         logged.append({"event": _msg, **(kwargs.get("extra") or {})})
 
-    monkeypatch.setattr("app.services.domains.arxiv.rate_limit.logger.info", _capture_log)
+    monkeypatch.setattr("app.services.arxiv.rate_limit.logger.info", _capture_log)
     await run_with_global_arxiv_limit(fetch=_fetch, source_path="search")
 
     scheduled = [entry for entry in logged if entry.get("event") == "arxiv.request_scheduled"]
@@ -128,7 +128,7 @@ async def test_arxiv_rate_limit_logs_cooldown_activation(
         def _capture_warning(_msg: str, *args, **kwargs) -> None:
             logged_warning.append({"event": _msg, **(kwargs.get("extra") or {})})
 
-        monkeypatch.setattr("app.services.domains.arxiv.rate_limit.logger.warning", _capture_warning)
+        monkeypatch.setattr("app.services.arxiv.rate_limit.logger.warning", _capture_warning)
         with pytest.raises(ArxivRateLimitError):
             await run_with_global_arxiv_limit(fetch=_fetch, source_path="lookup_ids")
     finally:

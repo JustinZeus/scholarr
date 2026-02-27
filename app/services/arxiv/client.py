@@ -6,21 +6,21 @@ from collections.abc import Awaitable, Callable
 import httpx
 
 from app.logging_utils import structured_log
-from app.services.domains.arxiv.cache import (
+from app.services.arxiv.cache import (
     build_query_fingerprint,
     get_cached_feed,
     run_with_inflight_dedupe,
     set_cached_feed,
 )
-from app.services.domains.arxiv.constants import (
+from app.services.arxiv.constants import (
     ARXIV_SOURCE_PATH_LOOKUP_IDS,
     ARXIV_SOURCE_PATH_SEARCH,
     ARXIV_SOURCE_PATH_UNKNOWN,
 )
-from app.services.domains.arxiv.errors import ArxivClientValidationError, ArxivRateLimitError
-from app.services.domains.arxiv.parser import parse_arxiv_feed
-from app.services.domains.arxiv.rate_limit import get_arxiv_cooldown_status, run_with_global_arxiv_limit
-from app.services.domains.arxiv.types import ArxivFeed
+from app.services.arxiv.errors import ArxivClientValidationError, ArxivRateLimitError
+from app.services.arxiv.parser import parse_arxiv_feed
+from app.services.arxiv.rate_limit import get_arxiv_cooldown_status, run_with_global_arxiv_limit
+from app.services.arxiv.types import ArxivFeed
 from app.settings import settings
 
 _ARXIV_API_URL = "https://export.arxiv.org/api/query"

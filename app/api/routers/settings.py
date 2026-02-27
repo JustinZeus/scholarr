@@ -12,8 +12,8 @@ from app.api.schemas import SettingsEnvelope, SettingsUpdateRequest
 from app.db.models import User
 from app.db.session import get_db_session
 from app.logging_utils import structured_log
-from app.services.domains.ingestion import safety as run_safety_service
-from app.services.domains.settings import application as user_settings_service
+from app.services.ingestion import safety as run_safety_service
+from app.services.settings import application as user_settings_service
 from app.settings import settings as settings_module
 
 logger = logging.getLogger(__name__)

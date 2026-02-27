@@ -12,8 +12,8 @@ from sqlalchemy import delete, func, select
 
 from app.db.models import ArxivQueryCacheEntry
 from app.db.session import get_session_factory
-from app.services.domains.arxiv.constants import ARXIV_CACHE_FINGERPRINT_VERSION
-from app.services.domains.arxiv.types import ArxivEntry, ArxivFeed, ArxivOpenSearchMeta
+from app.services.arxiv.constants import ARXIV_CACHE_FINGERPRINT_VERSION
+from app.services.arxiv.types import ArxivEntry, ArxivFeed, ArxivOpenSearchMeta
 
 _INFLIGHT_LOCK = asyncio.Lock()
 _INFLIGHT_FEEDS: dict[str, asyncio.Future[ArxivFeed]] = {}

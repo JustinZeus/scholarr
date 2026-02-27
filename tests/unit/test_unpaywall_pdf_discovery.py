@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.domains.unpaywall import pdf_discovery
+from app.services.unpaywall import pdf_discovery
 
 
 def test_looks_like_pdf_url_detects_path_and_query_variants() -> None:

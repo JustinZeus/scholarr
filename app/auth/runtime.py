@@ -9,7 +9,7 @@ from app.auth.session import clear_session_user, get_session_user, set_session_u
 from app.db.models import User
 from app.logging_utils import structured_log
 from app.security.csrf import CSRF_SESSION_KEY
-from app.services.domains.users import application as user_service
+from app.services.users import application as user_service
 
 logger = logging.getLogger(__name__)
 

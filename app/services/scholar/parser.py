@@ -1,30 +1,30 @@
 from __future__ import annotations
 
-from app.services.domains.scholar.author_rows import (
+from app.services.scholar.author_rows import (
     ScholarAuthorSearchParser,
     count_author_search_markers,
 )
-from app.services.domains.scholar.parser_constants import SCRIPT_STYLE_RE
-from app.services.domains.scholar.parser_types import (
+from app.services.scholar.parser_constants import SCRIPT_STYLE_RE
+from app.services.scholar.parser_types import (
     ParsedAuthorSearchPage,
     ParsedProfilePage,
     PublicationCandidate,
     ScholarDomInvariantError,
     ScholarMalformedDataError,
 )
-from app.services.domains.scholar.parser_types import (
+from app.services.scholar.parser_types import (
     ParseState as ParseState,
 )
-from app.services.domains.scholar.parser_types import (
+from app.services.scholar.parser_types import (
     ScholarParserError as ScholarParserError,
 )
-from app.services.domains.scholar.parser_types import (
+from app.services.scholar.parser_types import (
     ScholarSearchCandidate as ScholarSearchCandidate,
 )
-from app.services.domains.scholar.parser_utils import (
+from app.services.scholar.parser_utils import (
     strip_tags,
 )
-from app.services.domains.scholar.profile_rows import (
+from app.services.scholar.profile_rows import (
     count_markers,
     extract_articles_range,
     extract_profile_image_url,
@@ -33,8 +33,8 @@ from app.services.domains.scholar.profile_rows import (
     has_show_more_button,
     parse_publications,
 )
-from app.services.domains.scholar.source import FetchResult
-from app.services.domains.scholar.state_detection import (
+from app.services.scholar.source import FetchResult
+from app.services.scholar.state_detection import (
     detect_author_search_state,
     detect_state,
 )

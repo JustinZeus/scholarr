@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import Depends
 
-from app.services.domains.ingestion import application as ingestion_service
-from app.services.domains.scholar import source as scholar_source_service
+from app.services.ingestion import application as ingestion_service
+from app.services.scholar import source as scholar_source_service
 
 
 def get_scholar_source() -> scholar_source_service.ScholarSource:

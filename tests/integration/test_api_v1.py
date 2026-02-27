@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.runtime_deps import get_scholar_source
 from app.main import app
-from app.services.domains.publications.types import PublicationListItem
-from app.services.domains.scholar.source import FetchResult
-from app.services.domains.settings import application as user_settings_service
+from app.services.publications.types import PublicationListItem
+from app.services.scholar.source import FetchResult
+from app.services.settings import application as user_settings_service
 from app.settings import settings
 from tests.integration.helpers import insert_user, login_user
 
@@ -473,7 +473,7 @@ async def test_api_admin_dbops_pdf_queue_requeue_endpoint(
         fingerprint=f"{(target_user_id + 73):064x}",
     )
     monkeypatch.setattr(
-        "app.services.domains.publications.pdf_queue._schedule_rows",
+        "app.services.publications.pdf_queue._schedule_rows",
         lambda **_kwargs: None,
     )
     client = TestClient(app)
@@ -517,7 +517,7 @@ async def test_api_admin_dbops_pdf_queue_requeue_all_endpoint(
         fingerprint=f"{(target_user_id + 83):064x}",
     )
     monkeypatch.setattr(
-        "app.services.domains.publications.pdf_queue._schedule_rows",
+        "app.services.publications.pdf_queue._schedule_rows",
         lambda **_kwargs: None,
     )
     client = TestClient(app)
@@ -1290,12 +1290,16 @@ async def test_api_settings_get_and_update(db_session: AsyncSession) -> None:
     _assert_safety_state_contract(settings_payload["safety_state"])
     assert settings_payload["safety_state"]["cooldown_active"] is False
 
+    policy = settings_payload["policy"]
+    run_interval_minutes = max(45, int(policy["min_run_interval_minutes"]))
+    request_delay_seconds = max(6, int(policy["min_request_delay_seconds"]))
+
     update_response = client.put(
         "/api/v1/settings",
         json={
             "auto_run_enabled": True,
-            "run_interval_minutes": 45,
-            "request_delay_seconds": 6,
+            "run_interval_minutes": run_interval_minutes,
+            "request_delay_seconds": request_delay_seconds,
             "nav_visible_pages": ["dashboard", "scholars", "publications", "settings", "runs"],
         },
         headers=headers,
@@ -1303,8 +1307,8 @@ async def test_api_settings_get_and_update(db_session: AsyncSession) -> None:
     assert update_response.status_code == 200
     updated = update_response.json()["data"]
     assert updated["auto_run_enabled"] is True
-    assert updated["run_interval_minutes"] == 45
-    assert updated["request_delay_seconds"] == 6
+    assert updated["run_interval_minutes"] == run_interval_minutes
+    assert updated["request_delay_seconds"] == request_delay_seconds
     assert updated["nav_visible_pages"] == [
         "dashboard",
         "scholars",
@@ -2404,7 +2408,7 @@ async def test_api_publications_list_schedules_background_enrichment(
         return 1
 
     monkeypatch.setattr(
-        "app.services.domains.publications.application.schedule_missing_pdf_enrichment_for_user",
+        "app.services.publications.application.schedule_missing_pdf_enrichment_for_user",
         _fake_schedule,
     )
 
@@ -2484,7 +2488,7 @@ async def test_api_publication_retry_pdf_queues_resolution_job(
         return True
 
     monkeypatch.setattr(
-        "app.services.domains.publications.application.schedule_retry_pdf_enrichment_for_row",
+        "app.services.publications.application.schedule_retry_pdf_enrichment_for_row",
         _fake_retry_scheduler,
     )
 
@@ -2514,7 +2518,7 @@ async def test_api_publication_retry_pdf_queues_resolution_job(
         ]
 
     monkeypatch.setattr(
-        "app.services.domains.publications.application.hydrate_pdf_enrichment_state",
+        "app.services.publications.application.hydrate_pdf_enrichment_state",
         _fake_hydrate,
     )
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from app.services.domains.scholar.parser import ParseState
+from app.services.scholar.parser import ParseState
 
 TITLE_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 WORD_RE = re.compile(r"[a-z0-9]+")

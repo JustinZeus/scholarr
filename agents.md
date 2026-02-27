@@ -35,7 +35,7 @@ These limits prevent IP bans and are not to be optimized away.
 
 ## 5. Domain Service Boundaries
 
-- **Strict Modularity:** Flat files in the `app/services/` root are strictly prohibited. All business logic and routing must reside exclusively within `app/services/domains/`.
+- **Strict Modularity:** Flat files in the `app/services/` root are strictly prohibited. All business logic and routing must reside exclusively within `app/services/<domain>/`.
 
 ## 6. UI rules
 

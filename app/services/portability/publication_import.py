@@ -6,15 +6,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication, ScholarProfile, ScholarPublication
-from app.services.domains.doi.normalize import normalize_doi
-from app.services.domains.ingestion.application import build_publication_url, normalize_title
-from app.services.domains.portability.normalize import (
+from app.services.doi.normalize import normalize_doi
+from app.services.ingestion.application import build_publication_url, normalize_title
+from app.services.portability.normalize import (
     _normalize_citation_count,
     _normalize_optional_text,
     _normalize_optional_year,
     _resolve_fingerprint,
 )
-from app.services.domains.portability.types import ImportedPublicationInput
+from app.services.portability.types import ImportedPublicationInput
 
 
 async def _find_publication_by_cluster(

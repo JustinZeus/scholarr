@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 
 from app.db.models import PublicationPdfJob
-from app.services.domains.publications import pdf_queue
-from app.services.domains.publications.pdf_resolution_pipeline import PipelineOutcome
-from app.services.domains.unpaywall.application import OaResolutionOutcome
+from app.services.publications import pdf_queue
+from app.services.publications.pdf_resolution_pipeline import PipelineOutcome
+from app.services.unpaywall.application import OaResolutionOutcome
 
 
 def _job(

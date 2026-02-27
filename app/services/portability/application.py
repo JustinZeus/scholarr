@@ -5,20 +5,20 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication
-from app.services.domains.portability.constants import (
+from app.services.portability.constants import (
     EXPORT_SCHEMA_VERSION,
     MAX_IMPORT_PUBLICATIONS,
     MAX_IMPORT_SCHOLARS,
 )
-from app.services.domains.portability.exporting import export_user_data
-from app.services.domains.portability.normalize import _validate_import_sizes
-from app.services.domains.portability.publication_import import (
+from app.services.portability.exporting import export_user_data
+from app.services.portability.normalize import _validate_import_sizes
+from app.services.portability.publication_import import (
     _build_imported_publication_input,
     _initialize_import_counters,
     _upsert_imported_publication,
 )
-from app.services.domains.portability.scholar_import import _upsert_imported_scholars
-from app.services.domains.portability.types import ImportedPublicationInput, ImportExportError
+from app.services.portability.scholar_import import _upsert_imported_scholars
+from app.services.portability.types import ImportedPublicationInput, ImportExportError
 
 
 async def import_user_data(

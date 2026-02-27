@@ -7,22 +7,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication, PublicationIdentifier
-from app.services.domains.arxiv.guards import arxiv_skip_reason_for_item
-from app.services.domains.doi.normalize import normalize_doi
-from app.services.domains.publication_identifiers.normalize import (
+from app.services.arxiv.guards import arxiv_skip_reason_for_item
+from app.services.doi.normalize import normalize_doi
+from app.services.publication_identifiers.normalize import (
     normalize_arxiv_id,
     normalize_pmcid,
     normalize_pmid,
 )
-from app.services.domains.publication_identifiers.types import (
+from app.services.publication_identifiers.types import (
     DisplayIdentifier,
     IdentifierCandidate,
     IdentifierKind,
 )
 
 if TYPE_CHECKING:
-    from app.services.domains.publications.pdf_queue import PdfQueueListItem
-    from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
+    from app.services.publications.pdf_queue import PdfQueueListItem
+    from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 CONFIDENCE_HIGH = 0.98
 CONFIDENCE_MEDIUM = 0.9
@@ -163,7 +163,7 @@ def _identifier_lookup_item(
     publication: Publication,
     scholar_label: str,
 ) -> UnreadPublicationItem:
-    from app.services.domains.publications.types import UnreadPublicationItem
+    from app.services.publications.types import UnreadPublicationItem
 
     return UnreadPublicationItem(
         publication_id=int(publication.id),
@@ -184,7 +184,7 @@ async def _discover_crossref_doi(
     publication_id: int,
     item: UnreadPublicationItem,
 ) -> bool:
-    from app.services.domains.crossref import application as crossref_service
+    from app.services.crossref import application as crossref_service
 
     discovered_doi = await crossref_service.discover_doi_for_publication(item=item)
     normalized_doi = normalize_doi(discovered_doi)
@@ -212,7 +212,7 @@ async def _discover_arxiv_identifier(
     publication_id: int,
     item: UnreadPublicationItem,
 ) -> None:
-    from app.services.domains.arxiv import application as arxiv_service
+    from app.services.arxiv import application as arxiv_service
 
     discovered_arxiv = await arxiv_service.discover_arxiv_id_for_publication(item=item)
     normalized_arxiv = normalize_arxiv_id(discovered_arxiv)

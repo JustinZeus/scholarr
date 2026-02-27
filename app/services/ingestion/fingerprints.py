@@ -7,14 +7,14 @@ import unicodedata
 from typing import Any
 from urllib.parse import urljoin
 
-from app.services.domains.ingestion.constants import (
+from app.services.ingestion.constants import (
     HTML_TAG_RE,
     INITIAL_PAGE_FINGERPRINT_MAX_PUBLICATIONS,
     SPACE_RE,
     TITLE_ALNUM_RE,
     WORD_RE,
 )
-from app.services.domains.scholar.parser import ParsedProfilePage, ParseState, PublicationCandidate
+from app.services.scholar.parser import ParsedProfilePage, ParseState, PublicationCandidate
 
 # Scholar-specific noise patterns stripped before canonical comparison.
 # Applied in order; each targets a different Scholar metadata injection style.

@@ -5,9 +5,9 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from app.services.domains.scholar.parser_constants import AUTHOR_SEARCH_MARKER_KEYS
-from app.services.domains.scholar.parser_types import ScholarSearchCandidate
-from app.services.domains.scholar.parser_utils import (
+from app.services.scholar.parser_constants import AUTHOR_SEARCH_MARKER_KEYS
+from app.services.scholar.parser_types import ScholarSearchCandidate
+from app.services.scholar.parser_utils import (
     attr_class,
     attr_href,
     attr_src,

@@ -1,7 +1,7 @@
 import pytest
 
-from app.services.domains.scholar import rate_limit as scholar_rate_limit
-from app.services.domains.scholar.source import FetchResult, LiveScholarSource, _build_profile_url
+from app.services.scholar import rate_limit as scholar_rate_limit
+from app.services.scholar.source import FetchResult, LiveScholarSource, _build_profile_url
 
 
 def test_build_profile_url_includes_pagesize_for_initial_page() -> None:

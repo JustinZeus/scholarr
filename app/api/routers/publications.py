@@ -23,9 +23,9 @@ from app.api.schemas import (
 from app.db.models import User
 from app.db.session import get_db_session
 from app.logging_utils import structured_log
-from app.services.domains.publication_identifiers import application as identifier_service
-from app.services.domains.publications import application as publication_service
-from app.services.domains.scholars import application as scholar_service
+from app.services.publication_identifiers import application as identifier_service
+from app.services.publications import application as publication_service
+from app.services.scholars import application as scholar_service
 from app.settings import settings
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
-from app.services.domains.unpaywall.rate_limit import wait_for_unpaywall_slot
+from app.services.unpaywall.rate_limit import wait_for_unpaywall_slot
 from app.settings import settings
 
 PDF_MIME = "application/pdf"

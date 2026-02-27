@@ -5,12 +5,12 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from app.services.domains.scholar.parser_constants import (
+from app.services.scholar.parser_constants import (
     MARKER_KEYS,
     SHOW_MORE_BUTTON_RE,
 )
-from app.services.domains.scholar.parser_types import PublicationCandidate
-from app.services.domains.scholar.parser_utils import (
+from app.services.scholar.parser_types import PublicationCandidate
+from app.services.scholar.parser_utils import (
     attr_class,
     attr_href,
     build_absolute_scholar_url,

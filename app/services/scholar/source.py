@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from app.logging_utils import structured_log
-from app.services.domains.scholar import rate_limit as scholar_rate_limit
+from app.services.scholar import rate_limit as scholar_rate_limit
 from app.settings import settings
 
 SCHOLAR_PROFILE_URL = "https://scholar.google.com/citations"

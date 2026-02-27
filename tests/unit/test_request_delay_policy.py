@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app.services.domains.ingestion import scheduler as scheduler_module
-from app.services.domains.ingestion.application import ScholarIngestionService
+from app.services.ingestion import scheduler as scheduler_module
+from app.services.ingestion.application import ScholarIngestionService
 from app.settings import settings
 
 

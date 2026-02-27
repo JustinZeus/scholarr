@@ -21,7 +21,7 @@ from app.http.middleware import (
 from app.logging_config import configure_logging, parse_redact_fields
 from app.logging_utils import structured_log
 from app.security.csrf import CSRFMiddleware
-from app.services.domains.ingestion.scheduler import SchedulerService
+from app.services.ingestion.scheduler import SchedulerService
 from app.settings import settings
 
 logger = logging.getLogger(__name__)

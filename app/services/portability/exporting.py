@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Publication, ScholarProfile, ScholarPublication
-from app.services.domains.portability.constants import EXPORT_SCHEMA_VERSION
+from app.services.portability.constants import EXPORT_SCHEMA_VERSION
 
 
 def _exported_at_iso() -> str:

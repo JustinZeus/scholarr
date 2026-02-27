@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.domains.ingestion.application import ScholarIngestionService
-from app.services.domains.ingestion.types import RunProgress, ScholarProcessingOutcome
+from app.services.ingestion.application import ScholarIngestionService
+from app.services.ingestion.types import RunProgress, ScholarProcessingOutcome
 
 
 def _outcome(*, scholar_profile_id: int, outcome_label: str) -> ScholarProcessingOutcome:

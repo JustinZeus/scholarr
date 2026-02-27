@@ -13,8 +13,8 @@ from app.db.models import (
     ScholarProfile,
     ScholarPublication,
 )
-from app.services.domains.publications.modes import MODE_LATEST, MODE_UNREAD
-from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
+from app.services.publications.modes import MODE_LATEST, MODE_UNREAD
+from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 
 def _normalized_citation_count(value: object) -> int:

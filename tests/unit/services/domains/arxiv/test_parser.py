@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.domains.arxiv.errors import ArxivParseError
-from app.services.domains.arxiv.parser import parse_arxiv_feed
+from app.services.arxiv.errors import ArxivParseError
+from app.services.arxiv.parser import parse_arxiv_feed
 
 _VALID_FEED_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom"

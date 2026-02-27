@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.domains.scholar.parser_constants import (
+from app.services.scholar.parser_constants import (
     BLOCKED_KEYWORDS,
     NETWORK_DNS_ERROR_KEYWORDS,
     NETWORK_TIMEOUT_KEYWORDS,
@@ -8,8 +8,8 @@ from app.services.domains.scholar.parser_constants import (
     NO_AUTHOR_RESULTS_KEYWORDS,
     NO_RESULTS_KEYWORDS,
 )
-from app.services.domains.scholar.parser_types import ParseState, PublicationCandidate, ScholarSearchCandidate
-from app.services.domains.scholar.source import FetchResult
+from app.services.scholar.parser_types import ParseState, PublicationCandidate, ScholarSearchCandidate
+from app.services.scholar.source import FetchResult
 
 
 def classify_network_error_reason(fetch_error: str | None) -> str:

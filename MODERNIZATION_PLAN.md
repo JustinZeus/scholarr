@@ -80,17 +80,17 @@ Commit message: "refactor: add structured_log utility to eliminate logging boile
 
 ## Slice 3: Migrate Ingestion Logging to `structured_log()`
 
-**Why:** `app/services/domains/ingestion/application.py` is 3,089 lines. 8 `_log_*` helpers consume ~239 lines. 34 inline logger calls duplicate event names and include dead metric fields. This slice removes ~300 lines.
+**Why:** `app/services/ingestion/application.py` is 3,089 lines. 8 `_log_*` helpers consume ~239 lines. 34 inline logger calls duplicate event names and include dead metric fields. This slice removes ~300 lines.
 
 **Files to modify:**
-- `app/services/domains/ingestion/application.py`
+- `app/services/ingestion/application.py`
 
 **Context files:**
 - `app/logging_utils.py` (created in Slice 2)
 
 **Prompt:**
 ```
-You are working on the scholarr repository. The file `app/services/domains/ingestion/application.py` (3,089 lines) has 8 `_log_*` helper functions consuming ~239 lines, plus 34 inline logger calls with duplicated `"event":` keys and mixed `metric_name`/`metric_value` fields.
+You are working on the scholarr repository. The file `app/services/ingestion/application.py` (3,089 lines) has 8 `_log_*` helper functions consuming ~239 lines, plus 34 inline logger calls with duplicated `"event":` keys and mixed `metric_name`/`metric_value` fields.
 
 Migrate ALL logging in this file to use `structured_log()` from `app.logging_utils`.
 
@@ -148,11 +148,11 @@ Commit message: "refactor: migrate ingestion service logging to structured_log"
 **Why:** 11 more `_log_*` helpers remain across 8 files (183 lines total), plus inline logger calls with the same duplication pattern in ~20 files.
 
 **Files to modify (all have `_log_*` helpers to delete):**
-- `app/services/domains/ingestion/scheduler.py` — `_log_queue_item_resolved` (line ~518, 21 lines)
-- `app/services/domains/arxiv/rate_limit.py` — `_log_request_scheduled` (199), `_log_request_completed` (216), `_log_cooldown_activated` (235)
-- `app/services/domains/arxiv/client.py` — `_log_cache_event` (283), `_log_request_skipped_for_cooldown` (299)
-- `app/services/domains/publications/pdf_resolution_pipeline.py` — `_log_arxiv_skip` (148)
-- `app/services/domains/unpaywall/application.py` — `_log_resolution_summary` (194)
+- `app/services/ingestion/scheduler.py` — `_log_queue_item_resolved` (line ~518, 21 lines)
+- `app/services/arxiv/rate_limit.py` — `_log_request_scheduled` (199), `_log_request_completed` (216), `_log_cooldown_activated` (235)
+- `app/services/arxiv/client.py` — `_log_cache_event` (283), `_log_request_skipped_for_cooldown` (299)
+- `app/services/publications/pdf_resolution_pipeline.py` — `_log_arxiv_skip` (148)
+- `app/services/unpaywall/application.py` — `_log_resolution_summary` (194)
 - `app/api/routers/publications.py` — `_log_retry_pdf_result` (343)
 - `app/api/routers/settings.py` — `_log_settings_update` (103)
 - `app/main.py` — `_log_startup_build_marker` (53)
@@ -168,16 +168,16 @@ Commit message: "refactor: migrate ingestion service logging to structured_log"
 - `app/api/routers/admin.py`
 - `app/api/routers/auth.py`
 - `app/api/routers/publications.py`
-- `app/services/domains/scholars/application.py`
-- `app/services/domains/runs/events.py`
-- `app/services/domains/openalex/client.py`
-- `app/services/domains/openalex/matching.py`
-- `app/services/domains/crossref/application.py`
-- `app/services/domains/publications/dedup.py`
-- `app/services/domains/publications/enrichment.py`
-- `app/services/domains/publications/pdf_queue.py`
-- `app/services/domains/scholar/source.py`
-- `app/services/domains/arxiv/gateway.py`
+- `app/services/scholars/application.py`
+- `app/services/runs/events.py`
+- `app/services/openalex/client.py`
+- `app/services/openalex/matching.py`
+- `app/services/crossref/application.py`
+- `app/services/publications/dedup.py`
+- `app/services/publications/enrichment.py`
+- `app/services/publications/pdf_queue.py`
+- `app/services/scholar/source.py`
+- `app/services/arxiv/gateway.py`
 
 **Prompt:**
 ```
@@ -185,14 +185,14 @@ You are working on the scholarr repository. Slice 3 migrated `ingestion/applicat
 
 1. Delete these `_log_*` helper functions and replace their call sites with inline `structured_log()`:
 
-   - `app/services/domains/ingestion/scheduler.py:~518` — `_log_queue_item_resolved` (21 lines)
-   - `app/services/domains/arxiv/rate_limit.py:~199` — `_log_request_scheduled` (17 lines)
-   - `app/services/domains/arxiv/rate_limit.py:~216` — `_log_request_completed` (19 lines)
-   - `app/services/domains/arxiv/rate_limit.py:~235` — `_log_cooldown_activated` (13 lines)
-   - `app/services/domains/arxiv/client.py:~283` — `_log_cache_event` (16 lines)
-   - `app/services/domains/arxiv/client.py:~299` — `_log_request_skipped_for_cooldown` (13 lines)
-   - `app/services/domains/publications/pdf_resolution_pipeline.py:~148` — `_log_arxiv_skip` (11 lines)
-   - `app/services/domains/unpaywall/application.py:~194` — `_log_resolution_summary` (21 lines)
+   - `app/services/ingestion/scheduler.py:~518` — `_log_queue_item_resolved` (21 lines)
+   - `app/services/arxiv/rate_limit.py:~199` — `_log_request_scheduled` (17 lines)
+   - `app/services/arxiv/rate_limit.py:~216` — `_log_request_completed` (19 lines)
+   - `app/services/arxiv/rate_limit.py:~235` — `_log_cooldown_activated` (13 lines)
+   - `app/services/arxiv/client.py:~283` — `_log_cache_event` (16 lines)
+   - `app/services/arxiv/client.py:~299` — `_log_request_skipped_for_cooldown` (13 lines)
+   - `app/services/publications/pdf_resolution_pipeline.py:~148` — `_log_arxiv_skip` (11 lines)
+   - `app/services/unpaywall/application.py:~194` — `_log_resolution_summary` (21 lines)
    - `app/api/routers/publications.py:~343` — `_log_retry_pdf_result` (24 lines)
    - `app/api/routers/settings.py:~103` — `_log_settings_update` (15 lines)
    - `app/main.py:~53` — `_log_startup_build_marker` (13 lines)
@@ -203,7 +203,7 @@ You are working on the scholarr repository. Slice 3 migrated `ingestion/applicat
    - Remove `metric_name`/`metric_value` from all calls
    - Keep `logger.exception()` calls but remove the duplicated `"event"` key from their extra dicts
 
-3. In `app/services/domains/openalex/client.py`, the lines that log `response.text` (lines ~87, ~137):
+3. In `app/services/openalex/client.py`, the lines that log `response.text` (lines ~87, ~137):
    - Truncate: `response.text[:500]`
 
 4. Do NOT change any business logic. Only logging call sites.
@@ -221,8 +221,8 @@ Commit message: "refactor: migrate all remaining logging to structured_log, remo
 **Why:** Self-hosted users need clear, actionable logs. Current logging has verbose debug noise (per-HTTP-request, per-publication), overly long event names, and no console display optimization.
 
 **Files to modify:**
-- `app/services/domains/scholar/source.py`
-- `app/services/domains/ingestion/application.py`
+- `app/services/scholar/source.py`
+- `app/services/ingestion/application.py`
 - `app/logging_config.py`
 - Any files with event names longer than ~40 chars
 
@@ -231,8 +231,8 @@ Commit message: "refactor: migrate all remaining logging to structured_log, remo
 You are working on the scholarr repository. The logging has been migrated to `structured_log()` (slices 2-4). Now audit log RELEVANCE and READABILITY for self-hosted users running this in Docker.
 
 1. **Remove redundant debug logs:**
-   - `app/services/domains/scholar/source.py`: Remove the 3 debug-level HTTP fetch events (fetch_started, search_fetch_started, publication_fetch_started). Keep only `fetch_succeeded` at DEBUG. The HTTP middleware already logs request.started/completed.
-   - `app/services/domains/ingestion/application.py`: Remove per-publication `publication.discovered` and `publication.created` DEBUG logs. The run_completed summary already reports totals.
+   - `app/services/scholar/source.py`: Remove the 3 debug-level HTTP fetch events (fetch_started, search_fetch_started, publication_fetch_started). Keep only `fetch_succeeded` at DEBUG. The HTTP middleware already logs request.started/completed.
+   - `app/services/ingestion/application.py`: Remove per-publication `publication.discovered` and `publication.created` DEBUG logs. The run_completed summary already reports totals.
 
 2. **Shorten overly long event names** (search all structured_log calls in app/):
    - `ingestion.request_delay_coerced_to_policy_floor` → `ingestion.delay_coerced`
@@ -396,7 +396,7 @@ Commit message: "ci: add CodeQL security scanning and Dependabot"
 
 **Files to modify:**
 - `pyproject.toml`
-- `app/services/domains/crossref/application.py`
+- `app/services/crossref/application.py`
 
 **Files to create:**
 - `.github/workflows/release.yml`
@@ -405,7 +405,7 @@ Commit message: "ci: add CodeQL security scanning and Dependabot"
 ```
 You are working on the scholarr repository. Set up automated versioning with python-semantic-release.
 
-1. Fix hardcoded version in `app/services/domains/crossref/application.py` (line ~294):
+1. Fix hardcoded version in `app/services/crossref/application.py` (line ~294):
    ```python
    # Before:
    etiquette = Etiquette(settings.app_name, "0.1.0", "https://scholarr.local", email)
@@ -546,18 +546,18 @@ Commit message: "docs: rebuild documentation from scratch with clean IA"
 **Why:** After logging cleanup (slices 3+5), the file is ~2,700-2,800 lines. Still the largest source file by 3x. This begins decomposition with the safest extract: safety gate logic.
 
 **Files to modify:**
-- `app/services/domains/ingestion/application.py`
+- `app/services/ingestion/application.py`
 
 **Files to create:**
-- `app/services/domains/ingestion/safety.py`
+- `app/services/ingestion/safety.py`
 
 **Prompt:**
 ```
-You are working on the scholarr repository. `app/services/domains/ingestion/application.py` is ~2,700-2,800 lines (after logging cleanup). It contains the entire ingestion orchestration in a single class.
+You are working on the scholarr repository. `app/services/ingestion/application.py` is ~2,700-2,800 lines (after logging cleanup). It contains the entire ingestion orchestration in a single class.
 
 Extract the FIRST logical chunk: safety gate logic.
 
-1. Read `app/services/domains/ingestion/application.py` fully.
+1. Read `app/services/ingestion/application.py` fully.
 
 2. Identify safety/cooldown methods:
    - `_enforce_safety_gate`
@@ -565,7 +565,7 @@ Extract the FIRST logical chunk: safety gate logic.
    - Cooldown activation/clearing methods
    - Alert threshold evaluation methods
 
-3. Create `app/services/domains/ingestion/safety.py`:
+3. Create `app/services/ingestion/safety.py`:
    - Move identified methods to standalone functions or a small class
    - Accept explicit parameters (no implicit self.xxx state)
    - Keep same function signatures where possible
@@ -577,7 +577,7 @@ Extract the FIRST logical chunk: safety gate logic.
 
 Constraints from `agents.md`:
 - Max 50 lines per function
-- No flat files in `app/services/` root — all within `app/services/domains/ingestion/`
+- No flat files in `app/services/` root — all within `app/services/ingestion/`
 - Fail fast, early returns, guard clauses
 
 Commit message: "refactor: extract ingestion safety gate logic to dedicated module"

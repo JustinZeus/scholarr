@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.domains.dbops import run_publication_link_repair
+from app.services.dbops import run_publication_link_repair
 from tests.integration.helpers import insert_user
 
 

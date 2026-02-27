@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.domains.arxiv.errors import ArxivRateLimitError
-from app.services.domains.ingestion.application import ScholarIngestionService
-from app.services.domains.publication_identifiers import application as identifier_service
+from app.services.arxiv.errors import ArxivRateLimitError
+from app.services.ingestion.application import ScholarIngestionService
+from app.services.publication_identifiers import application as identifier_service
 
 
 @pytest.mark.asyncio

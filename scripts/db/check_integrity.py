@@ -6,7 +6,7 @@ import asyncio
 import json
 
 from app.db.session import get_session_factory
-from app.services.domains.dbops import collect_integrity_report
+from app.services.dbops import collect_integrity_report
 
 
 def build_parser() -> argparse.ArgumentParser:

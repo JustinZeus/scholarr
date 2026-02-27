@@ -3,17 +3,17 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from app.services.domains.arxiv.constants import (
+from app.services.arxiv.constants import (
     ARXIV_STRONG_IDENTIFIER_CONFIDENCE,
     ARXIV_TITLE_MIN_ALPHA_TOKENS,
     ARXIV_TITLE_MIN_TOKENS,
     ARXIV_TITLE_TOKEN_MIN_LENGTH,
 )
-from app.services.domains.doi.normalize import normalize_doi
-from app.services.domains.publication_identifiers.normalize import normalize_arxiv_id
+from app.services.doi.normalize import normalize_doi
+from app.services.publication_identifiers.normalize import normalize_arxiv_id
 
 if TYPE_CHECKING:
-    from app.services.domains.publications.types import PublicationListItem, UnreadPublicationItem
+    from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 _TITLE_TOKEN_RE = re.compile(r"[a-z0-9]+")
 

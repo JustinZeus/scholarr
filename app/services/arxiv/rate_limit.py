@@ -13,13 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import ArxivRuntimeState
 from app.db.session import get_session_factory
 from app.logging_utils import structured_log
-from app.services.domains.arxiv.constants import (
+from app.services.arxiv.constants import (
     ARXIV_RATE_LIMIT_LOCK_KEY,
     ARXIV_RATE_LIMIT_LOCK_NAMESPACE,
     ARXIV_RUNTIME_STATE_KEY,
     ARXIV_SOURCE_PATH_UNKNOWN,
 )
-from app.services.domains.arxiv.errors import ArxivRateLimitError
+from app.services.arxiv.errors import ArxivRateLimitError
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
