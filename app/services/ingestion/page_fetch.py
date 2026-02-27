@@ -145,6 +145,24 @@ class PageFetcher:
         if sleep_seconds > 0:
             await asyncio.sleep(sleep_seconds)
 
+    @staticmethod
+    def _classify_attempt(
+        parsed_page: ParsedProfilePage,
+        *,
+        network_attempts: int,
+        rate_limit_attempts: int,
+    ) -> tuple[int, int, int]:
+        if parsed_page.state == ParseState.NETWORK_ERROR:
+            network_attempts += 1
+            return network_attempts, rate_limit_attempts, network_attempts
+        if (
+            parsed_page.state == ParseState.BLOCKED_OR_CAPTCHA
+            and parsed_page.state_reason == "blocked_http_429_rate_limited"
+        ):
+            rate_limit_attempts += 1
+            return network_attempts, rate_limit_attempts, rate_limit_attempts
+        return network_attempts, rate_limit_attempts, network_attempts + rate_limit_attempts + 1
+
     async def fetch_and_parse_with_retry(
         self,
         *,
@@ -169,19 +187,9 @@ class PageFetcher:
                 page_size=page_size,
             )
             parsed_page = self.parse_page_or_layout_error(fetch_result=fetch_result)
-
-            if parsed_page.state == ParseState.NETWORK_ERROR:
-                network_attempts += 1
-                total_attempts = network_attempts
-            elif (
-                parsed_page.state == ParseState.BLOCKED_OR_CAPTCHA
-                and parsed_page.state_reason == "blocked_http_429_rate_limited"
-            ):
-                rate_limit_attempts += 1
-                total_attempts = rate_limit_attempts
-            else:
-                total_attempts = network_attempts + rate_limit_attempts + 1
-
+            network_attempts, rate_limit_attempts, total_attempts = self._classify_attempt(
+                parsed_page, network_attempts=network_attempts, rate_limit_attempts=rate_limit_attempts
+            )
             attempt_log.append(
                 {
                     "attempt": total_attempts,
@@ -192,7 +200,6 @@ class PageFetcher:
                     "fetch_error": fetch_result.error,
                 }
             )
-
             if not self._should_retry(
                 parsed_page=parsed_page,
                 network_attempt_count=network_attempts,
@@ -201,7 +208,6 @@ class PageFetcher:
                 rate_limit_retries=rate_limit_retries,
             ):
                 break
-
             await self._sleep_backoff(
                 scholar_id=scholar_id,
                 cstart=cstart,

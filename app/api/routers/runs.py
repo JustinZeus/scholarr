@@ -176,6 +176,67 @@ async def cancel_run(
     )
 
 
+async def _start_manual_run(
+    db_session: AsyncSession,
+    *,
+    current_user: User,
+    ingest_service: ingestion_service.ScholarIngestionService,
+    idempotency_key: str | None,
+) -> tuple[Any, Any, list, dict]:
+    user_settings = await user_settings_service.get_or_create_settings(db_session, user_id=current_user.id)
+    run, scholars, start_cstart_map = await ingest_service.initialize_run(
+        db_session,
+        user_id=current_user.id,
+        trigger_type=RunTriggerType.MANUAL,
+        request_delay_seconds=user_settings.request_delay_seconds,
+        network_error_retries=settings.ingestion_network_error_retries,
+        retry_backoff_seconds=settings.ingestion_retry_backoff_seconds,
+        max_pages_per_scholar=settings.ingestion_max_pages_per_scholar,
+        page_size=settings.ingestion_page_size,
+        idempotency_key=idempotency_key,
+        alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
+        alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
+        alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
+    )
+    return user_settings, run, scholars, start_cstart_map
+
+
+def _spawn_background_execution(
+    ingest_service: ingestion_service.ScholarIngestionService,
+    *,
+    run: Any,
+    current_user: User,
+    scholars: list,
+    start_cstart_map: dict,
+    user_settings: Any,
+    idempotency_key: str | None,
+) -> None:
+    from app.db.session import get_session_factory
+
+    task = asyncio.create_task(
+        ingest_service.execute_run(
+            session_factory=get_session_factory(),
+            run_id=run.id,
+            user_id=current_user.id,
+            scholars=scholars,
+            start_cstart_map=start_cstart_map,
+            request_delay_seconds=user_settings.request_delay_seconds,
+            network_error_retries=settings.ingestion_network_error_retries,
+            retry_backoff_seconds=settings.ingestion_retry_backoff_seconds,
+            max_pages_per_scholar=settings.ingestion_max_pages_per_scholar,
+            page_size=settings.ingestion_page_size,
+            auto_queue_continuations=settings.ingestion_continuation_queue_enabled,
+            queue_delay_seconds=settings.ingestion_continuation_base_delay_seconds,
+            alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
+            alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
+            alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
+            idempotency_key=idempotency_key,
+        )
+    )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
 @router.post(
     "/manual",
     response_model=ManualRunEnvelope,
@@ -202,52 +263,22 @@ async def run_manual(
         return reused_payload
 
     try:
-        user_settings = await user_settings_service.get_or_create_settings(db_session, user_id=current_user.id)
-
-        # Initialize run (creates the record and performs safety checks)
-        run, scholars, start_cstart_map = await ingest_service.initialize_run(
+        user_settings, run, scholars, start_cstart_map = await _start_manual_run(
             db_session,
-            user_id=current_user.id,
-            trigger_type=RunTriggerType.MANUAL,
-            request_delay_seconds=user_settings.request_delay_seconds,
-            network_error_retries=settings.ingestion_network_error_retries,
-            retry_backoff_seconds=settings.ingestion_retry_backoff_seconds,
-            max_pages_per_scholar=settings.ingestion_max_pages_per_scholar,
-            page_size=settings.ingestion_page_size,
+            current_user=current_user,
+            ingest_service=ingest_service,
             idempotency_key=idempotency_key,
-            alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
-            alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
-            alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
         )
-
         await db_session.commit()
-
-        # Kick off background execution
-        from app.db.session import get_session_factory
-
-        task = asyncio.create_task(
-            ingest_service.execute_run(
-                session_factory=get_session_factory(),
-                run_id=run.id,
-                user_id=current_user.id,
-                scholars=scholars,
-                start_cstart_map=start_cstart_map,
-                request_delay_seconds=user_settings.request_delay_seconds,
-                network_error_retries=settings.ingestion_network_error_retries,
-                retry_backoff_seconds=settings.ingestion_retry_backoff_seconds,
-                max_pages_per_scholar=settings.ingestion_max_pages_per_scholar,
-                page_size=settings.ingestion_page_size,
-                auto_queue_continuations=settings.ingestion_continuation_queue_enabled,
-                queue_delay_seconds=settings.ingestion_continuation_base_delay_seconds,
-                alert_blocked_failure_threshold=settings.ingestion_alert_blocked_failure_threshold,
-                alert_network_failure_threshold=settings.ingestion_alert_network_failure_threshold,
-                alert_retry_scheduled_threshold=settings.ingestion_alert_retry_scheduled_threshold,
-                idempotency_key=idempotency_key,
-            )
+        _spawn_background_execution(
+            ingest_service,
+            run=run,
+            current_user=current_user,
+            scholars=scholars,
+            start_cstart_map=start_cstart_map,
+            user_settings=user_settings,
+            idempotency_key=idempotency_key,
         )
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
-
         return success_payload(
             request,
             data={

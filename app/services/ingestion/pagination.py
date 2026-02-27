@@ -273,6 +273,24 @@ class PaginationEngine:
 
     # ── Pagination loop ──────────────────────────────────────────────
 
+    @staticmethod
+    async def _upsert_page_publications(
+        db_session: Any,
+        *,
+        run: CrawlRun,
+        scholar: ScholarProfile,
+        publications: list,
+        seen_canonical: set[str],
+        state: PagedLoopState,
+        upsert_publications_fn: Any,
+    ) -> None:
+        deduped = _dedupe_publication_candidates(list(publications), seen_canonical=seen_canonical)
+        if deduped:
+            discovered_count = await upsert_publications_fn(
+                db_session, run=run, scholar=scholar, publications=deduped
+            )
+            state.discovered_publication_count += discovered_count
+
     async def _paginate_loop(
         self,
         *,
@@ -292,14 +310,15 @@ class PaginationEngine:
         seen_canonical: set[str] = set()
 
         if state.parsed_page.publications:
-            deduped_first = _dedupe_publication_candidates(
-                list(state.parsed_page.publications), seen_canonical=seen_canonical
+            await self._upsert_page_publications(
+                db_session,
+                run=run,
+                scholar=scholar,
+                publications=state.parsed_page.publications,
+                seen_canonical=seen_canonical,
+                state=state,
+                upsert_publications_fn=upsert_publications_fn,
             )
-            if deduped_first:
-                discovered_count = await upsert_publications_fn(
-                    db_session, run=run, scholar=scholar, publications=deduped_first
-                )
-                state.discovered_publication_count += discovered_count
 
         while state.parsed_page.has_show_more_button:
             await db_session.refresh(run)
@@ -337,14 +356,15 @@ class PaginationEngine:
             )
 
             if next_parsed_page.publications:
-                deduped_next = _dedupe_publication_candidates(
-                    list(next_parsed_page.publications), seen_canonical=seen_canonical
+                await self._upsert_page_publications(
+                    db_session,
+                    run=run,
+                    scholar=scholar,
+                    publications=next_parsed_page.publications,
+                    seen_canonical=seen_canonical,
+                    state=state,
+                    upsert_publications_fn=upsert_publications_fn,
                 )
-                if deduped_next:
-                    discovered_count = await upsert_publications_fn(
-                        db_session, run=run, scholar=scholar, publications=deduped_next
-                    )
-                    state.discovered_publication_count += discovered_count
 
             if self._handle_page_state_transition(state=state):
                 return

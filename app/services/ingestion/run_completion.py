@@ -262,25 +262,13 @@ def build_failure_debug_context(
     return context
 
 
-def complete_run_for_user(
+def _log_alert_threshold_warnings(
     *,
-    user_settings: Any,
-    run: CrawlRun,
-    scholars: list[ScholarProfile],
     user_id: int,
-    progress: RunProgress,
-    idempotency_key: str | None,
-    alert_blocked_failure_threshold: int,
-    alert_network_failure_threshold: int,
-    alert_retry_scheduled_threshold: int,
-) -> tuple[RunFailureSummary, RunAlertSummary]:
-    failure_summary = summarize_failures(scholar_results=progress.scholar_results)
-    alert_summary = build_alert_summary(
-        failure_summary=failure_summary,
-        alert_blocked_failure_threshold=alert_blocked_failure_threshold,
-        alert_network_failure_threshold=alert_network_failure_threshold,
-        alert_retry_scheduled_threshold=alert_retry_scheduled_threshold,
-    )
+    run: CrawlRun,
+    failure_summary: RunFailureSummary,
+    alert_summary: RunAlertSummary,
+) -> None:
     if alert_summary.alert_flags["blocked_failure_threshold_exceeded"]:
         structured_log(
             logger,
@@ -311,6 +299,30 @@ def complete_run_for_user(
             retries_scheduled_count=failure_summary.retries_scheduled_count,
             threshold=alert_summary.retry_scheduled_threshold,
         )
+
+
+def complete_run_for_user(
+    *,
+    user_settings: Any,
+    run: CrawlRun,
+    scholars: list[ScholarProfile],
+    user_id: int,
+    progress: RunProgress,
+    idempotency_key: str | None,
+    alert_blocked_failure_threshold: int,
+    alert_network_failure_threshold: int,
+    alert_retry_scheduled_threshold: int,
+) -> tuple[RunFailureSummary, RunAlertSummary]:
+    failure_summary = summarize_failures(scholar_results=progress.scholar_results)
+    alert_summary = build_alert_summary(
+        failure_summary=failure_summary,
+        alert_blocked_failure_threshold=alert_blocked_failure_threshold,
+        alert_network_failure_threshold=alert_network_failure_threshold,
+        alert_retry_scheduled_threshold=alert_retry_scheduled_threshold,
+    )
+    _log_alert_threshold_warnings(
+        user_id=user_id, run=run, failure_summary=failure_summary, alert_summary=alert_summary
+    )
     apply_safety_outcome(user_settings=user_settings, run=run, user_id=user_id, alert_summary=alert_summary)
     run_status = resolve_run_status(
         scholar_count=len(scholars),
