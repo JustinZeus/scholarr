@@ -10,6 +10,7 @@ Adhere strictly to these constraints when working on this codebase.
 - **Negative space programming:** Fail fast with explicit assertions and guard clauses. No silent failures, especially in DOM parsing.
 - **Cyclomatic complexity:** Flatten with early returns. No deep nesting. No magic numbers.
 - **No dead code:** Do not leave commented-out code, unused imports, or backward-compatibility shims. Delete cleanly.
+- **Variable naming:** Any variable outside of a lambda functions or iterators should be descriptive. Code should be readable for maintainers.
 
 ## 2. Architecture
 
@@ -74,9 +75,11 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 Types: `feat`, `fix`, `docs`, `ci`, `refactor`, `test`, `chore`, `perf`.
 
-## 7. Testing
+## 7. Testing & Quality Gates
 
-All tests run inside containers:
+All commands run inside containers. Do not run bare `npm`, `pytest`, or `ruff` on the host.
+
+### Backend
 
 ```bash
 # Unit tests (default, excludes integration)
@@ -84,9 +87,34 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app pyth
 
 # Integration tests
 docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app python -m pytest -m integration
+
+# Linting
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app ruff check .
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app ruff format --check .
+
+# Type checking
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app mypy app/
 ```
 
-Markers: `integration`, `db`, `migrations`, `schema`, `smoke`.
+Pytest markers: `integration`, `db`, `migrations`, `schema`, `smoke`.
+
+### Frontend
+
+```bash
+# Type checking
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm frontend npm run typecheck
+
+# Unit tests
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm frontend npm run test:run
+
+# Lint
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm frontend npm run lint
+
+# Production build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm frontend npm run build
+```
+
+All four gates must pass before a PR is considered ready.
 
 ## 8. Frontend
 
