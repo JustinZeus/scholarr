@@ -576,6 +576,46 @@ class ScholarIngestionService:
             alert_network_failure_threshold=alert_network_failure_threshold,
             alert_retry_scheduled_threshold=alert_retry_scheduled_threshold,
         )
+        progress, failure_summary, alert_summary = await self._run_iteration_and_complete(
+            db_session,
+            run=run,
+            scholars=scholars,
+            user_id=user_id,
+            start_cstart_map=start_cstart_map,
+            paging=paging,
+            thresholds=thresholds,
+            auto_queue_continuations=auto_queue_continuations,
+            queue_delay_seconds=queue_delay_seconds,
+            idempotency_key=idempotency_key,
+        )
+        user_settings = await user_settings_service.get_or_create_settings(db_session, user_id=user_id)
+        await self._inline_enrich_and_finalize(
+            db_session, run=run, user_settings=user_settings, intended_final_status=run.status
+        )
+        _log_run_completed(
+            run=run,
+            user_id=user_id,
+            scholars=scholars,
+            progress=progress,
+            failure_summary=failure_summary,
+            alert_summary=alert_summary,
+        )
+        return run_execution_summary(run=run, scholars=scholars, progress=progress)
+
+    async def _run_iteration_and_complete(
+        self,
+        db_session: AsyncSession,
+        *,
+        run: CrawlRun,
+        scholars: list[ScholarProfile],
+        user_id: int,
+        start_cstart_map: dict[int, int],
+        paging: dict[str, Any],
+        thresholds: dict[str, Any],
+        auto_queue_continuations: bool,
+        queue_delay_seconds: int,
+        idempotency_key: str | None,
+    ) -> tuple[RunProgress, RunFailureSummary, RunAlertSummary]:
         progress = await run_scholar_iteration(
             db_session,
             pagination=self._pagination,
@@ -601,6 +641,16 @@ class ScholarIngestionService:
         if intended_final_status not in (RunStatus.CANCELED,):
             run.status = RunStatus.RESOLVING
         await db_session.commit()
+        return progress, failure_summary, alert_summary
+
+    async def _inline_enrich_and_finalize(
+        self,
+        db_session: AsyncSession,
+        *,
+        run: CrawlRun,
+        user_settings: Any,
+        intended_final_status: RunStatus,
+    ) -> None:
         try:
             await self._enrichment.enrich_pending_publications(
                 db_session,
@@ -612,15 +662,6 @@ class ScholarIngestionService:
         if run.status == RunStatus.RESOLVING:
             run.status = intended_final_status
         await db_session.commit()
-        _log_run_completed(
-            run=run,
-            user_id=user_id,
-            scholars=scholars,
-            progress=progress,
-            failure_summary=failure_summary,
-            alert_summary=alert_summary,
-        )
-        return run_execution_summary(run=run, scholars=scholars, progress=progress)
 
     async def _try_acquire_user_lock(
         self,

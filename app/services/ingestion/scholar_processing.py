@@ -528,6 +528,87 @@ def unexpected_scholar_exception_outcome(
     )
 
 
+async def _run_first_pass(
+    db_session: AsyncSession,
+    *,
+    scholars: list[ScholarProfile],
+    pagination: PaginationEngine,
+    run: CrawlRun,
+    user_id: int,
+    start_cstart_map: dict[int, int],
+    scholar_kwargs: dict[str, Any],
+    request_delay_seconds: int,
+    queue_delay_seconds: int,
+    progress: RunProgress,
+) -> dict[int, int]:
+    first_pass_cstarts: dict[int, int] = {}
+    for index, scholar in enumerate(scholars):
+        await db_session.refresh(run)
+        if run.status == RunStatus.CANCELED:
+            structured_log(logger, "info", "ingestion.run_canceled", run_id=run.id, user_id=user_id)
+            return first_pass_cstarts
+        if index > 0 and request_delay_seconds > 0:
+            await asyncio.sleep(float(request_delay_seconds))
+        start_cstart = int(start_cstart_map.get(int(scholar.id), 0))
+        outcome = await process_scholar(
+            db_session,
+            pagination=pagination,
+            run=run,
+            scholar=scholar,
+            user_id=user_id,
+            start_cstart=start_cstart,
+            max_pages_per_scholar=1,
+            auto_queue_continuations=False,
+            queue_delay_seconds=queue_delay_seconds,
+            **scholar_kwargs,
+        )
+        apply_outcome_to_progress(progress=progress, outcome=outcome)
+        resume_cstart = outcome.result_entry.get("continuation_cstart")
+        if resume_cstart is not None and int(resume_cstart) > start_cstart:
+            first_pass_cstarts[int(scholar.id)] = int(resume_cstart)
+    return first_pass_cstarts
+
+
+async def _run_depth_pass(
+    db_session: AsyncSession,
+    *,
+    scholars: list[ScholarProfile],
+    first_pass_cstarts: dict[int, int],
+    pagination: PaginationEngine,
+    run: CrawlRun,
+    user_id: int,
+    scholar_kwargs: dict[str, Any],
+    request_delay_seconds: int,
+    remaining_max: int,
+    auto_queue_continuations: bool,
+    queue_delay_seconds: int,
+    progress: RunProgress,
+) -> None:
+    for index, scholar in enumerate(scholars):
+        resume_cstart = first_pass_cstarts.get(int(scholar.id))
+        if resume_cstart is None:
+            continue
+        await db_session.refresh(run)
+        if run.status == RunStatus.CANCELED:
+            structured_log(logger, "info", "ingestion.run_canceled", run_id=run.id, user_id=user_id)
+            break
+        if index > 0 and request_delay_seconds > 0:
+            await asyncio.sleep(float(request_delay_seconds))
+        outcome = await process_scholar(
+            db_session,
+            pagination=pagination,
+            run=run,
+            scholar=scholar,
+            user_id=user_id,
+            start_cstart=resume_cstart,
+            max_pages_per_scholar=remaining_max,
+            auto_queue_continuations=auto_queue_continuations,
+            queue_delay_seconds=queue_delay_seconds,
+            **scholar_kwargs,
+        )
+        apply_outcome_to_progress(progress=progress, outcome=outcome)
+
+
 async def run_scholar_iteration(
     db_session: AsyncSession,
     *,
@@ -555,60 +636,33 @@ async def run_scholar_iteration(
         "rate_limit_backoff_seconds": rate_limit_backoff_seconds,
         "page_size": page_size,
     }
-
-    # ── Pass 1: first page of every scholar (breadth-first) ──────────
-    first_pass_cstarts: dict[int, int] = {}
-    for index, scholar in enumerate(scholars):
-        await db_session.refresh(run)
-        if run.status == RunStatus.CANCELED:
-            structured_log(logger, "info", "ingestion.run_canceled", run_id=run.id, user_id=user_id)
-            return progress
-        if index > 0 and request_delay_seconds > 0:
-            await asyncio.sleep(float(request_delay_seconds))
-        start_cstart = int(start_cstart_map.get(int(scholar.id), 0))
-        outcome = await process_scholar(
-            db_session,
-            pagination=pagination,
-            run=run,
-            scholar=scholar,
-            user_id=user_id,
-            start_cstart=start_cstart,
-            max_pages_per_scholar=1,
-            auto_queue_continuations=False,
-            queue_delay_seconds=queue_delay_seconds,
-            **scholar_kwargs,
-        )
-        apply_outcome_to_progress(progress=progress, outcome=outcome)
-        resume_cstart = outcome.result_entry.get("continuation_cstart")
-        if resume_cstart is not None and int(resume_cstart) > start_cstart:
-            first_pass_cstarts[int(scholar.id)] = int(resume_cstart)
-
-    # ── Pass 2: remaining pages for each scholar (depth) ─────────────
+    first_pass_cstarts = await _run_first_pass(
+        db_session,
+        scholars=scholars,
+        pagination=pagination,
+        run=run,
+        user_id=user_id,
+        start_cstart_map=start_cstart_map,
+        scholar_kwargs=scholar_kwargs,
+        request_delay_seconds=request_delay_seconds,
+        queue_delay_seconds=queue_delay_seconds,
+        progress=progress,
+    )
     remaining_max = max(max_pages_per_scholar - 1, 0)
     if remaining_max <= 0:
         return progress
-
-    for index, scholar in enumerate(scholars):
-        resume_cstart = first_pass_cstarts.get(int(scholar.id))
-        if resume_cstart is None:
-            continue
-        await db_session.refresh(run)
-        if run.status == RunStatus.CANCELED:
-            structured_log(logger, "info", "ingestion.run_canceled", run_id=run.id, user_id=user_id)
-            break
-        if index > 0 and request_delay_seconds > 0:
-            await asyncio.sleep(float(request_delay_seconds))
-        outcome = await process_scholar(
-            db_session,
-            pagination=pagination,
-            run=run,
-            scholar=scholar,
-            user_id=user_id,
-            start_cstart=resume_cstart,
-            max_pages_per_scholar=remaining_max,
-            auto_queue_continuations=auto_queue_continuations,
-            queue_delay_seconds=queue_delay_seconds,
-            **scholar_kwargs,
-        )
-        apply_outcome_to_progress(progress=progress, outcome=outcome)
+    await _run_depth_pass(
+        db_session,
+        scholars=scholars,
+        first_pass_cstarts=first_pass_cstarts,
+        pagination=pagination,
+        run=run,
+        user_id=user_id,
+        scholar_kwargs=scholar_kwargs,
+        request_delay_seconds=request_delay_seconds,
+        remaining_max=remaining_max,
+        auto_queue_continuations=auto_queue_continuations,
+        queue_delay_seconds=queue_delay_seconds,
+        progress=progress,
+    )
     return progress

@@ -25,6 +25,18 @@ from app.settings import settings
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_titles(publications: list) -> list[str]:
+    titles = []
+    for p in publications:
+        raw = getattr(p, "title_raw", None) or getattr(p, "title", None)
+        if not raw or not raw.strip():
+            continue
+        safe = " ".join(re.sub(r"[^\w\s]", " ", raw).split())
+        if safe:
+            titles.append(safe)
+    return titles
+
+
 class EnrichmentRunner:
     """Post-run OpenAlex enrichment logic.
 
@@ -44,31 +56,15 @@ class EnrichmentRunner:
             raise RuntimeError(f"Missing crawl_run for run_id={run_id}.")
         return status == RunStatus.CANCELED
 
-    async def enrich_pending_publications(
+    async def _load_unenriched_publications(
         self,
         db_session: AsyncSession,
         *,
         run_id: int,
-        openalex_api_key: str | None = None,
-    ) -> None:
-        """Enrich unenriched publications with OpenAlex data.
-
-        Stops immediately on budget exhaustion (429 with $0 remaining).
-        Sleeps 60s and continues on transient rate limits.
-        """
-        from app.services.openalex.client import (
-            OpenAlexBudgetExhaustedError,
-            OpenAlexClient,
-            OpenAlexRateLimitError,
-        )
-        from app.services.openalex.matching import find_best_match
-
+    ) -> tuple[int, list[Publication]]:
         run_result = await db_session.execute(select(CrawlRun.user_id).where(CrawlRun.id == run_id))
         user_id = run_result.scalar_one()
-
-        now = datetime.now(UTC)
-        cooldown_threshold = now - timedelta(days=7)
-
+        cooldown_threshold = datetime.now(UTC) - timedelta(days=7)
         stmt = (
             select(Publication)
             .join(ScholarPublication)
@@ -84,88 +80,51 @@ class EnrichmentRunner:
             .distinct()
         )
         result = await db_session.execute(stmt)
-        publications = list(result.scalars().all())
+        return user_id, list(result.scalars().all())
 
-        if not publications:
-            return
+    async def _enrich_batch(
+        self,
+        db_session: AsyncSession,
+        *,
+        batch: list[Publication],
+        run_id: int,
+        openalex_works: list,
+        now: datetime,
+        arxiv_lookup_allowed: bool,
+    ) -> tuple[bool, bool]:
+        from app.services.openalex.matching import find_best_match
 
-        resolved_key = openalex_api_key or settings.openalex_api_key
-        client = OpenAlexClient(api_key=resolved_key, mailto=settings.crossref_api_mailto)
-        batch_size = 25
-        arxiv_lookup_allowed = True
-
-        for i in range(0, len(publications), batch_size):
+        for p in batch:
             if await self.run_is_canceled(db_session, run_id=run_id):
                 logger.info("ingestion.enrichment_aborted", extra={"run_id": run_id})
-                return
-            batch = publications[i : i + batch_size]
-            titles = [
-                " ".join(re.sub(r"[^\w\s]", " ", p.title_raw).split())
-                for p in batch
-                if p.title_raw and p.title_raw.strip()
-            ]
+                return False, arxiv_lookup_allowed
+            p.openalex_last_attempt_at = now
+            arxiv_lookup_allowed = await self._discover_identifiers_for_enrichment(
+                db_session,
+                publication=p,
+                run_id=run_id,
+                allow_arxiv_lookup=arxiv_lookup_allowed,
+            )
+            match = find_best_match(
+                target_title=p.title_raw,
+                target_year=p.year,
+                target_authors=p.author_text or "",
+                candidates=openalex_works,
+            )
+            if match:
+                p.year = match.publication_year or p.year
+                p.citation_count = match.cited_by_count or p.citation_count
+                p.pdf_url = match.oa_url or p.pdf_url
+                p.openalex_enriched = True
+        return True, arxiv_lookup_allowed
 
-            if not titles:
-                continue
-
-            try:
-                openalex_works = await client.get_works_by_filter(
-                    {"title.search": "|".join(titles)}, limit=batch_size * 3
-                )
-            except OpenAlexBudgetExhaustedError:
-                structured_log(
-                    logger,
-                    "warning",
-                    "ingestion.openalex_budget_exhausted",
-                    run_id=run_id,
-                )
-                break
-            except OpenAlexRateLimitError:
-                structured_log(
-                    logger,
-                    "warning",
-                    "ingestion.openalex_rate_limited",
-                    run_id=run_id,
-                )
-                await asyncio.sleep(60)
-                continue
-            except Exception as e:
-                structured_log(
-                    logger,
-                    "warning",
-                    "ingestion.openalex_enrichment_failed",
-                    error=str(e),
-                    run_id=run_id,
-                )
-                continue
-
-            for p in batch:
-                if await self.run_is_canceled(db_session, run_id=run_id):
-                    logger.info("ingestion.enrichment_aborted", extra={"run_id": run_id})
-                    return
-
-                p.openalex_last_attempt_at = now
-                arxiv_lookup_allowed = await self._discover_identifiers_for_enrichment(
-                    db_session,
-                    publication=p,
-                    run_id=run_id,
-                    allow_arxiv_lookup=arxiv_lookup_allowed,
-                )
-
-                match = find_best_match(
-                    target_title=p.title_raw,
-                    target_year=p.year,
-                    target_authors=p.author_text or "",
-                    candidates=openalex_works,
-                )
-                if match:
-                    p.year = match.publication_year or p.year
-                    p.citation_count = match.cited_by_count or p.citation_count
-                    p.pdf_url = match.oa_url or p.pdf_url
-                    p.openalex_enriched = True
-
+    async def _flush_and_sweep_duplicates(
+        self,
+        db_session: AsyncSession,
+        *,
+        run_id: int,
+    ) -> None:
         await db_session.flush()
-
         from app.services.publications.dedup import sweep_identifier_duplicates
 
         merge_count = await sweep_identifier_duplicates(db_session)
@@ -177,6 +136,64 @@ class EnrichmentRunner:
                 merged_count=merge_count,
                 run_id=run_id,
             )
+
+    async def enrich_pending_publications(
+        self,
+        db_session: AsyncSession,
+        *,
+        run_id: int,
+        openalex_api_key: str | None = None,
+    ) -> None:
+        from app.services.openalex.client import (
+            OpenAlexBudgetExhaustedError,
+            OpenAlexClient,
+            OpenAlexRateLimitError,
+        )
+
+        _, publications = await self._load_unenriched_publications(db_session, run_id=run_id)
+        if not publications:
+            return
+
+        resolved_key = openalex_api_key or settings.openalex_api_key
+        client = OpenAlexClient(api_key=resolved_key, mailto=settings.crossref_api_mailto)
+        batch_size = 25
+        now = datetime.now(UTC)
+        arxiv_lookup_allowed = True
+
+        for i in range(0, len(publications), batch_size):
+            if await self.run_is_canceled(db_session, run_id=run_id):
+                logger.info("ingestion.enrichment_aborted", extra={"run_id": run_id})
+                return
+            batch = publications[i : i + batch_size]
+            titles = _sanitize_titles(batch)
+            if not titles:
+                continue
+            try:
+                openalex_works = await client.get_works_by_filter(
+                    {"title.search": "|".join(titles)}, limit=batch_size * 3
+                )
+            except OpenAlexBudgetExhaustedError:
+                structured_log(logger, "warning", "ingestion.openalex_budget_exhausted", run_id=run_id)
+                break
+            except OpenAlexRateLimitError:
+                structured_log(logger, "warning", "ingestion.openalex_rate_limited", run_id=run_id)
+                await asyncio.sleep(60)
+                continue
+            except Exception as e:
+                structured_log(logger, "warning", "ingestion.openalex_enrichment_failed", error=str(e), run_id=run_id)
+                continue
+            should_continue, arxiv_lookup_allowed = await self._enrich_batch(
+                db_session,
+                batch=batch,
+                run_id=run_id,
+                openalex_works=openalex_works,
+                now=now,
+                arxiv_lookup_allowed=arxiv_lookup_allowed,
+            )
+            if not should_continue:
+                return
+
+        await self._flush_and_sweep_duplicates(db_session, run_id=run_id)
 
     async def _discover_identifiers_for_enrichment(
         self,
@@ -275,23 +292,15 @@ class EnrichmentRunner:
 
         for i in range(0, len(publications), batch_size):
             batch = publications[i : i + batch_size]
-
-            titles = []
-            for p in batch:
-                if not p.title:
-                    continue
-                safe_title = re.sub(r"[^\w\s]", " ", p.title)
-                safe_title = " ".join(safe_title.split())
-                if safe_title:
-                    titles.append(safe_title)
-
+            titles = _sanitize_titles(batch)
             if not titles:
                 enriched.extend(batch)
                 continue
 
-            query = "|".join(t for t in titles)
             try:
-                openalex_works = await client.get_works_by_filter({"title.search": query}, limit=batch_size * 3)
+                openalex_works = await client.get_works_by_filter(
+                    {"title.search": "|".join(titles)}, limit=batch_size * 3
+                )
             except Exception as e:
                 logger.warning(
                     "ingestion.openalex_enrichment_failed",

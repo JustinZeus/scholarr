@@ -281,74 +281,72 @@ class QueueJobRunner:
                 await self._reschedule_queue_job_after_exception(job, exc=exc)
         return None
 
-    async def _finalize_queue_job_after_run(self, job: queue_service.ContinuationQueueJob, run_summary) -> None:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
-            if int(run_summary.failed_count) <= 0:
-                queue_item = await queue_service.reset_attempt_count(session, job_id=job.id)
-                await session.commit()
-                if queue_item is None:
-                    structured_log(
-                        logger,
-                        "info",
-                        "scheduler.queue_item_resolved",
-                        queue_item_id=job.id,
-                        user_id=job.user_id,
-                        run_id=run_summary.crawl_run_id,
-                        status=run_summary.status.value,
-                    )
-                    return
-                structured_log(
-                    logger,
-                    "info",
-                    "scheduler.queue_item_progressed",
-                    queue_item_id=job.id,
-                    user_id=job.user_id,
-                    run_id=run_summary.crawl_run_id,
-                    status=run_summary.status.value,
-                    attempt_count=int(queue_item.attempt_count),
-                )
-                return
-            queue_item = await queue_service.increment_attempt_count(session, job_id=job.id)
-            if queue_item is None:
-                await session.commit()
-                structured_log(
-                    logger,
-                    "info",
-                    "scheduler.queue_item_resolved",
-                    queue_item_id=job.id,
-                    user_id=job.user_id,
-                    run_id=run_summary.crawl_run_id,
-                    status=run_summary.status.value,
-                )
-                return
-            if int(queue_item.attempt_count) >= self._continuation_max_attempts:
-                await queue_service.mark_dropped(session, job_id=job.id, reason="max_attempts_after_run")
-                await session.commit()
-                structured_log(
-                    logger,
-                    "warning",
-                    "scheduler.queue_item_dropped_max_attempts_after_run",
-                    queue_item_id=job.id,
-                    user_id=job.user_id,
-                    attempt_count=queue_item.attempt_count,
-                    run_id=run_summary.crawl_run_id,
-                    status=run_summary.status.value,
-                )
-                return
-            delay_seconds = queue_service.compute_backoff_seconds(
-                base_seconds=self._continuation_base_delay_seconds,
-                attempt_count=int(queue_item.attempt_count),
-                max_seconds=self._continuation_max_delay_seconds,
+    async def _finalize_successful_queue_job(self, session, job, run_summary) -> None:
+        queue_item = await queue_service.reset_attempt_count(session, job_id=job.id)
+        await session.commit()
+        if queue_item is None:
+            structured_log(
+                logger,
+                "info",
+                "scheduler.queue_item_resolved",
+                queue_item_id=job.id,
+                user_id=job.user_id,
+                run_id=run_summary.crawl_run_id,
+                status=run_summary.status.value,
             )
-            await queue_service.reschedule_job(
-                session,
-                job_id=job.id,
-                delay_seconds=delay_seconds,
-                reason=queue_item.reason,
-                error=queue_item.last_error,
-            )
+            return
+        structured_log(
+            logger,
+            "info",
+            "scheduler.queue_item_progressed",
+            queue_item_id=job.id,
+            user_id=job.user_id,
+            run_id=run_summary.crawl_run_id,
+            status=run_summary.status.value,
+            attempt_count=int(queue_item.attempt_count),
+        )
+
+    async def _finalize_failed_queue_job(self, session, job, run_summary) -> None:
+        queue_item = await queue_service.increment_attempt_count(session, job_id=job.id)
+        if queue_item is None:
             await session.commit()
+            structured_log(
+                logger,
+                "info",
+                "scheduler.queue_item_resolved",
+                queue_item_id=job.id,
+                user_id=job.user_id,
+                run_id=run_summary.crawl_run_id,
+                status=run_summary.status.value,
+            )
+            return
+        if int(queue_item.attempt_count) >= self._continuation_max_attempts:
+            await queue_service.mark_dropped(session, job_id=job.id, reason="max_attempts_after_run")
+            await session.commit()
+            structured_log(
+                logger,
+                "warning",
+                "scheduler.queue_item_dropped_max_attempts_after_run",
+                queue_item_id=job.id,
+                user_id=job.user_id,
+                attempt_count=queue_item.attempt_count,
+                run_id=run_summary.crawl_run_id,
+                status=run_summary.status.value,
+            )
+            return
+        delay_seconds = queue_service.compute_backoff_seconds(
+            base_seconds=self._continuation_base_delay_seconds,
+            attempt_count=int(queue_item.attempt_count),
+            max_seconds=self._continuation_max_delay_seconds,
+        )
+        await queue_service.reschedule_job(
+            session,
+            job_id=job.id,
+            delay_seconds=delay_seconds,
+            reason=queue_item.reason,
+            error=queue_item.last_error,
+        )
+        await session.commit()
         structured_log(
             logger,
             "info",
@@ -360,6 +358,14 @@ class QueueJobRunner:
             attempt_count=int(queue_item.attempt_count),
             delay_seconds=delay_seconds,
         )
+
+    async def _finalize_queue_job_after_run(self, job: queue_service.ContinuationQueueJob, run_summary) -> None:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            if int(run_summary.failed_count) <= 0:
+                await self._finalize_successful_queue_job(session, job, run_summary)
+            else:
+                await self._finalize_failed_queue_job(session, job, run_summary)
 
     async def _run_queue_job(self, job: queue_service.ContinuationQueueJob) -> None:
         if await self._drop_queue_job_if_max_attempts(job):
