@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="frontend/public/scholar_logo.png" alt="Scholarr" width="120" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/logo-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="frontend/public/scholar_logo.png" />
+  <img src="frontend/public/scholar_logo.png" alt="Scholarr" width="120" />
+</picture>
 
 # Scholarr
 
@@ -92,13 +96,15 @@ BOOTSTRAP_ADMIN_PASSWORD=<secure-password>
 
 ```mermaid
 graph LR
-    Scholar[Google Scholar] -->|Scrape HTML| Parser[Parser & Fingerprinting]
-    Parser -->|Deduplicate| DB[(PostgreSQL)]
-    Parser -.->|Identify| APIs[arXiv / Crossref / OpenAlex]
-    APIs --> DB
+    UI[Vue 3 Dashboard] <-->|REST + SSE| API[FastAPI]
+    API --> Scheduler[Scheduler]
+    Scheduler -->|Scrape HTML| Scholar[Google Scholar]
+    Scholar -->|Parse & Deduplicate| DB[(PostgreSQL)]
+    Scholar -.->|Identify| Ext[arXiv / Crossref / OpenAlex]
+    Ext --> DB
     DB -->|DOIs| PDF[PDF Resolution]
     PDF -->|Unpaywall / arXiv| DB
-    DB --> UI[Vue 3 Dashboard]
+    API <--> DB
 ```
 
 ## Tech Stack
