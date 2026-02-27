@@ -22,8 +22,8 @@ from app.services.ingestion.constants import RUN_LOCK_NAMESPACE
 from app.services.ingestion.enrichment import EnrichmentRunner
 from app.services.ingestion.pagination import PaginationEngine
 from app.services.ingestion.run_completion import (
-    int_or_default,
     complete_run_for_user,
+    int_or_default,
     run_execution_summary,
 )
 from app.services.ingestion.scholar_processing import run_scholar_iteration

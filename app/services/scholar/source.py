@@ -74,9 +74,7 @@ class LiveScholarSource:
         self._min_interval_seconds = max(configured_interval, 0.0)
         self._user_agents = user_agents or DEFAULT_USER_AGENTS
         self._rotate_user_agents = (
-            bool(settings.scholar_http_rotate_user_agent)
-            if rotate_user_agents is None
-            else bool(rotate_user_agents)
+            bool(settings.scholar_http_rotate_user_agent) if rotate_user_agents is None else bool(rotate_user_agents)
         )
         configured_user_agent = settings.scholar_http_user_agent.strip()
         self._configured_user_agent = configured_user_agent or None

@@ -184,9 +184,7 @@ class SchedulerService:
             run_interval_minutes=int(run_interval_minutes),
             request_delay_seconds=effective_request_delay_seconds(
                 request_delay_seconds,
-                floor=user_settings_service.resolve_request_delay_minimum(
-                    settings.ingestion_min_request_delay_seconds
-                ),
+                floor=user_settings_service.resolve_request_delay_minimum(settings.ingestion_min_request_delay_seconds),
             ),
             cooldown_until=cooldown_until,
             cooldown_reason=(str(cooldown_reason).strip() if cooldown_reason else None),

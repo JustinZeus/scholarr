@@ -69,30 +69,30 @@ async def _run_serialized_fetch(
 ) -> tuple[httpx.Response, bool]:
     session_factory = get_session_factory()
     async with session_factory() as db_session, db_session.begin():
-            await _acquire_arxiv_lock(db_session)
-            runtime_state = await _load_runtime_state_for_update(db_session)
-            wait_seconds = await _wait_for_allowed_slot_or_raise(
-                runtime_state,
-                source_path=source_path,
-            )
-            response = await fetch()
-            hit_rate_limit = _record_post_response_state(
-                runtime_state,
-                response_status=int(response.status_code),
-                source_path=source_path,
-            )
-            structured_log(
-                logger,
-                "info",
-                "arxiv.request_completed",
-                status_code=int(response.status_code),
-                wait_seconds=wait_seconds,
-                cooldown_remaining_seconds=_cooldown_remaining_seconds(
-                    runtime_state.cooldown_until, now_utc=datetime.now(UTC)
-                ),
-                source_path=source_path,
-            )
-            return response, hit_rate_limit
+        await _acquire_arxiv_lock(db_session)
+        runtime_state = await _load_runtime_state_for_update(db_session)
+        wait_seconds = await _wait_for_allowed_slot_or_raise(
+            runtime_state,
+            source_path=source_path,
+        )
+        response = await fetch()
+        hit_rate_limit = _record_post_response_state(
+            runtime_state,
+            response_status=int(response.status_code),
+            source_path=source_path,
+        )
+        structured_log(
+            logger,
+            "info",
+            "arxiv.request_completed",
+            status_code=int(response.status_code),
+            wait_seconds=wait_seconds,
+            cooldown_remaining_seconds=_cooldown_remaining_seconds(
+                runtime_state.cooldown_until, now_utc=datetime.now(UTC)
+            ),
+            source_path=source_path,
+        )
+        return response, hit_rate_limit
 
 
 async def _acquire_arxiv_lock(db_session: AsyncSession) -> None:

@@ -84,9 +84,7 @@ async def test_deferred_enrichment_sweeps_previous_runs(db_session: AsyncSession
     # We patch the client at its source, and also mock arXiv to avoid real HTTP calls
     with (
         patch("app.services.openalex.client.OpenAlexClient") as MockClient,
-        patch(
-            "app.services.arxiv.application.discover_arxiv_id_for_publication", new=AsyncMock(return_value=None)
-        ),
+        patch("app.services.arxiv.application.discover_arxiv_id_for_publication", new=AsyncMock(return_value=None)),
     ):
         mock_instance = MockClient.return_value
         mock_instance.get_works_by_filter = AsyncMock(return_value=[mock_work])

@@ -9,7 +9,6 @@ from app.logging_utils import structured_log
 from app.services.publication_identifiers import application as identifier_service
 from app.services.publications.pdf_queue_common import (
     PDF_STATUS_FAILED,
-    PDF_STATUS_QUEUED,
     PDF_STATUS_RESOLVED,
     PDF_STATUS_RUNNING,
     event_row,

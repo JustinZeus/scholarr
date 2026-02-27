@@ -286,9 +286,7 @@ class PaginationEngine:
     ) -> None:
         deduped = _dedupe_publication_candidates(list(publications), seen_canonical=seen_canonical)
         if deduped:
-            discovered_count = await upsert_publications_fn(
-                db_session, run=run, scholar=scholar, publications=deduped
-            )
+            discovered_count = await upsert_publications_fn(db_session, run=run, scholar=scholar, publications=deduped)
             state.discovered_publication_count += discovered_count
 
     async def _paginate_loop(
