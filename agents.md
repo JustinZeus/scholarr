@@ -1,47 +1,95 @@
 # AI Agent Instructions: Scholarr
 
-Adhere strictly to these constraints.
+Adhere strictly to these constraints when working on this codebase.
 
-## 1. Coding Standards (Strict Enforcement)
+## 1. Code Quality
 
-- **Function Length:** Maximum 50 lines of code per function. Break down complex logic into small, testable, single-responsibility functions.
-- **DRY (Don't Repeat Yourself):** Abstract repetitive logic immediately. No duplicate boilerplate for database queries, API responses, or error handling.
-- **Negative Space Programming:** Utilize explicit assertions and constraints to define invalid states. Fail fast and early. Do not allow silent failures or cascading malformed data, especially in DOM parsing.
-- **Cyclomatic Complexity:** Flatten logic. Use early returns and guard clauses instead of deep nesting.
-  no magic numbers
+- **Function length:** 50 lines max. Extract helpers ruthlessly.
+- **File length:** 400 lines target, 600 lines hard ceiling. Files above this must be decomposed before adding more code.
+- **DRY:** Abstract repeated logic immediately. No duplicate boilerplate for queries, responses, or error handling.
+- **Negative space programming:** Fail fast with explicit assertions and guard clauses. No silent failures, especially in DOM parsing.
+- **Cyclomatic complexity:** Flatten with early returns. No deep nesting. No magic numbers.
+- **No dead code:** Do not leave commented-out code, unused imports, or backward-compatibility shims. Delete cleanly.
 
-## 2. Domain Architecture & Data Model
+## 2. Architecture
 
-- **Data Isolation:** Scholar tracking is **user-scoped**. Validate mapping/join tables; never assume global links between users and Scholar IDs.
-- **Data Deduplication:** Publications are **global records**. Deduplicate via Scholar cluster ID and normalized fingerprinting prior to database insertion.
-- **State Management:** Visibility and "read/unread" states exist exclusively on the scholar-publication link table, not the global publication table.
-- **API Contract:** Exact envelope format required:
-  - Success: `{"data": ..., "meta": {"request_id": "..."}}`
-  - Error: `{"error": {"code": "...", "message": "...", "details": ...}, "meta": {"request_id": "..."}}`
+### Data Model
 
-## 3. Scrape Safety & Rate Limiting (Immutable)
+- Scholar tracking is **user-scoped**. Never assume global links between users and Scholar IDs.
+- Publications are **global, deduplicated records**. Deduplicate via cluster ID and normalized fingerprinting.
+- Read/unread, favorites, and visibility state live on the **scholar-publication link**, not the publication.
 
-These limits prevent IP bans and are not to be optimized away.
+### Service Boundaries
 
-- **Minimum Delay:** Enforce `INGESTION_MIN_REQUEST_DELAY_SECONDS` (default 2s) between all external requests.
-- **Anti-Detection:** Default to direct ID or profile URL ingestion. Name searches trigger CAPTCHAs.
-- **Cooldowns:** Respect `INGESTION_SAFETY_COOLDOWN_BLOCKED_SECONDS` (1800s) and `INGESTION_SAFETY_COOLDOWN_NETWORK_SECONDS` (900s) upon threshold breaches.
+All business logic lives in `app/services/<domain>/`. No flat files in `app/services/` root. Each domain owns its application service, types, and helpers.
 
-## 4. Current Environment & Stack
+### API Envelope
 
-- **Backend:** Python 3.12+, FastAPI, SQLAlchemy (Async/asyncpg), Alembic.
-- **Frontend:** TypeScript, Vue 3, Vite.
-- **Infrastructure:** Multi-stage Docker.
+All `/api/v1` responses use this exact envelope:
 
-## 5. Domain Service Boundaries
+```
+Success: {"data": ..., "meta": {"request_id": "..."}}
+Error:   {"error": {"code": "...", "message": "...", "details": ...}, "meta": {"request_id": "..."}}
+```
 
-- **Strict Modularity:** Flat files in the `app/services/` root are strictly prohibited. All business logic and routing must reside exclusively within `app/services/<domain>/`.
+Use the Pydantic envelope schemas in `app/api/schemas.py`. Do not construct raw dicts.
 
-## 6. UI rules
+## 3. Scrape Safety (Immutable)
 
-Make sure to properly integrate tailwind in combination with the preset theming
-Clarity through both styling and language are a priority. all UI elements need to have a proper reason for existing.
+These constraints prevent IP bans. They are not tunable to zero and must not be optimized away.
+
+- Enforce `INGESTION_MIN_REQUEST_DELAY_SECONDS` (default 2s) between all external requests.
+- Default to direct ID or profile URL ingestion. Name searches trigger CAPTCHAs.
+- Respect `INGESTION_SAFETY_COOLDOWN_BLOCKED_SECONDS` (1800s) and `INGESTION_SAFETY_COOLDOWN_NETWORK_SECONDS` (900s) upon threshold breaches.
+
+## 4. Logging
+
+Use `structured_log()` from `app/logging_utils.py` for all domain logging. Do not use raw `logger.info()` / `logger.warning()` calls.
+
+```python
+from app.logging_utils import structured_log
+
+structured_log(logger, "info", "ingestion.run_started", user_id=user_id, scholar_count=count)
+```
+
+Every event name should be dot-namespaced to its domain (e.g., `arxiv.cache_hit`, `ingestion.safety_cooldown_entered`).
+
+## 5. Stack & Tooling
+
+- **Backend:** Python 3.12+, FastAPI, SQLAlchemy 2.0 (async/asyncpg), Alembic
+- **Frontend:** TypeScript, Vue 3, Vite, Tailwind CSS
+- **Infrastructure:** Multi-stage Docker, Docker Compose
+- **Package manager:** `uv` (used in Dockerfile and CI; `uv run` prefix for all commands)
+- **Linting:** `ruff check .` and `ruff format --check .` (config in `pyproject.toml`)
+- **Type checking:** `mypy app/`
+- **Versioning:** python-semantic-release with conventional commits
+
+## 6. Commits
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <description>
+```
+
+Types: `feat`, `fix`, `docs`, `ci`, `refactor`, `test`, `chore`, `perf`.
 
 ## 7. Testing
 
-All tests need to be ran using containers. `docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app`
+All tests run inside containers:
+
+```bash
+# Unit tests (default, excludes integration)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app python -m pytest
+
+# Integration tests
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app python -m pytest -m integration
+```
+
+Markers: `integration`, `db`, `migrations`, `schema`, `smoke`.
+
+## 8. Frontend
+
+- Use the tokenized theme system (`frontend/src/theme/presets/`). Do not hardcode colors.
+- Integrate Tailwind with preset theme tokens. Reference `frontend/scripts/check_theme_tokens.mjs` for enforcement.
+- Every UI element must have a clear purpose. Clarity through styling and language.
