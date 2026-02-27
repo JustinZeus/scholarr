@@ -1,33 +1,27 @@
 ---
-slug: /
+title: Scholarr Documentation
+sidebar_position: 1
 ---
 
-# scholarr Documentation
+# Scholarr
 
-This documentation is organized for both users and developers.
+Scholarr is a self-hosted academic publication tracker. It monitors Google Scholar profiles, discovers new publications, resolves open-access PDFs, and presents everything through a clean Vue 3 dashboard.
 
-## For Users
+## Quick Links
 
-- [User Overview](./user/overview.md)
-- [Getting Started](./user/getting-started.md)
+| Section | Description |
+|---------|-------------|
+| [User Guide](user/overview.md) | What scholarr does, installation, configuration |
+| [Developer Guide](developer/overview.md) | Architecture, local development, contributing |
+| [Operations](operations/overview.md) | Deployment, database runbook, scrape safety |
+| [Reference](reference/overview.md) | API contract, environment variables, changelog |
 
-## For Operators
+## Key Features
 
-- [Operations Overview](./operations/overview.md)
-- [Scrape Safety Runbook](./operations/scrape-safety-runbook.md)
-- [Database Runbook](./operations/database-runbook.md)
-- [Migration Rollout Checklist](./operations/migration-checklist.md)
-
-## For Developers
-
-- [Developer Overview](./developer/overview.md)
-- [Local Development](./developer/local-development.md)
-- [Architecture Boundaries](./developer/architecture.md)
-- [Contributing](./developer/contributing.md)
-- [Frontend Theme Inventory](./developer/frontend-theme-inventory.md)
-
-## Reference
-
-- [Reference Overview](./reference/overview.md)
-- [API Contract](./reference/api-contract.md)
-- [Environment Reference](./reference/environment.md)
+- **Scholar Tracking** - Add Google Scholar profiles by ID, URL, or name search
+- **Automated Ingestion** - Background scheduler fetches new publications on a configurable interval
+- **Identifier Resolution** - Cross-references arXiv, Crossref, and OpenAlex for DOIs and metadata
+- **PDF Discovery** - Resolves open-access PDFs via Unpaywall and arXiv
+- **Import/Export** - Portable scholar data with full publication state
+- **Multi-User** - Session-based auth with admin user management
+- **Theming** - Multiple color presets with light/dark mode support

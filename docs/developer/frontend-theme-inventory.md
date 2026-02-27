@@ -1,89 +1,105 @@
-# Theme Inventory (Phase 0)
+---
+title: Frontend Theme Inventory
+sidebar_position: 6
+---
 
-This file captures the semantic color system baseline for the theme refactor.
+# Frontend Theme Inventory
 
 ## Token Domains
 
-- `scale`:
-  - `brand` (`50..950`)
-  - `info` (`50..950`)
-  - `success` (`50..950`)
-  - `warning` (`50..950`)
-  - `danger` (`50..950`)
-- `surface`:
-  - `app`
-  - `nav`
-  - `nav_active`
-  - `card`
-  - `card_muted`
-  - `table`
-  - `table_header`
-  - `input`
-  - `overlay`
-- `text`:
-  - `primary`
-  - `secondary`
-  - `muted`
-  - `inverse`
-  - `link`
-- `border`:
-  - `default`
-  - `strong`
-  - `subtle`
-  - `interactive`
-- `focus`:
-  - `ring`
-  - `ring_offset`
-- `action` variants (`primary`, `secondary`, `ghost`, `danger`):
-  - `bg`
-  - `border`
-  - `text`
-  - `hover_bg`
-  - `hover_border`
-  - `hover_text`
-- `state` variants (`info`, `success`, `warning`, `danger`):
-  - `bg`
-  - `border`
-  - `text`
+The theme system uses semantic tokens organized into domains:
 
-## Theme Sources
+### Scale Colors
 
-Theme presets are dynamically loaded from `frontend/src/theme/presets/*.{json,js}`.
+Color ramps from `50` to `950` for each intent:
 
-Current preset files:
+- `brand` - Primary brand color
+- `info` - Informational elements
+- `success` - Success states
+- `warning` - Warning states
+- `danger` - Error/destructive states
 
-- `frontend/src/theme/presets/parchment.js`
-- `frontend/src/theme/presets/lilac.js`
-- `frontend/src/theme/presets/dune.js`
-- `frontend/src/theme/presets/oatmeal.js`
-- `frontend/src/theme/presets/scholarly.json`
-- `frontend/src/theme/presets/graphite.json`
-- `frontend/src/theme/presets/tide.json`
+### Surface
 
-Each preset contains both `light` and `dark` mode token definitions.
+Background colors for major UI areas:
 
-## Adoption Status (Phase 0-3 complete baseline)
+| Token | Usage |
+|-------|-------|
+| `app` | Application background |
+| `nav` | Navigation bar |
+| `nav_active` | Active navigation item |
+| `card` | Card backgrounds |
+| `card_muted` | Muted card variant |
+| `table` | Table body |
+| `table_header` | Table header |
+| `input` | Form inputs |
+| `overlay` | Modal/dialog overlays |
 
-Tokenized foundation components:
+### Text
 
-- `AppButton`
-- `AppCard`
-- `AppCheckbox`
-- `AppEmptyState`
-- `AppHelpHint`
-- `AppInput`
-- `AppSelect`
-- `AppTable`
-- `AppModal`
-- `AppHeader`
-- `AppNav`
-- `AppAlert`
-- `AppBadge`
-- `RunStatusBadge`
-- `QueueHealthBadge`
+| Token | Usage |
+|-------|-------|
+| `primary` | Default text |
+| `secondary` | Supporting text |
+| `muted` | Disabled/placeholder text |
+| `inverse` | Text on dark backgrounds |
+| `link` | Hyperlinks |
 
-Hardening in place:
+### Border
 
-- Frontend token policy check script: `frontend/scripts/check_theme_tokens.mjs`
-- CI enforcement step in `frontend-quality` workflow
-- Theme preset integrity tests in `frontend/src/theme/presets.test.ts`
+| Token | Usage |
+|-------|-------|
+| `default` | Standard borders |
+| `strong` | Emphasized borders |
+| `subtle` | Light separators |
+| `interactive` | Hover/focus borders |
+
+### Focus
+
+| Token | Usage |
+|-------|-------|
+| `ring` | Focus ring color |
+| `ring_offset` | Focus ring offset color |
+
+### Action Variants
+
+Each action type (`primary`, `secondary`, `ghost`, `danger`) provides:
+
+`bg`, `border`, `text`, `hover_bg`, `hover_border`, `hover_text`
+
+### State Variants
+
+Each state (`info`, `success`, `warning`, `danger`) provides:
+
+`bg`, `border`, `text`
+
+## Theme Presets
+
+Presets are loaded from `frontend/src/theme/presets/*.{json,js}`. Each contains both `light` and `dark` mode token definitions.
+
+Current presets:
+
+| Preset | Format |
+|--------|--------|
+| `parchment` | JS |
+| `lilac` | JS |
+| `dune` | JS |
+| `oatmeal` | JS |
+| `scholarly` | JSON |
+| `graphite` | JSON |
+| `tide` | JSON |
+
+## Tokenized Components
+
+Foundation components using the token system:
+
+- `AppButton`, `AppCard`, `AppCheckbox`, `AppEmptyState`
+- `AppHelpHint`, `AppInput`, `AppSelect`, `AppTable`
+- `AppModal`, `AppHeader`, `AppNav`, `AppAlert`
+- `AppBadge`, `RunStatusBadge`, `QueueHealthBadge`
+
+## Enforcement
+
+- Token policy check: `frontend/scripts/check_theme_tokens.mjs`
+- CI step in `frontend-quality` workflow
+- Preset integrity tests: `frontend/src/theme/presets.test.ts`
