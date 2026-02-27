@@ -38,18 +38,18 @@ def classify_block_or_captcha_reason(
 ) -> str | None:
     if "accounts.google.com" in final_url and ("signin" in final_url or "servicelogin" in final_url):
         return "blocked_accounts_redirect"
-    if status_code == 429:
-        return "blocked_http_429_rate_limited"
-    if status_code == 403:
-        if "recaptcha" in body_lowered or "captcha" in body_lowered or "sorry/index" in final_url:
-            return "blocked_http_403_captcha_challenge"
-        return "blocked_http_403_forbidden"
     if "sorry/index" in final_url or "sorry/index" in body_lowered:
         return "blocked_google_sorry_challenge"
     if "our systems have detected" in body_lowered or "unusual traffic" in body_lowered:
         return "blocked_unusual_traffic_detected"
     if "automated queries" in body_lowered:
         return "blocked_automated_queries_detected"
+    if status_code == 429:
+        return "blocked_http_429_rate_limited"
+    if status_code == 403:
+        if "recaptcha" in body_lowered or "captcha" in body_lowered:
+            return "blocked_http_403_captcha_challenge"
+        return "blocked_http_403_forbidden"
     if "not a robot" in body_lowered:
         return "blocked_not_a_robot_challenge"
     if "recaptcha" in body_lowered:

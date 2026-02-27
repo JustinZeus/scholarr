@@ -14,9 +14,12 @@ import AppTabs, { type AppTabItem } from "@/components/ui/AppTabs.vue";
 import SettingsAdminPanel from "@/features/settings/SettingsAdminPanel.vue";
 import {
   changePassword,
+  fetchAdminScholarHttpSettings,
   fetchSettings,
+  type AdminScholarHttpSettings,
   type UserSettings,
   type UserSettingsUpdate,
+  updateAdminScholarHttpSettings,
   updateSettings,
 } from "@/features/settings";
 import { ApiRequestError } from "@/lib/api/errors";
@@ -40,6 +43,7 @@ const router = useRouter();
 
 const loading = ref(true);
 const saving = ref(false);
+const savingScholarHttp = ref(false);
 const updatingPassword = ref(false);
 
 const autoRunEnabled = ref(false);
@@ -49,6 +53,10 @@ const navVisiblePages = ref<string[]>([]);
 const openalexApiKey = ref("");
 const crossrefApiToken = ref("");
 const crossrefApiMailto = ref("");
+const scholarHttpUserAgent = ref("");
+const scholarHttpRotateUserAgent = ref(false);
+const scholarHttpAcceptLanguage = ref("en-US,en;q=0.9");
+const scholarHttpCookie = ref("");
 
 const currentPassword = ref("");
 const newPassword = ref("");
@@ -142,6 +150,13 @@ function hydrateSettings(settings: UserSettings): void {
   runStatus.setSafetyState(settings.safety_state);
 }
 
+function hydrateScholarHttpSettings(settings: AdminScholarHttpSettings): void {
+  scholarHttpUserAgent.value = settings.user_agent;
+  scholarHttpRotateUserAgent.value = Boolean(settings.rotate_user_agent);
+  scholarHttpAcceptLanguage.value = settings.accept_language;
+  scholarHttpCookie.value = settings.cookie;
+}
+
 function parseBoundedInteger(value: string, label: string, minimum: number): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) {
@@ -160,6 +175,9 @@ async function loadSettings(): Promise<void> {
   try {
     const settings = await fetchSettings();
     hydrateSettings(settings);
+    if (auth.isAdmin) {
+      hydrateScholarHttpSettings(await fetchAdminScholarHttpSettings());
+    }
   } catch (error) {
     if (error instanceof ApiRequestError) {
       errorMessage.value = error.message;
@@ -169,6 +187,32 @@ async function loadSettings(): Promise<void> {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+async function onSaveScholarHttpSettings(): Promise<void> {
+  savingScholarHttp.value = true;
+  errorMessage.value = null;
+  errorRequestId.value = null;
+  successMessage.value = null;
+  try {
+    const updated = await updateAdminScholarHttpSettings({
+      user_agent: scholarHttpUserAgent.value.trim(),
+      rotate_user_agent: scholarHttpRotateUserAgent.value,
+      accept_language: scholarHttpAcceptLanguage.value.trim(),
+      cookie: scholarHttpCookie.value.trim(),
+    });
+    hydrateScholarHttpSettings(updated);
+    successMessage.value = "Scholar HTTP profile updated.";
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      errorMessage.value = error.message;
+      errorRequestId.value = error.requestId;
+    } else {
+      errorMessage.value = "Unable to save Scholar HTTP profile.";
+    }
+  } finally {
+    savingScholarHttp.value = false;
   }
 }
 
@@ -403,6 +447,49 @@ onMounted(async () => {
                 <span>Mailto (Polite Pool)</span>
                 <AppInput v-model="crossrefApiMailto" placeholder="e.g. admin@yourdomain.com" type="email" autocomplete="off" />
               </label>
+            </div>
+
+            <div class="grid gap-2 rounded-lg border border-stroke-default bg-surface-card-muted p-3">
+              <h3 class="text-sm font-semibold text-ink-secondary">Scholar Request Profile</h3>
+              <p class="text-xs text-secondary mb-2">
+                Tune Scholar HTTP fingerprint behavior used by live scraper requests. Changes apply to new runs.
+              </p>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+                <span>User-Agent override</span>
+                <AppInput
+                  v-model="scholarHttpUserAgent"
+                  placeholder="Leave empty to use built-in browser-like user agent"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary mt-2">
+                <span>Accept-Language</span>
+                <AppInput
+                  v-model="scholarHttpAcceptLanguage"
+                  placeholder="e.g. en-US,en;q=0.9"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary mt-2">
+                <span>Cookie header</span>
+                <AppInput
+                  v-model="scholarHttpCookie"
+                  placeholder="Optional. Leave empty to disable cookie passthrough"
+                  autocomplete="off"
+                />
+              </label>
+              <div class="mt-2">
+                <AppCheckbox
+                  id="scholar-http-rotate-user-agent"
+                  v-model="scholarHttpRotateUserAgent"
+                  label="Rotate user-agent per request"
+                />
+              </div>
+              <div>
+                <AppButton :disabled="savingScholarHttp" @click="onSaveScholarHttpSettings">
+                  {{ savingScholarHttp ? "Saving..." : "Save Scholar request profile" }}
+                </AppButton>
+              </div>
             </div>
           </div>
 

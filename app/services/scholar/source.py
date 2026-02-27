@@ -62,6 +62,7 @@ class LiveScholarSource:
         *,
         timeout_seconds: float = 25.0,
         min_interval_seconds: float | None = None,
+        rotate_user_agents: bool | None = None,
         user_agents: list[str] | None = None,
     ) -> None:
         self._timeout_seconds = timeout_seconds
@@ -72,6 +73,38 @@ class LiveScholarSource:
         )
         self._min_interval_seconds = max(configured_interval, 0.0)
         self._user_agents = user_agents or DEFAULT_USER_AGENTS
+        self._rotate_user_agents = (
+            bool(settings.scholar_http_rotate_user_agent)
+            if rotate_user_agents is None
+            else bool(rotate_user_agents)
+        )
+        configured_user_agent = settings.scholar_http_user_agent.strip()
+        self._configured_user_agent = configured_user_agent or None
+        self._accept_language = settings.scholar_http_accept_language.strip() or "en-US,en;q=0.9"
+        self._cookie_header = settings.scholar_http_cookie.strip() or None
+        self._stable_user_agent = self._resolve_initial_user_agent()
+
+    def _resolve_initial_user_agent(self) -> str:
+        if self._configured_user_agent is not None:
+            return self._configured_user_agent
+        return random.choice(self._user_agents)
+
+    def _resolve_user_agent_for_request(self) -> str:
+        if self._configured_user_agent is not None:
+            return self._configured_user_agent
+        if self._rotate_user_agents:
+            return random.choice(self._user_agents)
+        return self._stable_user_agent
+
+    def _request_headers(self) -> dict[str, str]:
+        headers = {
+            "User-Agent": self._resolve_user_agent_for_request(),
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": self._accept_language,
+        }
+        if self._cookie_header is not None:
+            headers["Cookie"] = self._cookie_header
+        return headers
 
     async def fetch_profile_html(self, scholar_id: str) -> FetchResult:
         return await self.fetch_profile_page_html(
@@ -116,15 +149,21 @@ class LiveScholarSource:
         return await asyncio.to_thread(self._fetch_sync, requested_url)
 
     def _build_request(self, requested_url: str) -> Request:
-        return Request(
-            requested_url,
-            headers={
-                "User-Agent": random.choice(self._user_agents),
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Connection": "close",
-            },
-        )
+        return Request(requested_url, headers=self._request_headers())
+
+    @staticmethod
+    def _http_error_reason(*, status_code: int, final_url: str, body: str) -> str:
+        lowered_url = final_url.lower()
+        lowered_body = body.lower()
+        if "sorry/index" in lowered_url or "sorry/index" in lowered_body:
+            return "blocked_google_sorry_challenge"
+        if "our systems have detected" in lowered_body or "unusual traffic" in lowered_body:
+            return "blocked_unusual_traffic_detected"
+        if "automated queries" in lowered_body:
+            return "blocked_automated_queries_detected"
+        if status_code == 429:
+            return "blocked_http_429_rate_limited"
+        return f"http_error_status_{status_code}"
 
     @staticmethod
     def _http_error_body(exc: HTTPError) -> str:
@@ -151,18 +190,27 @@ class LiveScholarSource:
 
     @staticmethod
     def _http_error_result(requested_url: str, exc: HTTPError) -> FetchResult:
+        final_url = exc.geturl()
+        body = LiveScholarSource._http_error_body(exc)
+        block_reason = LiveScholarSource._http_error_reason(
+            status_code=exc.code,
+            final_url=final_url,
+            body=body,
+        )
         structured_log(
             logger,
             "warning",
             "scholar_source.fetch_http_error",
             requested_url=requested_url,
             status_code=exc.code,
+            final_url=final_url,
+            block_reason=block_reason,
         )
         return FetchResult(
             requested_url=requested_url,
             status_code=exc.code,
-            final_url=exc.geturl(),
-            body=LiveScholarSource._http_error_body(exc),
+            final_url=final_url,
+            body=body,
             error=str(exc),
         )
 

@@ -394,6 +394,61 @@ async def test_api_admin_user_management_endpoints(db_session: AsyncSession) -> 
 @pytest.mark.integration
 @pytest.mark.db
 @pytest.mark.asyncio
+async def test_api_admin_scholar_http_settings_endpoints(db_session: AsyncSession) -> None:
+    await insert_user(
+        db_session,
+        email="api-admin-http@example.com",
+        password="admin-password",
+        is_admin=True,
+    )
+    await insert_user(
+        db_session,
+        email="api-member-http@example.com",
+        password="member-password",
+        is_admin=False,
+    )
+    previous_user_agent = settings.scholar_http_user_agent
+    previous_rotate = settings.scholar_http_rotate_user_agent
+    previous_accept_language = settings.scholar_http_accept_language
+    previous_cookie = settings.scholar_http_cookie
+    try:
+        client = TestClient(app)
+        login_user(client, email="api-admin-http@example.com", password="admin-password")
+        headers = _api_csrf_headers(client)
+
+        read_response = client.get("/api/v1/admin/settings/scholar-http")
+        assert read_response.status_code == 200
+
+        update_response = client.put(
+            "/api/v1/admin/settings/scholar-http",
+            json={
+                "user_agent": "Mozilla/5.0 Test Runner",
+                "rotate_user_agent": False,
+                "accept_language": "en-US,en;q=0.8",
+                "cookie": "SID=test-cookie",
+            },
+            headers=headers,
+        )
+        assert update_response.status_code == 200
+        payload = update_response.json()["data"]
+        assert payload["user_agent"] == "Mozilla/5.0 Test Runner"
+        assert payload["cookie"] == "SID=test-cookie"
+        assert settings.scholar_http_user_agent == "Mozilla/5.0 Test Runner"
+
+        client.post("/api/v1/auth/logout", headers=headers)
+        login_user(client, email="api-member-http@example.com", password="member-password")
+        forbidden_response = client.get("/api/v1/admin/settings/scholar-http")
+        assert forbidden_response.status_code == 403
+    finally:
+        object.__setattr__(settings, "scholar_http_user_agent", previous_user_agent)
+        object.__setattr__(settings, "scholar_http_rotate_user_agent", previous_rotate)
+        object.__setattr__(settings, "scholar_http_accept_language", previous_accept_language)
+        object.__setattr__(settings, "scholar_http_cookie", previous_cookie)
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.asyncio
 async def test_api_admin_dbops_integrity_and_repair_flow(db_session: AsyncSession) -> None:
     await insert_user(db_session, email="api-admin-dbops@example.com", password="admin-password", is_admin=True)
     target_user_id = await insert_user(db_session, email="api-dbops-target@example.com", password="target-password")

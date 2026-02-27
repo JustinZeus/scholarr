@@ -433,3 +433,18 @@ def test_parse_author_search_page_classifies_http_429_as_blocked() -> None:
 
     assert parsed.state == ParseState.BLOCKED_OR_CAPTCHA
     assert parsed.state_reason == "blocked_http_429_rate_limited"
+
+
+def test_parse_author_search_page_prefers_sorry_challenge_reason_over_generic_429() -> None:
+    fetch_result = FetchResult(
+        requested_url="https://scholar.google.com/citations?hl=en&view_op=search_authors&mauthors=ada",
+        status_code=429,
+        final_url="https://www.google.com/sorry/index?continue=scholar",
+        body="<html><body>Our systems have detected unusual traffic.</body></html>",
+        error=None,
+    )
+
+    parsed = parse_author_search_page(fetch_result)
+
+    assert parsed.state == ParseState.BLOCKED_OR_CAPTCHA
+    assert parsed.state_reason == "blocked_google_sorry_challenge"

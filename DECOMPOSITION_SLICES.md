@@ -26,7 +26,7 @@ This file contains self-contained decomposition prompts ("slices") to bring the 
 |---|-------|--------|
 | 1 | Schema split | **DONE** |
 | 2 | Ingestion: pagination + publication upsert | **DONE** |
-| 3 | Ingestion: enrichment + scholar processing + run completion | pending |
+| 3 | Ingestion: enrichment + scholar processing + run completion | **DONE** |
 | 4 | Scholars service + PDF queue | pending |
 | 5 | Routers + scheduler | pending |
 
@@ -63,7 +63,17 @@ Also fixed two external import paths (`portability/normalize.py`, `portability/p
 
 ---
 
-## Slice 3: Decompose `app/services/ingestion/application.py` — enrichment, scholar processing, run completion
+## Slice 3: Decompose `app/services/ingestion/application.py` — enrichment, scholar processing, run completion — DONE
+
+Completed. Extracted four logical chunks from `application.py` (2,085 → 635 lines):
+
+| File | Lines | Contents |
+|---|---|---|
+| `app/services/ingestion/enrichment.py` | 323 | `EnrichmentRunner` class — OpenAlex enrichment, identifier discovery, dedup sweep |
+| `app/services/ingestion/scholar_processing.py` | 614 | `process_scholar`, `run_scholar_iteration`, continuation queue, outcome resolution |
+| `app/services/ingestion/run_completion.py` | 417 | `complete_run_for_user`, failure summary, alert summary, safety outcome, progress tracking |
+
+Also updated two tests (`test_ingestion_arxiv_rate_limit.py`, `test_ingestion_progress_reporting.py`) and one integration test (`test_deferred_enrichment.py`) to import from new modules.
 
 **Why:** Three remaining logical chunks. Extracting all three brings `application.py` down to ~500 lines (the orchestration spine).
 

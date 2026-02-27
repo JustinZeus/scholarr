@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.ingestion.application import ScholarIngestionService
+from app.services.ingestion.run_completion import apply_outcome_to_progress
 from app.services.ingestion.types import RunProgress, ScholarProcessingOutcome
 
 
@@ -31,11 +31,11 @@ def _outcome(*, scholar_profile_id: int, outcome_label: str) -> ScholarProcessin
 def test_apply_outcome_to_progress_replaces_previous_scholar_outcome() -> None:
     progress = RunProgress()
 
-    ScholarIngestionService._apply_outcome_to_progress(
+    apply_outcome_to_progress(
         progress=progress,
         outcome=_outcome(scholar_profile_id=42, outcome_label="partial"),
     )
-    ScholarIngestionService._apply_outcome_to_progress(
+    apply_outcome_to_progress(
         progress=progress,
         outcome=_outcome(scholar_profile_id=42, outcome_label="success"),
     )
@@ -58,4 +58,4 @@ def test_apply_outcome_to_progress_rejects_invalid_scholar_id() -> None:
     )
 
     with pytest.raises(RuntimeError, match="missing valid scholar_profile_id"):
-        ScholarIngestionService._apply_outcome_to_progress(progress=progress, outcome=invalid)
+        apply_outcome_to_progress(progress=progress, outcome=invalid)

@@ -34,6 +34,13 @@ export interface UserSettingsUpdate {
   crossref_api_mailto: string | null;
 }
 
+export interface AdminScholarHttpSettings {
+  user_agent: string;
+  rotate_user_agent: boolean;
+  accept_language: string;
+  cookie: string;
+}
+
 export interface ChangePasswordPayload {
   current_password: string;
   new_password: string;
@@ -56,6 +63,23 @@ export async function updateSettings(payload: UserSettingsUpdate): Promise<UserS
 export async function changePassword(payload: ChangePasswordPayload): Promise<{ message: string }> {
   const response = await apiRequest<{ message: string }>("/auth/change-password", {
     method: "POST",
+    body: payload,
+  });
+  return response.data;
+}
+
+export async function fetchAdminScholarHttpSettings(): Promise<AdminScholarHttpSettings> {
+  const response = await apiRequest<AdminScholarHttpSettings>("/admin/settings/scholar-http", {
+    method: "GET",
+  });
+  return response.data;
+}
+
+export async function updateAdminScholarHttpSettings(
+  payload: AdminScholarHttpSettings,
+): Promise<AdminScholarHttpSettings> {
+  const response = await apiRequest<AdminScholarHttpSettings>("/admin/settings/scholar-http", {
+    method: "PUT",
     body: payload,
   });
   return response.data;

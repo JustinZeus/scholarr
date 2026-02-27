@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services.arxiv.errors import ArxivRateLimitError
-from app.services.ingestion.application import ScholarIngestionService
+from app.services.ingestion.enrichment import EnrichmentRunner
 from app.services.publication_identifiers import application as identifier_service
 
 
@@ -13,7 +13,7 @@ from app.services.publication_identifiers import application as identifier_servi
 async def test_discover_identifiers_for_enrichment_disables_arxiv_on_rate_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    service = ScholarIngestionService(source=object())
+    runner = EnrichmentRunner()
     publication = SimpleNamespace(id=11, author_text="Ada Lovelace")
     calls = {"sync": 0}
 
@@ -35,9 +35,9 @@ async def test_discover_identifiers_for_enrichment_disables_arxiv_on_rate_limit(
     async def _publish_noop(*args, **kwargs) -> None:
         _ = (args, kwargs)
 
-    monkeypatch.setattr(service, "_publish_identifier_update_event", _publish_noop)
+    monkeypatch.setattr(runner, "_publish_identifier_update_event", _publish_noop)
 
-    result = await service._discover_identifiers_for_enrichment(
+    result = await runner._discover_identifiers_for_enrichment(
         object(),
         publication=publication,
         run_id=321,

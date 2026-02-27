@@ -235,6 +235,13 @@ class Settings:
         "SCHOLAR_NAME_SEARCH_ALERT_COOLDOWN_REJECTIONS_THRESHOLD",
         3,
     )
+    scholar_http_user_agent: str = _env_str("SCHOLAR_HTTP_USER_AGENT", "")
+    scholar_http_rotate_user_agent: bool = _env_bool("SCHOLAR_HTTP_ROTATE_USER_AGENT", False)
+    scholar_http_accept_language: str = _env_str(
+        "SCHOLAR_HTTP_ACCEPT_LANGUAGE",
+        "en-US,en;q=0.9",
+    )
+    scholar_http_cookie: str = _env_str("SCHOLAR_HTTP_COOKIE", "")
     unpaywall_enabled: bool = _env_bool("UNPAYWALL_ENABLED", True)
     unpaywall_email: str = _env_str("UNPAYWALL_EMAIL", "")
     unpaywall_timeout_seconds: float = _env_float("UNPAYWALL_TIMEOUT_SECONDS", 4.0)

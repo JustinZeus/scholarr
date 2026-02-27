@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import CrawlRun, Publication, RunStatus, RunTriggerType, ScholarProfile, ScholarPublication
-from app.services.ingestion.application import ScholarIngestionService
+from app.services.ingestion.enrichment import EnrichmentRunner
 from app.services.openalex.types import OpenAlexWork
 from tests.integration.helpers import insert_user
 
@@ -79,8 +79,7 @@ async def test_deferred_enrichment_sweeps_previous_runs(db_session: AsyncSession
         oa_url="http://example.com/grover.pdf",
     )
 
-    mock_source = MagicMock()
-    service = ScholarIngestionService(source=mock_source)
+    runner = EnrichmentRunner()
 
     # We patch the client at its source, and also mock arXiv to avoid real HTTP calls
     with (
@@ -93,7 +92,7 @@ async def test_deferred_enrichment_sweeps_previous_runs(db_session: AsyncSession
         mock_instance.get_works_by_filter = AsyncMock(return_value=[mock_work])
 
         # 5. Execute the enrichment pass for the NEW run
-        await service._enrich_pending_publications(db_session, run_id=new_run.id)
+        await runner.enrich_pending_publications(db_session, run_id=new_run.id)
         await db_session.commit()
 
     # 6. Verification: The publication from the FAILED run should now be enriched
