@@ -55,7 +55,7 @@ def _apply_scholar_http_settings(payload: AdminScholarHttpSettingsUpdateRequest)
         max_length=_MAX_ACCEPT_LANGUAGE_LENGTH,
     )
     cookie = _normalize_header_value(
-        payload.cookie,
+        payload.cookie or "",
         field_name="cookie",
         max_length=_MAX_COOKIE_LENGTH,
     )
