@@ -335,14 +335,23 @@ async function onStartRun(): Promise<void> {
   pub.successMessage.value = null;
   pub.errorMessage.value = null;
   pub.errorRequestId.value = null;
-  const result = await runStatus.startManualCheck();
-  if (result.kind === "started") { pub.successMessage.value = `Run #${result.runId} started.`; return; }
-  if (result.kind === "already_running") {
-    pub.successMessage.value = result.runId ? `Run #${result.runId} is already in progress.` : "A run is already in progress.";
-    return;
+  try {
+    const result = await runStatus.startManualCheck();
+    if (result.kind === "started") { pub.successMessage.value = `Run #${result.runId} started.`; return; }
+    if (result.kind === "already_running") {
+      pub.successMessage.value = result.runId ? `Run #${result.runId} is already in progress.` : "A run is already in progress.";
+      return;
+    }
+    pub.errorMessage.value = result.message;
+    pub.errorRequestId.value = result.requestId;
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      pub.errorMessage.value = error.message;
+      pub.errorRequestId.value = error.requestId;
+    } else {
+      pub.errorMessage.value = "Unable to start manual run.";
+    }
   }
-  pub.errorMessage.value = result.message;
-  pub.errorRequestId.value = result.requestId;
 }
 
 // --- Lifecycle ---

@@ -46,7 +46,7 @@ async def _mark_attempt_started(
             db_session.add(job)
         job.status = PDF_STATUS_RUNNING
         job.last_attempt_at = utcnow()
-        job.attempt_count = int(job.attempt_count) + 1
+        job.attempt_count = int(job.attempt_count or 0) + 1
         db_session.add(
             event_row(
                 publication_id=publication_id,
@@ -240,6 +240,26 @@ async def _run_resolution_task(
                 detail="Stopping PDF resolution batch — OpenAlex daily budget exhausted",
             )
             break
+        except Exception:
+            structured_log(
+                logger,
+                "exception",
+                "pdf_queue.row_failed",
+                publication_id=row.publication_id,
+            )
+            try:
+                await _persist_outcome(
+                    publication_id=row.publication_id,
+                    user_id=user_id,
+                    outcome=_failed_outcome(row=row),
+                )
+            except Exception:
+                structured_log(
+                    logger,
+                    "exception",
+                    "pdf_queue.row_fail_persist_error",
+                    publication_id=row.publication_id,
+                )
 
 
 def _register_task(task: asyncio.Task[None]) -> None:

@@ -7,6 +7,7 @@ import AppHelpHint from "@/components/ui/AppHelpHint.vue";
 import AppRefreshButton from "@/components/ui/AppRefreshButton.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AppTable from "@/components/ui/AppTable.vue";
+import RequestStateAlerts from "@/components/patterns/RequestStateAlerts.vue";
 import {
   listAdminPdfQueue,
   requeueAdminPdfLookup,
@@ -15,7 +16,7 @@ import {
 } from "@/features/admin_dbops";
 import { useRequestState } from "@/composables/useRequestState";
 
-const { clearAlerts, assignError, setSuccess } = useRequestState();
+const { errorMessage, errorRequestId, successMessage, clearAlerts, assignError, setSuccess } = useRequestState();
 
 const refreshingPdfQueue = ref(false);
 const requeueingPublicationId = ref<number | null>(null);
@@ -131,7 +132,17 @@ defineExpose({ load });
 </script>
 
 <template>
-  <AppCard class="space-y-3">
+  <section class="grid gap-4">
+    <RequestStateAlerts
+      :success-message="successMessage"
+      :error-message="errorMessage"
+      :error-request-id="errorRequestId"
+      success-title="PDF queue operation complete"
+      error-title="PDF queue operation failed"
+      @dismiss-success="successMessage = null"
+    />
+
+    <AppCard class="space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-1">
         <h2 class="text-lg font-semibold text-ink-primary">PDF Gathering Queue</h2>
@@ -200,4 +211,5 @@ defineExpose({ load });
       </div>
     </div>
   </AppCard>
+  </section>
 </template>

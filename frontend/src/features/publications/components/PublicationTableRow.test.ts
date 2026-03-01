@@ -13,7 +13,7 @@ function buildItem(overrides: Partial<PublicationItem> = {}): PublicationItem {
     citation_count: 42,
     pub_url: "https://example.com/pub",
     pdf_url: null,
-    pdf_status: null,
+    pdf_status: "untracked",
     is_read: false,
     is_favorite: false,
     is_new_in_latest_run: true,

@@ -196,6 +196,7 @@ async def list_due_jobs(
             IngestionQueueItem.id.asc(),
         )
         .limit(limit)
+        .with_for_update(skip_locked=True)
     )
     rows = list(result.scalars().all())
     jobs: list[ContinuationQueueJob] = []

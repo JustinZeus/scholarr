@@ -8,6 +8,8 @@ from app.logging_utils import structured_log
 
 logger = logging.getLogger(__name__)
 
+_SUBSCRIBER_QUEUE_MAXSIZE = 256
+
 
 class RunEventPublisher:
     def __init__(self) -> None:
@@ -17,7 +19,7 @@ class RunEventPublisher:
     def subscribe(self, run_id: int) -> asyncio.Queue:
         if run_id not in self._subscribers:
             self._subscribers[run_id] = set()
-        queue: asyncio.Queue[Any] = asyncio.Queue()
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=_SUBSCRIBER_QUEUE_MAXSIZE)
         self._subscribers[run_id].add(queue)
         structured_log(
             logger,
@@ -51,6 +53,10 @@ class RunEventPublisher:
                     "runs.event_subscriber_queue_full",
                     run_id=run_id,
                 )
+                self._subscribers[run_id].discard(queue)
+
+    async def publish_run_complete(self, run_id: int) -> None:
+        await self.publish(run_id, "run_complete", {})
 
 
 run_events = RunEventPublisher()
@@ -62,8 +68,11 @@ async def event_generator(run_id: int) -> AsyncGenerator[str, None]:
         while True:
             # Wait for a new event
             message = await queue.get()
-            # Server-Sent Events format: "event: <type>\ndata: <json>\n\n"
             event_type = message["type"]
+            if event_type == "run_complete":
+                yield f"event: {event_type}\ndata: {{}}\n\n"
+                break
+            # Server-Sent Events format: "event: <type>\ndata: <json>\n\n"
             data_str = json.dumps(message["data"])
             yield f"event: {event_type}\ndata: {data_str}\n\n"
     except asyncio.CancelledError:

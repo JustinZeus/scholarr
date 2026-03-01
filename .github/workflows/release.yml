@@ -21,6 +21,10 @@ jobs:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --extra dev
+      - name: Lint
+        run: uv run ruff check
+      - name: Test
+        run: uv run pytest
       - name: Semantic Release
         id: release
         run: uv run semantic-release publish

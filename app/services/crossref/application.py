@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from app.services.publications.types import PublicationListItem, UnreadPublicationItem
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
-NON_ALNUM_RE = re.compile(r"[^a-z0-9\\s]+")
+NON_ALNUM_RE = re.compile(r"[^a-z0-9\s]+")
 STOP_WORDS = {"the", "and", "for", "with", "from", "method", "study", "analysis"}
 _RATE_LOCK = threading.Lock()
 _LAST_REQUEST_AT = 0.0
@@ -35,8 +35,9 @@ def _rate_limit_wait(min_interval_seconds: float) -> None:
     with _RATE_LOCK:
         elapsed = time.monotonic() - _LAST_REQUEST_AT
         remaining = interval - elapsed
-        if remaining > 0:
-            time.sleep(remaining)
+    if remaining > 0:
+        time.sleep(remaining)
+    with _RATE_LOCK:
         _LAST_REQUEST_AT = time.monotonic()
 
 

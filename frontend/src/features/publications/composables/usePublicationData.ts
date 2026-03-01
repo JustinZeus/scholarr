@@ -1,4 +1,4 @@
-import { computed, ref, watch } from "vue";
+import { computed, onScopeDispose, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   listPublications,
@@ -269,6 +269,10 @@ export function usePublicationData() {
       resetPageAndSnapshot();
       void loadPublications();
     }, 300);
+  });
+
+  onScopeDispose(() => {
+    if (searchDebounceTimer !== null) clearTimeout(searchDebounceTimer);
   });
 
   // --- Run-triggered refresh watcher ---

@@ -401,6 +401,7 @@ class ScholarIngestionService:
                 if run_to_fail:
                     run_to_fail.status = RunStatus.FAILED
                     run_to_fail.end_dt = datetime.now(UTC)
+                    run_to_fail.error_log = run_to_fail.error_log or {}
                     run_to_fail.error_log["terminal_exception"] = str(exc)
                     await cleanup_session.commit()
         except Exception:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
@@ -215,7 +215,7 @@ async def execute_manual_run(
         raise_manual_failed(exc=exc, user_id=user_id)
 
 
-def raise_manual_blocked_safety(*, exc, user_id: int) -> None:
+def raise_manual_blocked_safety(*, exc, user_id: int) -> NoReturn:
     structured_log(
         logger,
         "info",
@@ -233,7 +233,7 @@ def raise_manual_blocked_safety(*, exc, user_id: int) -> None:
     ) from exc
 
 
-def raise_manual_failed(*, exc: Exception, user_id: int) -> None:
+def raise_manual_failed(*, exc: Exception, user_id: int) -> NoReturn:
     structured_log(
         logger,
         "exception",

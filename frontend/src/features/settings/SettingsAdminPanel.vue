@@ -36,10 +36,8 @@ async function refreshForSection(): Promise<void> {
     return;
   }
   if (props.section === SECTION_REPAIRS) {
-    await Promise.all([
-      usersRef.value?.load(),
-      repairsRef.value?.load(),
-    ]);
+    await usersRef.value?.load();
+    await repairsRef.value?.load();
     return;
   }
   if (props.section === SECTION_PDF && pdfQueueRef.value) {

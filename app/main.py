@@ -81,6 +81,26 @@ async def lifespan(_: FastAPI):
             error=str(exc),
         )
 
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            await session.execute(
+                text(
+                    "UPDATE publication_pdf_jobs SET status = 'queued'"
+                    " WHERE status = 'running'"
+                    " AND (last_attempt_at IS NULL OR last_attempt_at < NOW() - INTERVAL '10 minutes')"
+                )
+            )
+            await session.commit()
+            structured_log(logger, "info", "app.startup_stuck_pdf_jobs_recovered")
+    except Exception as exc:
+        structured_log(
+            logger,
+            "error",
+            "app.startup_stuck_pdf_jobs_recovery_failed",
+            error=str(exc),
+        )
+
     await scheduler_service.start()
     yield
     await scheduler_service.stop()

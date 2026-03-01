@@ -176,45 +176,51 @@ async def upsert_profile_publications(
     seen_publication_ids: set[int] = set()
     discovered_count = 0
 
-    for candidate in publications:
-        publication = await resolve_publication(db_session, candidate)
-        if publication.id in seen_publication_ids:
-            continue
-        seen_publication_ids.add(publication.id)
+    try:
+        for candidate in publications:
+            publication = await resolve_publication(db_session, candidate)
+            if publication.id in seen_publication_ids:
+                continue
+            seen_publication_ids.add(publication.id)
 
-        link_result = await db_session.execute(
-            select(ScholarPublication).where(
-                ScholarPublication.scholar_profile_id == scholar.id,
-                ScholarPublication.publication_id == publication.id,
+            link_result = await db_session.execute(
+                select(ScholarPublication).where(
+                    ScholarPublication.scholar_profile_id == scholar.id,
+                    ScholarPublication.publication_id == publication.id,
+                )
             )
-        )
-        link = link_result.scalar_one_or_none()
-        if link is not None:
-            continue
+            link = link_result.scalar_one_or_none()
+            if link is not None:
+                continue
 
-        link = ScholarPublication(
-            scholar_profile_id=scholar.id,
-            publication_id=publication.id,
-            is_read=False,
-            first_seen_run_id=run.id,
-        )
-        db_session.add(link)
-        discovered_count += 1
+            link = ScholarPublication(
+                scholar_profile_id=scholar.id,
+                publication_id=publication.id,
+                is_read=False,
+                first_seen_run_id=run.id,
+            )
+            db_session.add(link)
+            discovered_count += 1
 
-        await commit_discovered_publication(
-            db_session,
-            run=run,
-            scholar=scholar,
-            publication=publication,
-        )
+            await flush_discovered_publication(
+                db_session,
+                run=run,
+                scholar=scholar,
+                publication=publication,
+            )
 
-    if not scholar.baseline_completed:
-        scholar.baseline_completed = True
+        if not scholar.baseline_completed:
+            scholar.baseline_completed = True
+
+        await db_session.commit()
+    except Exception:
+        await db_session.rollback()
+        raise
 
     return discovered_count
 
 
-async def commit_discovered_publication(
+async def flush_discovered_publication(
     db_session: AsyncSession,
     *,
     run: CrawlRun,
@@ -222,7 +228,7 @@ async def commit_discovered_publication(
     publication: Publication,
 ) -> None:
     run.new_pub_count = int(run.new_pub_count or 0) + 1
-    await db_session.commit()
+    await db_session.flush()
     await run_events.publish(
         run_id=run.id,
         event_type="publication_discovered",

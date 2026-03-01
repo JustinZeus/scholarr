@@ -47,4 +47,5 @@ def queued_job(
         status=PDF_STATUS_QUEUED,
         queued_at=now,
         last_requested_by_user_id=user_id,
+        attempt_count=0,
     )

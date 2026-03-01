@@ -35,7 +35,7 @@ class AdminUsersListEnvelope(BaseModel):
 
 class AdminUserCreateRequest(BaseModel):
     email: str = Field(max_length=254)
-    password: str = Field(max_length=128)
+    password: str = Field(min_length=8, max_length=128)
     is_admin: bool = False
 
     model_config = ConfigDict(extra="forbid")
@@ -55,7 +55,7 @@ class AdminUserEnvelope(BaseModel):
 
 
 class AdminResetPasswordRequest(BaseModel):
-    new_password: str = Field(max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -64,7 +64,7 @@ class AdminScholarHttpSettingsData(BaseModel):
     user_agent: str
     rotate_user_agent: bool
     accept_language: str
-    cookie: str
+    cookie: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -80,7 +80,7 @@ class AdminScholarHttpSettingsUpdateRequest(BaseModel):
     user_agent: str
     rotate_user_agent: bool
     accept_language: str
-    cookie: str
+    cookie: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 

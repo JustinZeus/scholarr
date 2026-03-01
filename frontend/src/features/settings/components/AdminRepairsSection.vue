@@ -9,6 +9,7 @@ import AppInput from "@/components/ui/AppInput.vue";
 import AppRefreshButton from "@/components/ui/AppRefreshButton.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AppTable from "@/components/ui/AppTable.vue";
+import RequestStateAlerts from "@/components/patterns/RequestStateAlerts.vue";
 import {
   dropAllPublications,
   listAdminDbRepairJobs,
@@ -34,7 +35,7 @@ const DROP_PUBLICATIONS_CONFIRM_TEXT = "DROP ALL PUBLICATIONS";
 
 type RepairScopeMode = typeof SCOPE_SINGLE_USER | typeof SCOPE_ALL_USERS;
 
-const { clearAlerts, assignError, setSuccess } = useRequestState();
+const { errorMessage, errorRequestId, successMessage, clearAlerts, assignError, setSuccess } = useRequestState();
 
 const refreshingJobs = ref(false);
 const runningRepair = ref(false);
@@ -246,6 +247,15 @@ defineExpose({ load });
 
 <template>
   <section class="grid gap-4">
+    <RequestStateAlerts
+      :success-message="successMessage"
+      :error-message="errorMessage"
+      :error-request-id="errorRequestId"
+      success-title="Repair operation complete"
+      error-title="Repair operation failed"
+      @dismiss-success="successMessage = null"
+    />
+
     <AppCard class="space-y-3">
       <div class="flex items-center gap-1">
         <h2 class="text-lg font-semibold text-ink-primary">Publication Link Repair</h2>

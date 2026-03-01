@@ -162,7 +162,10 @@ async def _complete_job(
 
 
 async def _fail_job(db_session: AsyncSession, *, job: DataRepairJob, error: Exception) -> None:
+    from sqlalchemy.orm import make_transient
+
     await db_session.rollback()
+    make_transient(job)
     job.status = REPAIR_STATUS_FAILED
     job.error_text = str(error)
     job.finished_at = _utcnow()

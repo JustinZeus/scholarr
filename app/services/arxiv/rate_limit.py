@@ -53,7 +53,7 @@ async def get_arxiv_cooldown_status(*, now_utc: datetime | None = None) -> Arxiv
         result = await db_session.execute(
             select(ArxivRuntimeState.cooldown_until).where(ArxivRuntimeState.state_key == ARXIV_RUNTIME_STATE_KEY)
         )
-    cooldown_until = _normalize_datetime(result.scalar_one_or_none())
+        cooldown_until = _normalize_datetime(result.scalar_one_or_none())
     remaining_seconds = _cooldown_remaining_seconds(cooldown_until, now_utc=timestamp)
     return ArxivCooldownStatus(
         is_active=remaining_seconds > 0.0,
@@ -68,26 +68,31 @@ async def _run_serialized_fetch(
     source_path: str,
 ) -> tuple[httpx.Response, bool]:
     session_factory = get_session_factory()
-    async with session_factory() as db_session, db_session.begin():
-        await _acquire_arxiv_lock(db_session)
-        runtime_state = await _load_runtime_state_for_update(db_session)
-        wait_seconds = await _wait_for_allowed_slot_or_raise(
-            runtime_state,
-            source_path=source_path,
-        )
-        runtime_state.next_allowed_at = datetime.now(UTC) + timedelta(seconds=_min_interval_seconds())
+    async with session_factory() as lock_session:
+        await _acquire_arxiv_lock(lock_session)
+        try:
+            async with session_factory() as db_session, db_session.begin():
+                runtime_state = await _load_runtime_state_for_update(db_session)
+                wait_seconds = await _wait_for_allowed_slot_or_raise(
+                    runtime_state,
+                    source_path=source_path,
+                )
+                runtime_state.next_allowed_at = datetime.now(UTC) + timedelta(seconds=_min_interval_seconds())
 
-    if wait_seconds > 0:
-        await asyncio.sleep(wait_seconds)
-    response = await fetch()
+            if wait_seconds > 0:
+                await asyncio.sleep(wait_seconds)
+            response = await fetch()
 
-    async with session_factory() as db_session, db_session.begin():
-        runtime_state = await _load_runtime_state_for_update(db_session)
-        hit_rate_limit = _record_post_response_state(
-            runtime_state,
-            response_status=int(response.status_code),
-            source_path=source_path,
-        )
+            async with session_factory() as db_session, db_session.begin():
+                runtime_state = await _load_runtime_state_for_update(db_session)
+                hit_rate_limit = _record_post_response_state(
+                    runtime_state,
+                    response_status=int(response.status_code),
+                    source_path=source_path,
+                )
+                cooldown_until_value = runtime_state.cooldown_until
+        finally:
+            await _release_arxiv_lock(lock_session)
     structured_log(
         logger,
         "info",
@@ -95,7 +100,7 @@ async def _run_serialized_fetch(
         status_code=int(response.status_code),
         wait_seconds=wait_seconds,
         cooldown_remaining_seconds=_cooldown_remaining_seconds(
-            runtime_state.cooldown_until, now_utc=datetime.now(UTC)
+            cooldown_until_value, now_utc=datetime.now(UTC)
         ),
         source_path=source_path,
     )
@@ -104,7 +109,17 @@ async def _run_serialized_fetch(
 
 async def _acquire_arxiv_lock(db_session: AsyncSession) -> None:
     await db_session.execute(
-        text("SELECT pg_advisory_xact_lock(:namespace, :lock_key)"),
+        text("SELECT pg_advisory_lock(:namespace, :lock_key)"),
+        {
+            "namespace": ARXIV_RATE_LIMIT_LOCK_NAMESPACE,
+            "lock_key": ARXIV_RATE_LIMIT_LOCK_KEY,
+        },
+    )
+
+
+async def _release_arxiv_lock(db_session: AsyncSession) -> None:
+    await db_session.execute(
+        text("SELECT pg_advisory_unlock(:namespace, :lock_key)"),
         {
             "namespace": ARXIV_RATE_LIMIT_LOCK_NAMESPACE,
             "lock_key": ARXIV_RATE_LIMIT_LOCK_KEY,
