@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.domains.dbops.integrity import collect_integrity_report
+from app.services.dbops.integrity import collect_integrity_report
 
 
 def _check_counts(report: dict) -> dict[str, int]:

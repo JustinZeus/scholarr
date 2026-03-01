@@ -8,8 +8,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import RunStatus, RunTriggerType
-from app.services.domains.ingestion.application import ScholarIngestionService
-from app.services.domains.scholar.source import FetchResult
+from app.services.ingestion.application import ScholarIngestionService
+from app.services.scholar.source import FetchResult
 from tests.integration.helpers import insert_user
 
 REGRESSION_FIXTURE_DIR = Path("tests/fixtures/scholar/regression")
@@ -34,8 +34,7 @@ def _blocked_fetch(*, scholar_id: str, body: str) -> FetchResult:
         requested_url=f"https://scholar.google.com/citations?hl=en&user={scholar_id}",
         status_code=200,
         final_url=(
-            "https://accounts.google.com/v3/signin/identifier"
-            "?continue=https%3A%2F%2Fscholar.google.com%2Fcitations"
+            "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fscholar.google.com%2Fcitations"
         ),
         body=body,
         error=None,
@@ -96,7 +95,7 @@ async def test_fixture_probe_run_emits_failure_and_retry_summary_metrics(
         "retry": "RSTUVWX12345",
     }
 
-    for label in ("ok", "blocked", "retry"):
+    for label in ("ok", "retry", "blocked"):
         await db_session.execute(
             text(
                 """
@@ -144,7 +143,9 @@ async def test_fixture_probe_run_emits_failure_and_retry_summary_metrics(
         request_delay_seconds=0,
         network_error_retries=1,
         retry_backoff_seconds=0.0,
-        max_pages_per_scholar=1,
+        rate_limit_retries=0,
+        rate_limit_backoff_seconds=0.0,
+        max_pages_per_scholar=10,
         page_size=100,
         auto_queue_continuations=False,
         alert_blocked_failure_threshold=1,

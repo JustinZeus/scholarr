@@ -12,15 +12,15 @@ const props = withDefaults(
 
 const sizeClass = computed(() => {
   if (props.size === "sm") {
-    return "h-5 w-5";
+    return "h-7 w-7";
   }
   if (props.size === "lg") {
-    return "h-8 w-8";
+    return "h-10 w-10";
   }
   if (props.size === "xl") {
-    return "h-12 w-12";
+    return "h-14 w-14";
   }
-  return "h-6 w-6";
+  return "h-7 w-7";
 });
 
 const logoMaskStyle: Record<string, string> = {

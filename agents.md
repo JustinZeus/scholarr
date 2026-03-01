@@ -1,43 +1,123 @@
 # AI Agent Instructions: Scholarr
 
-Adhere strictly to these constraints.
+Adhere strictly to these constraints when working on this codebase.
 
-## 1. Coding Standards (Strict Enforcement)
-* **Function Length:** Maximum 50 lines of code per function. Break down complex logic into small, testable, single-responsibility functions.
-* **DRY (Don't Repeat Yourself):** Abstract repetitive logic immediately. No duplicate boilerplate for database queries, API responses, or error handling.
-* **Negative Space Programming:** Utilize explicit assertions and constraints to define invalid states. Fail fast and early. Do not allow silent failures or cascading malformed data, especially in DOM parsing.
-* **Cyclomatic Complexity:** Flatten logic. Use early returns and guard clauses instead of deep nesting.
+## 1. Code Quality
 
-## 2. Domain Architecture & Data Model
-* **Data Isolation:** Scholar tracking is **user-scoped**. Validate mapping/join tables; never assume global links between users and Scholar IDs.
-* **Data Deduplication:** Publications are **global records**. Deduplicate via Scholar cluster ID and normalized fingerprinting prior to database insertion.
-* **State Management:** Visibility and "read/unread" states exist exclusively on the scholar-publication link table, not the global publication table.
-* **API Contract:** Exact envelope format required:
-    * Success: `{"data": ..., "meta": {"request_id": "..."}}`
-    * Error: `{"error": {"code": "...", "message": "...", "details": ...}, "meta": {"request_id": "..."}}`
+- **Function length:** 50 lines max. Extract helpers ruthlessly.
+- **File length:** 400 lines target, 600 lines hard ceiling. Files above this must be decomposed before adding more code.
+- **DRY:** Abstract repeated logic immediately. No duplicate boilerplate for queries, responses, or error handling.
+- **Negative space programming:** Fail fast with explicit assertions and guard clauses. No silent failures, especially in DOM parsing.
+- **Cyclomatic complexity:** Flatten with early returns. No deep nesting. No magic numbers.
+- **No dead code:** Do not leave commented-out code, unused imports, or backward-compatibility shims. Delete cleanly.
+- **Variable naming:** Any variable outside of a lambda functions or iterators should be descriptive. Code should be readable for maintainers.
 
-## 3. Scrape Safety & Rate Limiting (Immutable)
-These limits prevent IP bans and are not to be optimized away.
-* **Minimum Delay:** Enforce `INGESTION_MIN_REQUEST_DELAY_SECONDS` (default 2s) between all external requests.
-* **Anti-Detection:** Default to direct ID or profile URL ingestion. Name searches trigger CAPTCHAs.
-* **Cooldowns:** Respect `INGESTION_SAFETY_COOLDOWN_BLOCKED_SECONDS` (1800s) and `INGESTION_SAFETY_COOLDOWN_NETWORK_SECONDS` (900s) upon threshold breaches.
+## 2. Architecture
 
-## 4. Current Environment & Stack
-* **Backend:** Python 3.12+, FastAPI, SQLAlchemy (Async/asyncpg), Alembic.
-* **Frontend:** TypeScript, Vue 3, Vite.
-* **Infrastructure:** Multi-stage Docker.
+### Data Model
 
-## 5. Domain Service Boundaries
-* **Strict Modularity:** Flat files in the `app/services/` root are strictly prohibited. All business logic and routing must reside exclusively within `app/services/domains/`.
-* **`app/services/domains/scholar/*`:** Parser contract is fail-fast. Layout drift must emit explicit exceptions and `layout_*` reasons/warnings. Never allow silent partial success.
-* **`app/services/domains/ingestion/application.py`:** Orchestrates ingestion runs; validate parser outputs before persistence; enforce publication candidate constraints before upsert.
-* **`app/services/domains/publications/*`:** Publication list/read-state query layer. Includes `doi` + `pdf_url` fields for UI consumption, enforces non-blocking lazy OA enrichment scheduling on list reads, and exposes per-publication PDF retry behavior.
-* **`app/services/domains/crossref/*`:** DOI discovery fallback module. Must use bounded/paced lookups to avoid burst traffic and 429 responses.
-* **`app/services/domains/unpaywall/*`:** OA resolver by DOI only (best OA location + PDF URL extraction). Do not use Google Scholar for PDF resolution to avoid N+1 scrape amplification.
-* **`app/services/domains/portability/*`:** Handles JSON import/export for user-scoped scholars and scholar-publication link state while preserving global publication dedup rules.
-* **`app/services/domains/ingestion/scheduler.py`:** Owns automatic runs and continuation queue retries/drops; do not bypass safety gate or cooldown logic.
+- Scholar tracking is **user-scoped**. Never assume global links between users and Scholar IDs.
+- Publications are **global, deduplicated records**. Deduplicate via cluster ID and normalized fingerprinting.
+- Read/unread, favorites, and visibility state live on the **scholar-publication link**, not the publication.
 
+### Service Boundaries
 
-## 6. UI rules
-Make sure to properly integrate tailwind in combination with the preset theming
-Clarity through both styling and language are a priority. all UI elements need to have a proper reason for existing.
+All business logic lives in `app/services/<domain>/`. No flat files in `app/services/` root. Each domain owns its application service, types, and helpers.
+
+### API Envelope
+
+All `/api/v1` responses use this exact envelope:
+
+```
+Success: {"data": ..., "meta": {"request_id": "..."}}
+Error:   {"error": {"code": "...", "message": "...", "details": ...}, "meta": {"request_id": "..."}}
+```
+
+Use the Pydantic envelope schemas in `app/api/schemas.py`. Do not construct raw dicts.
+
+## 3. Scrape Safety (Immutable)
+
+These constraints prevent IP bans. They are not tunable to zero and must not be optimized away.
+
+- Enforce `INGESTION_MIN_REQUEST_DELAY_SECONDS` (default 2s) between all external requests.
+- Default to direct ID or profile URL ingestion. Name searches trigger CAPTCHAs.
+- Respect `INGESTION_SAFETY_COOLDOWN_BLOCKED_SECONDS` (1800s) and `INGESTION_SAFETY_COOLDOWN_NETWORK_SECONDS` (900s) upon threshold breaches.
+
+## 4. Logging
+
+Use `structured_log()` from `app/logging_utils.py` for all domain logging. Do not use raw `logger.info()` / `logger.warning()` calls.
+
+```python
+from app.logging_utils import structured_log
+
+structured_log(logger, "info", "ingestion.run_started", user_id=user_id, scholar_count=count)
+```
+
+Every event name should be dot-namespaced to its domain (e.g., `arxiv.cache_hit`, `ingestion.safety_cooldown_entered`).
+
+## 5. Stack & Tooling
+
+- **Backend:** Python 3.12+, FastAPI, SQLAlchemy 2.0 (async/asyncpg), Alembic
+- **Frontend:** TypeScript, Vue 3, Vite, Tailwind CSS
+- **Infrastructure:** Multi-stage Docker, Docker Compose
+- **Package manager:** `uv` (used in Dockerfile and CI; `uv run` prefix for all commands)
+- **Linting:** `ruff check .` and `ruff format --check .` (config in `pyproject.toml`)
+- **Type checking:** `mypy app/`
+- **Versioning:** python-semantic-release with conventional commits
+
+## 6. Commits
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <description>
+```
+
+Types: `feat`, `fix`, `docs`, `ci`, `refactor`, `test`, `chore`, `perf`.
+
+## 7. Testing & Quality Gates
+
+All **local development** commands run inside containers. Do not run bare `npm`, `pytest`, or `ruff` on the host. CI workflows (`.github/workflows/`) use bare runners with `uv` and `npm` directly — this is intentional since CI has no Docker-in-Docker dependency.
+
+### Backend
+
+```bash
+# Unit tests (default, excludes integration)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app python -m pytest
+
+# Integration tests
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app python -m pytest -m integration
+
+# Linting
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app ruff check .
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app ruff format --check .
+
+# Type checking
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app mypy app/
+```
+
+Pytest markers: `integration`, `db`, `migrations`, `schema`, `smoke`.
+
+### Frontend
+
+```bash
+# Type checking
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm frontend npm run typecheck
+
+# Unit tests
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm frontend npm run test:run
+
+# Lint
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm frontend npm run lint
+
+# Production build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm frontend npm run build
+```
+
+All four gates must pass before a PR is considered ready.
+
+## 8. Frontend
+
+- Use the tokenized theme system (`frontend/src/theme/presets/`). Do not hardcode colors.
+- Integrate Tailwind with preset theme tokens. Reference `frontend/scripts/check_theme_tokens.mjs` for enforcement.
+- Every UI element must have a clear purpose. Clarity through styling and language.

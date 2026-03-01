@@ -17,7 +17,9 @@ dependencies = [
   "httpx>=0.28,<0.29",
   "itsdangerous>=2.2,<3.0",
   "python-multipart>=0.0.9,<0.1",
+  "rapidfuzz>=3.14.3",
   "sqlalchemy>=2.0,<2.1",
+  "tenacity>=9.1.4",
   "uvicorn[standard]>=0.34,<0.35",
 ]
 
@@ -25,10 +27,13 @@ dependencies = [
 dev = [
   "pytest>=8.3,<9.0",
   "pytest-asyncio>=0.25,<0.26",
+  "python-semantic-release>=9.0,<10.0",
+  "ruff>=0.9",
+  "mypy>=1.14",
 ]
 
 [tool.pytest.ini_options]
-addopts = "-q -m \"not integration\""
+addopts = "-q -m \"not integration\" --import-mode=importlib"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
@@ -38,6 +43,31 @@ markers = [
   "schema: tests focused on multi-tenant schema invariants",
   "smoke: smoke tests for containerized runtime",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501", "B008", "RUF001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = false
+warn_unused_ignores = true
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["frontend/package.json:version"]
+branch = "main"
+build_command = ""
+commit_message = "chore(release): v{version}"
 
 [tool.setuptools]
 include-package-data = true

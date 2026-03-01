@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Request
@@ -21,8 +22,10 @@ from app.api.schemas import (
 )
 from app.db.models import User
 from app.db.session import get_db_session
-from app.services.domains.publications import application as publication_service
-from app.services.domains.scholars import application as scholar_service
+from app.logging_utils import structured_log
+from app.services.publication_identifiers import application as identifier_service
+from app.services.publications import application as publication_service
+from app.services.scholars import application as scholar_service
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -61,7 +64,7 @@ def _serialize_publication_item(item) -> dict[str, object]:
         "citation_count": item.citation_count,
         "venue_text": item.venue_text,
         "pub_url": item.pub_url,
-        "doi": item.doi,
+        "display_identifier": _serialize_display_identifier(item.display_identifier),
         "pdf_url": item.pdf_url,
         "pdf_status": item.pdf_status,
         "pdf_attempt_count": item.pdf_attempt_count,
@@ -74,29 +77,46 @@ def _serialize_publication_item(item) -> dict[str, object]:
     }
 
 
+def _serialize_display_identifier(value) -> dict[str, object] | None:
+    if value is None:
+        return None
+    return {
+        "kind": value.kind,
+        "value": value.value,
+        "label": value.label,
+        "url": value.url,
+        "confidence_score": float(value.confidence_score),
+    }
+
+
 async def _publication_counts(
     db_session: AsyncSession,
     *,
     user_id: int,
     selected_scholar_id: int | None,
     favorite_only: bool,
+    search: str | None,
+    snapshot_before: datetime | None,
 ) -> tuple[int, int, int, int]:
     unread_count = await publication_service.count_unread_for_user(
         db_session,
         user_id=user_id,
         scholar_profile_id=selected_scholar_id,
         favorite_only=favorite_only,
+        snapshot_before=snapshot_before,
     )
     favorites_count = await publication_service.count_favorite_for_user(
         db_session,
         user_id=user_id,
         scholar_profile_id=selected_scholar_id,
+        snapshot_before=snapshot_before,
     )
     latest_count = await publication_service.count_latest_for_user(
         db_session,
         user_id=user_id,
         scholar_profile_id=selected_scholar_id,
         favorite_only=favorite_only,
+        snapshot_before=snapshot_before,
     )
     total_count = await publication_service.count_for_user(
         db_session,
@@ -104,6 +124,8 @@ async def _publication_counts(
         mode=publication_service.MODE_ALL,
         scholar_profile_id=selected_scholar_id,
         favorite_only=favorite_only,
+        search=search,
+        snapshot_before=snapshot_before,
     )
     return unread_count, favorites_count, latest_count, total_count
 
@@ -115,8 +137,12 @@ async def _list_publications_for_request(
     mode: Literal["all", "unread", "latest", "new"] | None,
     favorite_only: bool,
     scholar_profile_id: int | None,
+    search: str | None,
+    sort_by: str,
+    sort_dir: str,
     limit: int,
     offset: int,
+    snapshot_before: datetime | None,
 ) -> tuple[str, int | None, list]:
     resolved_mode = publication_service.resolve_publication_view_mode(mode)
     selected_scholar_id = scholar_profile_id
@@ -131,8 +157,12 @@ async def _list_publications_for_request(
         mode=resolved_mode,
         scholar_profile_id=selected_scholar_id,
         favorite_only=favorite_only,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
         limit=limit,
         offset=offset,
+        snapshot_before=snapshot_before,
     )
     await publication_service.schedule_missing_pdf_enrichment_for_user(
         db_session,
@@ -146,6 +176,27 @@ async def _list_publications_for_request(
         items=publications,
     )
     return resolved_mode, selected_scholar_id, hydrated
+
+
+def _resolve_publications_snapshot(
+    *,
+    snapshot: str | None,
+) -> tuple[datetime, str]:
+    if snapshot is None:
+        now_utc = datetime.now(UTC)
+        return now_utc, now_utc.isoformat()
+    try:
+        parsed = datetime.fromisoformat(snapshot)
+    except ValueError as exc:
+        raise ApiException(
+            status_code=400,
+            code="invalid_snapshot",
+            message="Invalid publications snapshot cursor.",
+        ) from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    normalized = parsed.astimezone(UTC)
+    return normalized, normalized.isoformat()
 
 
 def _resolve_publications_paging(
@@ -174,6 +225,7 @@ def _publications_list_data(
     page: int,
     page_size: int,
     offset: int,
+    snapshot: str,
 ) -> dict[str, object]:
     return {
         "mode": mode,
@@ -186,6 +238,7 @@ def _publications_list_data(
         "total_count": total_count,
         "page": int(page),
         "page_size": int(page_size),
+        "snapshot": snapshot,
         "has_prev": int(offset) > 0,
         "has_next": int(offset) + int(page_size) < int(total_count),
         "publications": [_serialize_publication_item(item) for item in publications],
@@ -280,32 +333,12 @@ async def _favorite_publication_state(
         db_session,
         items=[publication],
     )
-    return hydrated[0] if hydrated else publication
-
-
-def _log_retry_pdf_result(
-    *,
-    current_user: User,
-    scholar_profile_id: int,
-    publication_id: int,
-    queued: bool,
-    resolved_pdf: bool,
-    pdf_status: str,
-    doi: str | None,
-) -> None:
-    logger.info(
-        "api.publications.retry_pdf",
-        extra={
-            "event": "api.publications.retry_pdf",
-            "user_id": current_user.id,
-            "scholar_profile_id": scholar_profile_id,
-            "publication_id": publication_id,
-            "queued": queued,
-            "resolved_pdf": resolved_pdf,
-            "pdf_status": pdf_status,
-            "has_doi": bool(doi),
-        },
+    current = hydrated[0] if hydrated else publication
+    identifiers = await identifier_service.overlay_publication_items_with_display_identifiers(
+        db_session,
+        items=[current],
     )
+    return identifiers[0] if identifiers else current
 
 
 @router.get(
@@ -317,10 +350,14 @@ async def list_publications(
     mode: Literal["all", "unread", "latest", "new"] | None = Query(default=None),
     favorite_only: bool = Query(default=False),
     scholar_profile_id: int | None = Query(default=None, ge=1),
+    search: str | None = Query(default=None, min_length=1, max_length=200),
+    sort_by: Literal["first_seen", "title", "year", "citations", "scholar", "pdf_status"] = Query(default="first_seen"),
+    sort_dir: Literal["asc", "desc"] = Query(default="desc"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=1, le=500),
     limit: int | None = Query(default=None, ge=1, le=1000),
     offset: int | None = Query(default=None, ge=0),
+    snapshot: str | None = Query(default=None, min_length=1, max_length=64),
     db_session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_api_current_user),
 ):
@@ -330,20 +367,28 @@ async def list_publications(
         limit=limit,
         offset=offset,
     )
+    snapshot_before, snapshot_cursor = _resolve_publications_snapshot(snapshot=snapshot)
+    normalized_search = (search or "").strip() or None
     resolved_mode, selected_scholar_id, publications = await _list_publications_for_request(
         db_session,
         current_user=current_user,
         mode=mode,
         favorite_only=favorite_only,
         scholar_profile_id=scholar_profile_id,
+        search=normalized_search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
         limit=resolved_limit,
         offset=resolved_offset,
+        snapshot_before=snapshot_before,
     )
     unread_count, favorites_count, latest_count, total_count = await _publication_counts(
         db_session,
         user_id=current_user.id,
         selected_scholar_id=selected_scholar_id,
         favorite_only=favorite_only,
+        search=normalized_search,
+        snapshot_before=snapshot_before,
     )
     data = _publications_list_data(
         mode=resolved_mode,
@@ -357,6 +402,7 @@ async def list_publications(
         page=resolved_page,
         page_size=resolved_limit,
         offset=resolved_offset,
+        snapshot=snapshot_cursor,
     )
     return success_payload(request, data=data)
 
@@ -374,13 +420,8 @@ async def mark_all_publications_read(
         db_session,
         user_id=current_user.id,
     )
-    logger.info(
-        "api.publications.mark_all_read",
-        extra={
-            "event": "api.publications.mark_all_read",
-            "user_id": current_user.id,
-            "updated_count": updated_count,
-        },
+    structured_log(
+        logger, "info", "api.publications.mark_all_read", user_id=current_user.id, updated_count=updated_count
     )
     return success_payload(
         request,
@@ -401,25 +442,19 @@ async def mark_selected_publications_read(
     db_session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_api_current_user),
 ):
-    selection_pairs = sorted(
-        {
-            (int(item.scholar_profile_id), int(item.publication_id))
-            for item in payload.selections
-        }
-    )
+    selection_pairs = sorted({(int(item.scholar_profile_id), int(item.publication_id)) for item in payload.selections})
     updated_count = await publication_service.mark_selected_as_read_for_user(
         db_session,
         user_id=current_user.id,
         selections=selection_pairs,
     )
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.publications.mark_selected_read",
-        extra={
-            "event": "api.publications.mark_selected_read",
-            "user_id": current_user.id,
-            "requested_count": len(selection_pairs),
-            "updated_count": updated_count,
-        },
+        user_id=current_user.id,
+        requested_count=len(selection_pairs),
+        updated_count=updated_count,
     )
     return success_payload(
         request,
@@ -454,14 +489,16 @@ async def retry_publication_pdf(
         resolved_pdf=resolved_pdf,
         pdf_status=current.pdf_status,
     )
-    _log_retry_pdf_result(
-        current_user=current_user,
+    structured_log(
+        logger,
+        "info",
+        "api.publications.retry_pdf",
+        user_id=current_user.id,
         scholar_profile_id=payload.scholar_profile_id,
         publication_id=publication_id,
         queued=queued,
         resolved_pdf=resolved_pdf,
         pdf_status=current.pdf_status,
-        doi=current.doi,
     )
     return success_payload(
         request,
@@ -492,15 +529,14 @@ async def toggle_publication_favorite(
         publication_id=publication_id,
         is_favorite=payload.is_favorite,
     )
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.publications.favorite",
-        extra={
-            "event": "api.publications.favorite",
-            "user_id": current_user.id,
-            "scholar_profile_id": payload.scholar_profile_id,
-            "publication_id": publication_id,
-            "is_favorite": bool(payload.is_favorite),
-        },
+        user_id=current_user.id,
+        scholar_profile_id=payload.scholar_profile_id,
+        publication_id=publication_id,
+        is_favorite=bool(payload.is_favorite),
     )
     return success_payload(
         request,

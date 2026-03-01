@@ -13,13 +13,15 @@ EXPECTED_TABLES = {
     "ingestion_queue_items",
     "author_search_runtime_state",
     "author_search_cache_entries",
+    "arxiv_runtime_state",
+    "arxiv_query_cache_entries",
     "data_repair_jobs",
     "publication_pdf_jobs",
     "publication_pdf_job_events",
 }
 
 EXPECTED_ENUMS = {"run_status", "run_trigger_type"}
-EXPECTED_REVISION = "20260221_0015"
+EXPECTED_REVISION = "20260226_0024"
 
 
 @pytest.mark.integration
@@ -27,9 +29,7 @@ EXPECTED_REVISION = "20260221_0015"
 @pytest.mark.migrations
 @pytest.mark.asyncio
 async def test_migration_creates_expected_tables(db_session: AsyncSession) -> None:
-    result = await db_session.execute(
-        text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
-    )
+    result = await db_session.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'"))
     table_names = {row[0] for row in result}
     assert EXPECTED_TABLES.issubset(table_names)
 
@@ -134,6 +134,28 @@ async def test_crawl_runs_has_manual_idempotency_unique_index(db_session: AsyncS
     indexdef = result.scalar_one()
     assert "UNIQUE INDEX" in indexdef
     assert "(user_id, idempotency_key)" in indexdef
+    assert "WHERE" in indexdef
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.migrations
+@pytest.mark.asyncio
+async def test_crawl_runs_has_single_active_run_unique_index(db_session: AsyncSession) -> None:
+    result = await db_session.execute(
+        text(
+            """
+            SELECT indexdef
+            FROM pg_indexes
+            WHERE schemaname = 'public'
+              AND tablename = 'crawl_runs'
+              AND indexname = 'uq_crawl_runs_user_active'
+            """
+        )
+    )
+    indexdef = result.scalar_one()
+    assert "UNIQUE INDEX" in indexdef
+    assert "(user_id)" in indexdef
     assert "WHERE" in indexdef
 
 

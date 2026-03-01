@@ -20,7 +20,8 @@ from app.auth.deps import get_auth_service
 from app.auth.service import AuthService
 from app.db.models import User
 from app.db.session import get_db_session
-from app.services.domains.users import application as user_service
+from app.logging_utils import structured_log
+from app.services.users import application as user_service
 
 logger = logging.getLogger(__name__)
 
@@ -48,14 +49,7 @@ async def list_users(
     admin_user: User = Depends(get_api_admin_user),
 ):
     users = await user_service.list_users(db_session)
-    logger.info(
-        "api.admin.users_listed",
-        extra={
-            "event": "api.admin.users_listed",
-            "admin_user_id": int(admin_user.id),
-            "user_count": len(users),
-        },
-    )
+    structured_log(logger, "info", "api.admin.users_listed", admin_user_id=int(admin_user.id), user_count=len(users))
     return success_payload(
         request,
         data={
@@ -92,14 +86,13 @@ async def create_user(
             message=str(exc),
         ) from exc
 
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.admin.user_created",
-        extra={
-            "event": "api.admin.user_created",
-            "admin_user_id": int(admin_user.id),
-            "target_user_id": int(created_user.id),
-            "target_is_admin": bool(created_user.is_admin),
-        },
+        admin_user_id=int(admin_user.id),
+        target_user_id=int(created_user.id),
+        target_is_admin=bool(created_user.is_admin),
     )
     return success_payload(
         request,
@@ -125,11 +118,7 @@ async def set_user_active(
             code="user_not_found",
             message="User not found.",
         )
-    if (
-        int(target_user.id) == int(admin_user.id)
-        and bool(target_user.is_active)
-        and not bool(payload.is_active)
-    ):
+    if int(target_user.id) == int(admin_user.id) and bool(target_user.is_active) and not bool(payload.is_active):
         raise ApiException(
             status_code=400,
             code="cannot_deactivate_self",
@@ -140,14 +129,13 @@ async def set_user_active(
         user=target_user,
         is_active=bool(payload.is_active),
     )
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.admin.user_active_updated",
-        extra={
-            "event": "api.admin.user_active_updated",
-            "admin_user_id": int(admin_user.id),
-            "target_user_id": int(updated_user.id),
-            "is_active": bool(updated_user.is_active),
-        },
+        admin_user_id=int(admin_user.id),
+        target_user_id=int(updated_user.id),
+        is_active=bool(updated_user.is_active),
     )
     return success_payload(
         request,
@@ -188,13 +176,12 @@ async def reset_user_password(
         user=target_user,
         password_hash=auth_service.hash_password(validated_password),
     )
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.admin.user_password_reset",
-        extra={
-            "event": "api.admin.user_password_reset",
-            "admin_user_id": int(admin_user.id),
-            "target_user_id": int(target_user.id),
-        },
+        admin_user_id=int(admin_user.id),
+        target_user_id=int(target_user.id),
     )
     return success_payload(
         request,

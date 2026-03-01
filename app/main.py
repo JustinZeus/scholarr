@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -12,17 +12,16 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.api.errors import register_api_exception_handlers
 from app.api.media import router as media_router
 from app.api.router import router as api_router
-from app.api.runtime_deps import get_ingestion_service, get_scholar_source
-from app.db.session import check_database
-from app.db.session import close_engine
+from app.db.session import check_database, close_engine
 from app.http.middleware import (
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
     parse_skip_paths,
 )
 from app.logging_config import configure_logging, parse_redact_fields
+from app.logging_utils import structured_log
 from app.security.csrf import CSRFMiddleware
-from app.services.domains.ingestion.scheduler import SchedulerService
+from app.services.ingestion.scheduler import SchedulerService
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -50,22 +49,58 @@ scheduler_service = SchedulerService(
 )
 
 
-def _log_startup_build_marker() -> None:
-    logger.info(
-        "app.startup_build_marker",
-        extra={
-            "event": "app.startup_build_marker",
-            "build_marker": BUILD_MARKER,
-            "frontend_enabled": settings.frontend_enabled,
-            "scheduler_enabled": settings.scheduler_enabled,
-            "log_format": settings.log_format,
-        },
-    )
-
-
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    _log_startup_build_marker()
+    structured_log(
+        logger,
+        "info",
+        "app.startup_build_marker",
+        build_marker=BUILD_MARKER,
+        frontend_enabled=settings.frontend_enabled,
+        scheduler_enabled=settings.scheduler_enabled,
+        log_format=settings.log_format,
+    )
+
+    from sqlalchemy import text
+
+    from app.db.session import get_session_factory
+
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            await session.execute(
+                text("UPDATE crawl_runs SET status = 'failed' WHERE status::text IN ('running', 'resolving')")
+            )
+            await session.commit()
+            structured_log(logger, "info", "app.startup_orphaned_runs_cleaned")
+    except Exception as exc:
+        structured_log(
+            logger,
+            "error",
+            "app.startup_orphaned_runs_cleanup_failed",
+            error=str(exc),
+        )
+
+    try:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            await session.execute(
+                text(
+                    "UPDATE publication_pdf_jobs SET status = 'queued'"
+                    " WHERE status = 'running'"
+                    " AND (last_attempt_at IS NULL OR last_attempt_at < NOW() - INTERVAL '10 minutes')"
+                )
+            )
+            await session.commit()
+            structured_log(logger, "info", "app.startup_stuck_pdf_jobs_recovered")
+    except Exception as exc:
+        structured_log(
+            logger,
+            "error",
+            "app.startup_stuck_pdf_jobs_recovery_failed",
+            error=str(exc),
+        )
+
     await scheduler_service.start()
     yield
     await scheduler_service.stop()
@@ -101,9 +136,7 @@ app.add_middleware(
     content_security_policy_report_only=settings.security_csp_report_only,
     strict_transport_security_enabled=settings.security_strict_transport_security_enabled,
     strict_transport_security_max_age=settings.security_strict_transport_security_max_age,
-    strict_transport_security_include_subdomains=(
-        settings.security_strict_transport_security_include_subdomains
-    ),
+    strict_transport_security_include_subdomains=(settings.security_strict_transport_security_include_subdomains),
     strict_transport_security_preload=settings.security_strict_transport_security_preload,
 )
 app.include_router(api_router)

@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.domains.dbops import run_publication_link_repair
+from app.services.dbops import run_publication_link_repair
 from tests.integration.helpers import insert_user
 
 
@@ -160,10 +160,7 @@ async def _assert_apply_effects(
     )
     baseline_completed = await _count_rows(
         db_session,
-        sql=(
-            "SELECT count(*) FROM scholar_profiles "
-            "WHERE id = :scholar_profile_id AND baseline_completed = false"
-        ),
+        sql=("SELECT count(*) FROM scholar_profiles WHERE id = :scholar_profile_id AND baseline_completed = false"),
         params={"scholar_profile_id": scholar_profile_id},
     )
     publication_count = await _count_rows(

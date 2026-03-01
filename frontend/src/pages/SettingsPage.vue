@@ -14,9 +14,12 @@ import AppTabs, { type AppTabItem } from "@/components/ui/AppTabs.vue";
 import SettingsAdminPanel from "@/features/settings/SettingsAdminPanel.vue";
 import {
   changePassword,
+  fetchAdminScholarHttpSettings,
   fetchSettings,
+  type AdminScholarHttpSettings,
   type UserSettings,
   type UserSettingsUpdate,
+  updateAdminScholarHttpSettings,
   updateSettings,
 } from "@/features/settings";
 import { ApiRequestError } from "@/lib/api/errors";
@@ -30,6 +33,7 @@ const TAB_ADMIN_USERS = "admin-users";
 const TAB_ADMIN_INTEGRITY = "admin-integrity";
 const TAB_ADMIN_REPAIRS = "admin-repairs";
 const TAB_ADMIN_PDF = "admin-pdf";
+const TAB_ADMIN_INTEGRATIONS = "admin-integrations";
 
 const auth = useAuthStore();
 const userSettings = useUserSettingsStore();
@@ -39,12 +43,20 @@ const router = useRouter();
 
 const loading = ref(true);
 const saving = ref(false);
+const savingScholarHttp = ref(false);
 const updatingPassword = ref(false);
 
 const autoRunEnabled = ref(false);
 const runIntervalMinutes = ref("60");
 const requestDelaySeconds = ref("2");
 const navVisiblePages = ref<string[]>([]);
+const openalexApiKey = ref("");
+const crossrefApiToken = ref("");
+const crossrefApiMailto = ref("");
+const scholarHttpUserAgent = ref("");
+const scholarHttpRotateUserAgent = ref(false);
+const scholarHttpAcceptLanguage = ref("en-US,en;q=0.9");
+const scholarHttpCookie = ref("");
 
 const currentPassword = ref("");
 const newPassword = ref("");
@@ -72,6 +84,7 @@ const tabItems = computed<AppTabItem[]>(() => {
       { id: TAB_ADMIN_INTEGRITY, label: "Integrity" },
       { id: TAB_ADMIN_REPAIRS, label: "Repairs" },
       { id: TAB_ADMIN_PDF, label: "PDF Queue" },
+      { id: TAB_ADMIN_INTEGRATIONS, label: "Integrations" },
     );
   }
   return tabs;
@@ -129,8 +142,19 @@ function hydrateSettings(settings: UserSettings): void {
   requestDelaySeconds.value = String(settings.request_delay_seconds);
   navVisiblePages.value = normalizeUserNavVisiblePages(settings.nav_visible_pages);
 
+  openalexApiKey.value = settings.openalex_api_key ?? "";
+  crossrefApiToken.value = settings.crossref_api_token ?? "";
+  crossrefApiMailto.value = settings.crossref_api_mailto ?? "";
+
   userSettings.applySettings(settings);
   runStatus.setSafetyState(settings.safety_state);
+}
+
+function hydrateScholarHttpSettings(settings: AdminScholarHttpSettings): void {
+  scholarHttpUserAgent.value = settings.user_agent;
+  scholarHttpRotateUserAgent.value = Boolean(settings.rotate_user_agent);
+  scholarHttpAcceptLanguage.value = settings.accept_language;
+  scholarHttpCookie.value = settings.cookie;
 }
 
 function parseBoundedInteger(value: string, label: string, minimum: number): number {
@@ -151,6 +175,9 @@ async function loadSettings(): Promise<void> {
   try {
     const settings = await fetchSettings();
     hydrateSettings(settings);
+    if (auth.isAdmin) {
+      hydrateScholarHttpSettings(await fetchAdminScholarHttpSettings());
+    }
   } catch (error) {
     if (error instanceof ApiRequestError) {
       errorMessage.value = error.message;
@@ -160,6 +187,32 @@ async function loadSettings(): Promise<void> {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+async function onSaveScholarHttpSettings(): Promise<void> {
+  savingScholarHttp.value = true;
+  errorMessage.value = null;
+  errorRequestId.value = null;
+  successMessage.value = null;
+  try {
+    const updated = await updateAdminScholarHttpSettings({
+      user_agent: scholarHttpUserAgent.value.trim(),
+      rotate_user_agent: scholarHttpRotateUserAgent.value,
+      accept_language: scholarHttpAcceptLanguage.value.trim(),
+      cookie: scholarHttpCookie.value.trim(),
+    });
+    hydrateScholarHttpSettings(updated);
+    successMessage.value = "Scholar HTTP profile updated.";
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      errorMessage.value = error.message;
+      errorRequestId.value = error.requestId;
+    } else {
+      errorMessage.value = "Unable to save Scholar HTTP profile.";
+    }
+  } finally {
+    savingScholarHttp.value = false;
   }
 }
 
@@ -183,6 +236,9 @@ async function onSaveSettings(): Promise<void> {
         minRequestDelaySeconds.value,
       ),
       nav_visible_pages: normalizeUserNavVisiblePages(navVisiblePages.value),
+      openalex_api_key: openalexApiKey.value.trim() || null,
+      crossref_api_token: crossrefApiToken.value.trim() || null,
+      crossref_api_mailto: crossrefApiMailto.value.trim() || null,
     };
 
     const saved = await updateSettings(payload);
@@ -355,6 +411,93 @@ onMounted(async () => {
               </AppButton>
             </div>
           </form>
+        </section>
+
+        <section v-if="activeTab === TAB_ADMIN_INTEGRATIONS" class="grid gap-4">
+          <div class="flex items-center gap-1">
+            <h2 class="text-lg font-semibold text-ink-primary">API Integrations</h2>
+            <AppHelpHint text="Configure API keys for external services like OpenAlex and Crossref. These are global system settings." />
+          </div>
+          <p class="text-sm text-secondary">If no keys are provided, the system will gracefully fall back to free unauthenticated tiers where available.</p>
+
+          <div class="grid gap-3">
+            <div class="grid gap-2 rounded-lg border border-stroke-default bg-surface-card-muted p-3">
+              <h3 class="text-sm font-semibold text-ink-secondary">OpenAlex</h3>
+              <p class="text-xs text-secondary mb-2">
+                OpenAlex is a free index of the world's research. Providing a key unlocks a higher rate limit. 
+                Values returned from the backend might be 'SET' to hide the raw key for security.
+              </p>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+                <span>API Key</span>
+                <AppInput v-model="openalexApiKey" placeholder="e.g. iBo3Ye2q322zKYkEyI..." autocomplete="off" />
+              </label>
+            </div>
+
+            <div class="grid gap-2 rounded-lg border border-stroke-default bg-surface-card-muted p-3">
+              <h3 class="text-sm font-semibold text-ink-secondary">Crossref</h3>
+              <p class="text-xs text-secondary mb-2">
+                Crossref metadata search for DOIs. A "mailto" address puts you in their "Polite Pool" for better performance. 
+                A Plus API token unlocks the fastest tier.
+              </p>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+                <span>API Token (Plus)</span>
+                <AppInput v-model="crossrefApiToken" placeholder="Usually empty unless you have an enterprise Plus account" autocomplete="off" />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary mt-2">
+                <span>Mailto (Polite Pool)</span>
+                <AppInput v-model="crossrefApiMailto" placeholder="e.g. admin@yourdomain.com" type="email" autocomplete="off" />
+              </label>
+            </div>
+
+            <div class="grid gap-2 rounded-lg border border-stroke-default bg-surface-card-muted p-3">
+              <h3 class="text-sm font-semibold text-ink-secondary">Scholar Request Profile</h3>
+              <p class="text-xs text-secondary mb-2">
+                Tune Scholar HTTP fingerprint behavior used by live scraper requests. Changes apply to new runs.
+              </p>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary">
+                <span>User-Agent override</span>
+                <AppInput
+                  v-model="scholarHttpUserAgent"
+                  placeholder="Leave empty to use built-in browser-like user agent"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary mt-2">
+                <span>Accept-Language</span>
+                <AppInput
+                  v-model="scholarHttpAcceptLanguage"
+                  placeholder="e.g. en-US,en;q=0.9"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-ink-secondary mt-2">
+                <span>Cookie header</span>
+                <AppInput
+                  v-model="scholarHttpCookie"
+                  placeholder="Optional. Leave empty to disable cookie passthrough"
+                  autocomplete="off"
+                />
+              </label>
+              <div class="mt-2">
+                <AppCheckbox
+                  id="scholar-http-rotate-user-agent"
+                  v-model="scholarHttpRotateUserAgent"
+                  label="Rotate user-agent per request"
+                />
+              </div>
+              <div>
+                <AppButton :disabled="savingScholarHttp" @click="onSaveScholarHttpSettings">
+                  {{ savingScholarHttp ? "Saving..." : "Save Scholar request profile" }}
+                </AppButton>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <AppButton :disabled="saving" @click="onSaveSettings">
+              {{ saving ? "Saving..." : "Save integrations" }}
+            </AppButton>
+          </div>
         </section>
 
         <SettingsAdminPanel v-if="activeAdminSection" :section="activeAdminSection" />

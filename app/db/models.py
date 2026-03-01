@@ -8,6 +8,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -30,9 +31,11 @@ class RunTriggerType(StrEnum):
 
 class RunStatus(StrEnum):
     RUNNING = "running"
+    RESOLVING = "resolving"
     SUCCESS = "success"
     PARTIAL_FAILURE = "partial_failure"
     FAILED = "failed"
+    CANCELED = "canceled"
 
 
 class QueueItemStatus(StrEnum):
@@ -59,18 +62,10 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
-    is_admin: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class UserSetting(Base):
@@ -86,18 +81,10 @@ class UserSetting(Base):
         ),
     )
 
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    auto_run_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
-    run_interval_minutes: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("1440")
-    )
-    request_delay_seconds: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("10")
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    auto_run_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    run_interval_minutes: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1440"))
+    request_delay_seconds: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("10"))
     nav_visible_pages: Mapped[list[str]] = mapped_column(
         JSONB,
         nullable=False,
@@ -112,12 +99,13 @@ class UserSetting(Base):
     )
     scrape_cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     scrape_cooldown_reason: Mapped[str | None] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+
+    openalex_api_key: Mapped[str | None] = mapped_column(String(255))
+    crossref_api_token: Mapped[str | None] = mapped_column(String(255))
+    crossref_api_mailto: Mapped[str | None] = mapped_column(String(255))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class ScholarProfile(Base):
@@ -128,9 +116,7 @@ class ScholarProfile(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     scholar_id: Mapped[str] = mapped_column(String(64), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(255))
     profile_image_url: Mapped[str | None] = mapped_column(Text)
@@ -138,22 +124,14 @@ class ScholarProfile(Base):
     profile_image_upload_path: Mapped[str | None] = mapped_column(Text)
     last_initial_page_fingerprint_sha256: Mapped[str | None] = mapped_column(String(64))
     last_initial_page_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    is_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
-    baseline_completed: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    baseline_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     last_run_dt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_run_status: Mapped[RunStatus | None] = mapped_column(
         RUN_STATUS_DB_ENUM,
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class CrawlRun(Base):
@@ -161,46 +139,32 @@ class CrawlRun(Base):
     __table_args__ = (
         Index("ix_crawl_runs_user_start", "user_id", "start_dt"),
         Index(
+            "uq_crawl_runs_user_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('running'::run_status, 'resolving'::run_status)"),
+        ),
+        Index(
             "uq_crawl_runs_user_manual_idempotency_key",
             "user_id",
             "idempotency_key",
             unique=True,
-            postgresql_where=text(
-                "idempotency_key IS NOT NULL AND trigger_type = 'manual'::run_trigger_type"
-            ),
+            postgresql_where=text("idempotency_key IS NOT NULL AND trigger_type = 'manual'::run_trigger_type"),
         ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    trigger_type: Mapped[RunTriggerType] = mapped_column(
-        RUN_TRIGGER_TYPE_DB_ENUM, nullable=False
-    )
-    status: Mapped[RunStatus] = mapped_column(
-        RUN_STATUS_DB_ENUM, nullable=False
-    )
-    start_dt: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    trigger_type: Mapped[RunTriggerType] = mapped_column(RUN_TRIGGER_TYPE_DB_ENUM, nullable=False)
+    status: Mapped[RunStatus] = mapped_column(RUN_STATUS_DB_ENUM, nullable=False)
+    start_dt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     end_dt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    scholar_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
-    new_pub_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
+    scholar_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    new_pub_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     idempotency_key: Mapped[str | None] = mapped_column(String(128))
-    error_log: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, server_default=text("'{}'::jsonb")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    error_log: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class Publication(Base):
@@ -221,20 +185,59 @@ class Publication(Base):
     title_raw: Mapped[str] = mapped_column(Text, nullable=False)
     title_normalized: Mapped[str] = mapped_column(Text, nullable=False)
     year: Mapped[int | None] = mapped_column(Integer)
-    citation_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
+    citation_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     author_text: Mapped[str | None] = mapped_column(Text)
     venue_text: Mapped[str | None] = mapped_column(Text)
     pub_url: Mapped[str | None] = mapped_column(Text)
-    doi: Mapped[str | None] = mapped_column(String(255))
     pdf_url: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+    canonical_title_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    openalex_enriched: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    openalex_last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class PublicationIdentifier(Base):
+    __tablename__ = "publication_identifiers"
+    __table_args__ = (
+        UniqueConstraint(
+            "publication_id",
+            "kind",
+            "value_normalized",
+            name="uq_publication_identifiers_publication_kind_value",
+        ),
+        CheckConstraint(
+            "confidence_score >= 0 AND confidence_score <= 1",
+            name="publication_identifiers_confidence_score_range",
+        ),
+        Index(
+            "ix_publication_identifiers_kind_value",
+            "kind",
+            "value_normalized",
+        ),
+        Index(
+            "ix_publication_identifiers_publication_id",
+            "publication_id",
+        ),
     )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    publication_id: Mapped[int] = mapped_column(
+        ForeignKey("publications.id", ondelete="CASCADE"),
+        nullable=False,
     )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    value_raw: Mapped[str] = mapped_column(Text, nullable=False)
+    value_normalized: Mapped[str] = mapped_column(String(255), nullable=False)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    confidence_score: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        server_default=text("0"),
+    )
+    evidence_url: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class PublicationPdfJob(Base):
@@ -272,12 +275,8 @@ class PublicationPdfJob(Base):
     last_requested_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class PublicationPdfJobEvent(Base):
@@ -301,9 +300,7 @@ class PublicationPdfJobEvent(Base):
     source: Mapped[str | None] = mapped_column(String(32))
     failure_reason: Mapped[str | None] = mapped_column(String(64))
     message: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class ScholarPublication(Base):
@@ -321,18 +318,10 @@ class ScholarPublication(Base):
         ForeignKey("publications.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    is_read: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
-    is_favorite: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
-    first_seen_run_id: Mapped[int | None] = mapped_column(
-        ForeignKey("crawl_runs.id", ondelete="SET NULL")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    is_favorite: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    first_seen_run_id: Mapped[int | None] = mapped_column(ForeignKey("crawl_runs.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class IngestionQueueItem(Base):
@@ -387,12 +376,8 @@ class IngestionQueueItem(Base):
     last_error: Mapped[str | None] = mapped_column(Text)
     dropped_reason: Mapped[str | None] = mapped_column(String(128))
     dropped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class DataRepairJob(Base):
@@ -432,12 +417,8 @@ class DataRepairJob(Base):
     error_text: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class AuthorSearchRuntimeState(Base):
@@ -461,12 +442,38 @@ class AuthorSearchRuntimeState(Base):
         nullable=False,
         server_default=text("false"),
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ArxivRuntimeState(Base):
+    __tablename__ = "arxiv_runtime_state"
+
+    state_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    next_allowed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ArxivQueryCacheEntry(Base):
+    __tablename__ = "arxiv_query_cache_entries"
+    __table_args__ = (
+        Index("ix_arxiv_query_cache_expires_at", "expires_at"),
+        Index("ix_arxiv_query_cache_cached_at", "cached_at"),
     )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+
+    query_fingerprint: Mapped[str] = mapped_column(String(64), primary_key=True)
+    payload: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
     )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class AuthorSearchCacheEntry(Base):
@@ -485,9 +492,5 @@ class AuthorSearchCacheEntry(Base):
         DateTime(timezone=True),
         nullable=False,
     )
-    cached_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

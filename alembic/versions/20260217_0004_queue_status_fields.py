@@ -7,8 +7,9 @@ Create Date: 2026-02-17 10:15:00.000000
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "20260217_0004"
@@ -22,9 +23,7 @@ def upgrade() -> None:
     inspector = sa.inspect(bind)
     columns = {column["name"] for column in inspector.get_columns("ingestion_queue_items")}
     indexes = {index["name"] for index in inspector.get_indexes("ingestion_queue_items")}
-    checks = {
-        constraint["name"] for constraint in inspector.get_check_constraints("ingestion_queue_items")
-    }
+    checks = {constraint["name"] for constraint in inspector.get_check_constraints("ingestion_queue_items")}
 
     if "status" not in columns:
         op.add_column(
@@ -80,9 +79,7 @@ def downgrade() -> None:
     inspector = sa.inspect(bind)
     columns = {column["name"] for column in inspector.get_columns("ingestion_queue_items")}
     indexes = {index["name"] for index in inspector.get_indexes("ingestion_queue_items")}
-    checks = {
-        constraint["name"] for constraint in inspector.get_check_constraints("ingestion_queue_items")
-    }
+    checks = {constraint["name"] for constraint in inspector.get_check_constraints("ingestion_queue_items")}
 
     if "ix_ingestion_queue_status_next_attempt" in indexes:
         op.drop_index("ix_ingestion_queue_status_next_attempt", table_name="ingestion_queue_items")

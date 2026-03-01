@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from app.services.domains.ingestion.application import ScholarIngestionService
-from app.services.domains.ingestion import scheduler as scheduler_module
+from app.services.ingestion import scheduler as scheduler_module
+from app.services.ingestion.application import ScholarIngestionService
+from app.services.ingestion.queue_runner import effective_request_delay_seconds
 from app.settings import settings
 
 
@@ -25,9 +26,9 @@ def test_ingestion_effective_request_delay_respects_policy_minimum() -> None:
 def test_scheduler_effective_request_delay_respects_policy_minimum() -> None:
     previous = _set_policy_minimum(9)
     try:
-        assert scheduler_module._effective_request_delay_seconds(None) == 9
-        assert scheduler_module._effective_request_delay_seconds(6) == 9
-        assert scheduler_module._effective_request_delay_seconds(11) == 11
+        assert effective_request_delay_seconds(None, floor=9) == 9
+        assert effective_request_delay_seconds(6, floor=9) == 9
+        assert effective_request_delay_seconds(11, floor=9) == 11
     finally:
         object.__setattr__(settings, "ingestion_min_request_delay_seconds", previous)
 
@@ -37,7 +38,7 @@ def test_scheduler_candidate_row_clamps_request_delay() -> None:
     try:
         candidate = scheduler_module.SchedulerService._candidate_from_row(
             (1, 15, 1, None, None),
-            now_utc=datetime(2026, 2, 21, tzinfo=timezone.utc),
+            now_utc=datetime(2026, 2, 21, tzinfo=UTC),
         )
         assert candidate is not None
         assert candidate.request_delay_seconds == 6

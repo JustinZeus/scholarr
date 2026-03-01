@@ -24,4 +24,3 @@ def get_login_rate_limiter() -> SlidingWindowRateLimiter:
         max_attempts=settings.login_rate_limit_attempts,
         window_seconds=settings.login_rate_limit_window_seconds,
     )
-

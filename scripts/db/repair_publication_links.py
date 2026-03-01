@@ -6,7 +6,7 @@ import asyncio
 import json
 
 from app.db.session import get_session_factory
-from app.services.domains.dbops import run_publication_link_repair
+from app.services.dbops import run_publication_link_repair
 
 
 def build_parser() -> argparse.ArgumentParser:

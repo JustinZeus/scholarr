@@ -21,9 +21,7 @@ class AuthService:
         normalized_email = email.strip().lower()
         if not normalized_email or not password:
             return None
-        result = await db_session.execute(
-            select(User).where(User.email == normalized_email)
-        )
+        result = await db_session.execute(select(User).where(User.email == normalized_email))
         user = result.scalar_one_or_none()
         if user is None or not user.is_active:
             return None

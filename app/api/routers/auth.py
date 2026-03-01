@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+from typing import NoReturn
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.errors import ApiException
 from app.api.deps import get_api_current_user
+from app.api.errors import ApiException
 from app.api.responses import success_payload
 from app.api.schemas import (
     AuthMeEnvelope,
@@ -16,15 +17,16 @@ from app.api.schemas import (
     LoginRequest,
     MessageEnvelope,
 )
+from app.auth import runtime as auth_runtime
 from app.auth.deps import get_auth_service, get_login_rate_limiter
 from app.auth.rate_limit import SlidingWindowRateLimiter
-from app.auth import runtime as auth_runtime
 from app.auth.service import AuthService
 from app.auth.session import set_session_user
 from app.db.models import User
 from app.db.session import get_db_session
+from app.logging_utils import structured_log
 from app.security.csrf import ensure_csrf_token
-from app.services.domains.users import application as user_service
+from app.services.users import application as user_service
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +38,12 @@ def _login_limiter_key_and_email(request: Request, payload: LoginRequest) -> tup
 
 
 def _raise_rate_limited(normalized_email: str, retry_after_seconds: int) -> None:
-    logger.warning(
+    structured_log(
+        logger,
+        "warning",
         "api.auth.login_rate_limited",
-        extra={
-            "event": "api.auth.login_rate_limited",
-            "email": normalized_email,
-            "retry_after_seconds": retry_after_seconds,
-        },
+        email=normalized_email,
+        retry_after_seconds=retry_after_seconds,
     )
     raise ApiException(
         status_code=429,
@@ -61,11 +62,8 @@ def _serialize_user_payload(user: User) -> dict[str, object]:
     }
 
 
-def _raise_invalid_credentials(*, normalized_email: str) -> None:
-    logger.info(
-        "api.auth.login_failed",
-        extra={"event": "api.auth.login_failed", "email": normalized_email},
-    )
+def _raise_invalid_credentials(*, normalized_email: str) -> NoReturn:
+    structured_log(logger, "info", "api.auth.login_failed", email=normalized_email)
     raise ApiException(
         status_code=401,
         code="invalid_credentials",
@@ -105,14 +103,7 @@ async def login(
         email=user.email,
         is_admin=user.is_admin,
     )
-    logger.info(
-        "api.auth.login_succeeded",
-        extra={
-            "event": "api.auth.login_succeeded",
-            "user_id": user.id,
-            "is_admin": user.is_admin,
-        },
-    )
+    structured_log(logger, "info", "api.auth.login_succeeded", user_id=user.id, is_admin=user.is_admin)
     return success_payload(
         request,
         data={
@@ -199,13 +190,7 @@ async def change_password(
         user=current_user,
         password_hash=auth_service.hash_password(validated_password),
     )
-    logger.info(
-        "api.auth.password_changed",
-        extra={
-            "event": "api.auth.password_changed",
-            "user_id": int(current_user.id),
-        },
-    )
+    structured_log(logger, "info", "api.auth.password_changed", user_id=int(current_user.id))
     return success_payload(
         request,
         data={"message": "Password updated successfully."},
@@ -222,12 +207,8 @@ async def logout(
 ):
     current_user = await auth_runtime.get_authenticated_user(request, db_session)
     auth_runtime.invalidate_session(request)
-    logger.info(
-        "api.auth.logout",
-        extra={
-            "event": "api.auth.logout",
-            "user_id": int(current_user.id) if current_user is not None else None,
-        },
+    structured_log(
+        logger, "info", "api.auth.logout", user_id=int(current_user.id) if current_user is not None else None
     )
     return success_payload(
         request,

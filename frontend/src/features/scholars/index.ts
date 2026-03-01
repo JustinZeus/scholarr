@@ -54,7 +54,6 @@ export interface PublicationExportItem {
   author_text: string | null;
   venue_text: string | null;
   pub_url: string | null;
-  doi: string | null;
   pdf_url: string | null;
   is_read: boolean;
 }
@@ -86,7 +85,7 @@ interface ScholarsListData {
   scholars: ScholarProfile[];
 }
 
-interface ScholarSearchData extends ScholarSearchResult {}
+interface ScholarSearchData extends ScholarSearchResult { }
 
 export async function listScholars(): Promise<ScholarProfile[]> {
   const response = await apiRequest<ScholarsListData>("/scholars", { method: "GET" });

@@ -1,8 +1,7 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import MetaData, event
 from sqlalchemy.orm import DeclarativeBase
-
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -21,7 +20,7 @@ class Base(DeclarativeBase):
 def _set_updated_at_before_update(_mapper, _connection, target) -> None:
     # Keep audit timestamps current for ORM-managed updates.
     if hasattr(target, "updated_at"):
-        target.updated_at = datetime.now(timezone.utc)
+        target.updated_at = datetime.now(UTC)
 
 
 metadata = Base.metadata

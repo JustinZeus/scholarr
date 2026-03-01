@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
 import logging
 import sys
+from datetime import UTC, datetime
 from typing import Any
 
 from app.logging_context import get_request_id
@@ -102,10 +102,20 @@ class JsonLogFormatter(logging.Formatter):
         if key.lower() in self._redact_fields:
             return "[REDACTED]"
         if isinstance(value, dict):
-            return {nested_key: self._redact_value(nested_key, nested_value) for nested_key, nested_value in value.items()}
+            return {
+                nested_key: self._redact_value(nested_key, nested_value) for nested_key, nested_value in value.items()
+            }
         if isinstance(value, (list, tuple)):
             return [self._redact_value(key, item) for item in value]
         return value
+
+
+_CONSOLE_SHORT_KEYS = {
+    "user_id": "user",
+    "scholar_id": "scholar",
+    "crawl_run_id": "run",
+    "run_id": "run",
+}
 
 
 class ConsoleLogFormatter(logging.Formatter):
@@ -140,7 +150,8 @@ class ConsoleLogFormatter(logging.Formatter):
         for key in sorted(payload.keys()):
             if key in {"timestamp", "level", "logger", "event", "exception"}:
                 continue
-            parts.append(f"{key}={payload[key]}")
+            display_key = _CONSOLE_SHORT_KEYS.get(key, key)
+            parts.append(f"{display_key}={payload[key]}")
 
         if "exception" in payload:
             parts.append(f"exception={payload['exception']}")
@@ -168,7 +179,7 @@ def _normalize_level(level: str) -> int:
 
 
 def _format_timestamp(created_ts: float) -> str:
-    dt = datetime.fromtimestamp(created_ts, tz=timezone.utc)
+    dt = datetime.fromtimestamp(created_ts, tz=UTC)
     return dt.strftime("%Y-%m-%d %H:%M:%SZ")
 
 

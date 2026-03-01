@@ -82,4 +82,3 @@ def register_api_exception_handlers(app: FastAPI) -> None:
             message="Request validation failed.",
             details=exc.errors(),
         )
-

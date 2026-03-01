@@ -20,4 +20,3 @@ async def test_database_connectivity_from_database_url() -> None:
             assert result.scalar_one() == 1
     finally:
         await engine.dispose()
-

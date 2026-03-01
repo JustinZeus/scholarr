@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from secrets import token_urlsafe
 import logging
 import time
+from secrets import token_urlsafe
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.logging_context import set_request_id
+from app.logging_utils import structured_log
 
 REQUEST_ID_HEADER = "X-Request-ID"
 DEFAULT_PERMISSIONS_POLICY = (
@@ -61,42 +62,39 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         should_log = self._log_requests and not self._is_skipped_path(request.url.path)
         if should_log:
-            logger.debug(
+            structured_log(
+                logger,
+                "debug",
                 "request.started",
-                extra={
-                    "event": "request.started",
-                    "method": request.method,
-                    "path": request.url.path,
-                },
+                method=request.method,
+                path=request.url.path,
             )
 
         try:
             response = await call_next(request)
         except Exception:
             duration_ms = int((time.perf_counter() - start) * 1000)
-            logger.exception(
+            structured_log(
+                logger,
+                "exception",
                 "request.failed",
-                extra={
-                    "event": "request.failed",
-                    "method": request.method,
-                    "path": request.url.path,
-                    "duration_ms": duration_ms,
-                },
+                method=request.method,
+                path=request.url.path,
+                duration_ms=duration_ms,
             )
             raise
         else:
             duration_ms = int((time.perf_counter() - start) * 1000)
             response.headers[REQUEST_ID_HEADER] = request_id
             if should_log:
-                logger.debug(
+                structured_log(
+                    logger,
+                    "debug",
                     "request.completed",
-                    extra={
-                        "event": "request.completed",
-                        "method": request.method,
-                        "path": request.url.path,
-                        "status_code": response.status_code,
-                        "duration_ms": duration_ms,
-                    },
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=response.status_code,
+                    duration_ms=duration_ms,
                 )
             return response
         finally:
@@ -170,11 +168,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         csp_policy = self._csp_policy_for_path(request.url.path)
         if self._csp_enabled and csp_policy:
-            csp_header = (
-                "Content-Security-Policy-Report-Only"
-                if self._csp_report_only
-                else "Content-Security-Policy"
-            )
+            csp_header = "Content-Security-Policy-Report-Only" if self._csp_report_only else "Content-Security-Policy"
             response.headers.setdefault(csp_header, csp_policy)
 
         hsts = self._strict_transport_security_value()

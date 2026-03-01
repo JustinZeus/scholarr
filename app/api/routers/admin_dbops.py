@@ -10,21 +10,25 @@ from app.api.errors import ApiException
 from app.api.responses import success_payload
 from app.api.schemas import (
     AdminDbIntegrityEnvelope,
-    AdminPdfQueueBulkEnqueueEnvelope,
-    AdminPdfQueueRequeueEnvelope,
-    AdminPdfQueueEnvelope,
     AdminDbRepairJobsEnvelope,
+    AdminPdfQueueBulkEnqueueEnvelope,
+    AdminPdfQueueEnvelope,
+    AdminPdfQueueRequeueEnvelope,
     AdminRepairPublicationLinksEnvelope,
     AdminRepairPublicationLinksRequest,
+    AdminRepairPublicationNearDuplicatesEnvelope,
+    AdminRepairPublicationNearDuplicatesRequest,
 )
 from app.db.models import DataRepairJob, User
 from app.db.session import get_db_session
-from app.services.domains.dbops import (
+from app.logging_utils import structured_log
+from app.services.dbops import (
     collect_integrity_report,
     list_repair_jobs,
     run_publication_link_repair,
+    run_publication_near_duplicate_repair,
 )
-from app.services.domains.publications import application as publication_service
+from app.services.publications import application as publication_service
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +52,7 @@ def _serialize_repair_job(job: DataRepairJob) -> dict[str, object]:
     }
 
 
-def _requested_by_value(*, payload: AdminRepairPublicationLinksRequest, admin_user: User) -> str:
+def _requested_by_value(*, payload, admin_user: User) -> str:
     from_payload = (payload.requested_by or "").strip()
     return from_payload or admin_user.email
 
@@ -57,7 +61,7 @@ def _serialize_pdf_queue_item(item) -> dict[str, object]:
     return {
         "publication_id": item.publication_id,
         "title": item.title,
-        "doi": item.doi,
+        "display_identifier": _serialize_display_identifier(item.display_identifier),
         "pdf_url": item.pdf_url,
         "status": item.status,
         "attempt_count": item.attempt_count,
@@ -70,6 +74,18 @@ def _serialize_pdf_queue_item(item) -> dict[str, object]:
         "last_attempt_at": item.last_attempt_at,
         "resolved_at": item.resolved_at,
         "updated_at": item.updated_at,
+    }
+
+
+def _serialize_display_identifier(value) -> dict[str, object] | None:
+    if value is None:
+        return None
+    return {
+        "kind": value.kind,
+        "value": value.value,
+        "label": value.label,
+        "url": value.url,
+        "confidence_score": float(value.confidence_score),
     }
 
 
@@ -120,15 +136,14 @@ async def get_integrity_report(
     admin_user: User = Depends(get_api_admin_user),
 ):
     report = await collect_integrity_report(db_session)
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.admin.db.integrity_checked",
-        extra={
-            "event": "api.admin.db.integrity_checked",
-            "admin_user_id": int(admin_user.id),
-            "status": report.get("status"),
-            "failure_count": len(report.get("failures", [])),
-            "warning_count": len(report.get("warnings", [])),
-        },
+        admin_user_id=int(admin_user.id),
+        status=report.get("status"),
+        failure_count=len(report.get("failures", [])),
+        warning_count=len(report.get("warnings", [])),
     )
     return success_payload(request, data=report)
 
@@ -144,14 +159,13 @@ async def get_repair_jobs(
     admin_user: User = Depends(get_api_admin_user),
 ):
     jobs = await list_repair_jobs(db_session, limit=limit)
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.admin.db.repair_jobs_listed",
-        extra={
-            "event": "api.admin.db.repair_jobs_listed",
-            "admin_user_id": int(admin_user.id),
-            "limit": int(limit),
-            "job_count": len(jobs),
-        },
+        admin_user_id=int(admin_user.id),
+        limit=int(limit),
+        job_count=len(jobs),
     )
     return success_payload(
         request,
@@ -186,18 +200,17 @@ async def get_pdf_queue(
         offset=resolved_offset,
         status=normalized_status,
     )
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.admin.db.pdf_queue_listed",
-        extra={
-            "event": "api.admin.db.pdf_queue_listed",
-            "admin_user_id": int(admin_user.id),
-            "page": int(resolved_page),
-            "page_size": int(resolved_limit),
-            "offset": int(resolved_offset),
-            "status": normalized_status,
-            "item_count": len(queue_page.items),
-            "total_count": int(queue_page.total_count),
-        },
+        admin_user_id=int(admin_user.id),
+        page=int(resolved_page),
+        page_size=int(resolved_limit),
+        offset=int(resolved_offset),
+        status=normalized_status,
+        item_count=len(queue_page.items),
+        total_count=int(queue_page.total_count),
     )
     return success_payload(
         request,
@@ -236,14 +249,13 @@ async def requeue_pdf_lookup(
             message="Publication not found.",
         )
     status, message = _requeue_response_state(queued=result.queued)
-    logger.info(
-        "api.admin.db.pdf_queue_requeue_requested",
-        extra={
-            "event": "api.admin.db.pdf_queue_requeue_requested",
-            "admin_user_id": int(admin_user.id),
-            "publication_id": int(publication_id),
-            "queued": bool(result.queued),
-        },
+    structured_log(
+        logger,
+        "info",
+        "api.admin.db.pdf_requeued",
+        admin_user_id=int(admin_user.id),
+        publication_id=int(publication_id),
+        queued=bool(result.queued),
     )
     return success_payload(
         request,
@@ -272,15 +284,14 @@ async def requeue_all_missing_pdfs(
         request_email=admin_user.email,
         limit=limit,
     )
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.admin.db.pdf_queue_requeue_all",
-        extra={
-            "event": "api.admin.db.pdf_queue_requeue_all",
-            "admin_user_id": int(admin_user.id),
-            "limit": int(limit),
-            "requested_count": int(result.requested_count),
-            "queued_count": int(result.queued_count),
-        },
+        admin_user_id=int(admin_user.id),
+        limit=int(limit),
+        requested_count=int(result.requested_count),
+        queued_count=int(result.queued_count),
     )
     return success_payload(
         request,
@@ -321,17 +332,114 @@ async def trigger_publication_link_repair(
             code="invalid_repair_scope",
             message=str(exc),
         ) from exc
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.admin.db.publication_link_repair_triggered",
-        extra={
-            "event": "api.admin.db.publication_link_repair_triggered",
-            "admin_user_id": int(admin_user.id),
-            "scope_mode": payload.scope_mode,
-            "target_user_id": int(payload.user_id) if payload.user_id is not None else None,
-            "dry_run": bool(payload.dry_run),
-            "gc_orphan_publications": bool(payload.gc_orphan_publications),
-            "job_id": int(result["job_id"]),
-            "status": result["status"],
-        },
+        admin_user_id=int(admin_user.id),
+        scope_mode=payload.scope_mode,
+        target_user_id=int(payload.user_id) if payload.user_id is not None else None,
+        dry_run=bool(payload.dry_run),
+        gc_orphan_publications=bool(payload.gc_orphan_publications),
+        job_id=int(result["job_id"]),
+        status=result["status"],
     )
     return success_payload(request, data=result)
+
+
+@router.post(
+    "/repairs/publication-near-duplicates",
+    response_model=AdminRepairPublicationNearDuplicatesEnvelope,
+)
+async def trigger_publication_near_duplicate_repair(
+    payload: AdminRepairPublicationNearDuplicatesRequest,
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    admin_user: User = Depends(get_api_admin_user),
+):
+    try:
+        result = await run_publication_near_duplicate_repair(
+            db_session,
+            dry_run=bool(payload.dry_run),
+            similarity_threshold=float(payload.similarity_threshold),
+            min_shared_tokens=int(payload.min_shared_tokens),
+            max_year_delta=int(payload.max_year_delta),
+            max_clusters=int(payload.max_clusters),
+            selected_cluster_keys=list(payload.selected_cluster_keys),
+            requested_by=_requested_by_value(payload=payload, admin_user=admin_user),
+        )
+    except ValueError as exc:
+        raise ApiException(
+            status_code=400,
+            code="invalid_near_duplicate_repair_request",
+            message=str(exc),
+        ) from exc
+    structured_log(
+        logger,
+        "info",
+        "api.admin.db.dedup_repair_triggered",
+        admin_user_id=int(admin_user.id),
+        dry_run=bool(payload.dry_run),
+        selected_cluster_count=len(payload.selected_cluster_keys),
+        job_id=int(result["job_id"]),
+        status=result["status"],
+    )
+    return success_payload(request, data=result)
+
+
+DROP_PUBLICATIONS_CONFIRMATION = "DROP ALL PUBLICATIONS"
+
+
+@router.post("/drop-all-publications")
+async def drop_all_publications(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    admin_user: User = Depends(get_api_admin_user),
+):
+    body = await request.json()
+    confirmation_text = (body.get("confirmation_text") or "").strip()
+    if confirmation_text != DROP_PUBLICATIONS_CONFIRMATION:
+        raise ApiException(
+            status_code=400,
+            code="confirmation_required",
+            message=f"Type '{DROP_PUBLICATIONS_CONFIRMATION}' to confirm this destructive action.",
+        )
+
+    from sqlalchemy import delete, func, select, update
+
+    from app.db.models import (
+        Publication,
+        PublicationIdentifier,
+        PublicationPdfJob,
+        PublicationPdfJobEvent,
+        ScholarProfile,
+        ScholarPublication,
+    )
+
+    count_result = await db_session.execute(select(func.count()).select_from(Publication))
+    total_publications = count_result.scalar_one()
+
+    await db_session.execute(delete(ScholarPublication))
+    await db_session.execute(delete(PublicationIdentifier))
+    await db_session.execute(delete(PublicationPdfJobEvent))
+    await db_session.execute(delete(PublicationPdfJob))
+    await db_session.execute(delete(Publication))
+    await db_session.execute(update(ScholarProfile).values(baseline_completed=False))
+    await db_session.commit()
+
+    structured_log(
+        logger,
+        "warning",
+        "api.admin.db.all_publications_dropped",
+        admin_user_id=int(admin_user.id),
+        admin_email=admin_user.email,
+        deleted_count=int(total_publications),
+    )
+    return success_payload(
+        request,
+        data={
+            "deleted_count": int(total_publications),
+            "message": f"Dropped {total_publications} publication(s) and all related data. "
+            "Scholar baselines have been reset; the next run will re-discover all publications.",
+        },
+    )

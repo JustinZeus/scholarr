@@ -1,38 +1,49 @@
 /** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
 const sidebars = {
-  docsSidebar: [
+  docs: [
     "index",
     {
       type: "category",
-      label: "Users",
-      items: ["user/overview", "user/getting-started"],
+      label: "User Guide",
+      items: [
+        "user/overview",
+        "user/getting-started",
+        "user/configuration",
+      ],
+    },
+    {
+      type: "category",
+      label: "Developer",
+      items: [
+        "developer/overview",
+        "developer/architecture",
+        "developer/local-development",
+        "developer/contributing",
+        "developer/ingestion",
+        "developer/frontend-theme-inventory",
+        "developer/testing",
+      ],
     },
     {
       type: "category",
       label: "Operations",
       items: [
         "operations/overview",
-        "operations/scrape-safety-runbook",
+        "operations/deployment",
         "operations/database-runbook",
-        "operations/migration-checklist",
-      ],
-    },
-    {
-      type: "category",
-      label: "Developers",
-      items: [
-        "developer/overview",
-        "developer/documentation-standards",
-        "developer/local-development",
-        "developer/architecture",
-        "developer/contributing",
-        "developer/frontend-theme-inventory",
+        "operations/scrape-safety-runbook",
+        "operations/arxiv-runbook",
       ],
     },
     {
       type: "category",
       label: "Reference",
-      items: ["reference/overview", "reference/api-contract", "reference/environment"],
+      items: [
+        "reference/overview",
+        "reference/api",
+        "reference/environment",
+        "reference/changelog",
+      ],
     },
   ],
 };

@@ -22,7 +22,9 @@ import {
   type QueueItem,
   type RunListItem,
 } from "@/features/runs";
+import { formatCooldownCountdown } from "@/features/safety";
 import { ApiRequestError } from "@/lib/api/errors";
+import { useAuthStore } from "@/stores/auth";
 import { useRunStatusStore } from "@/stores/run_status";
 import { useUserSettingsStore } from "@/stores/user_settings";
 
@@ -33,8 +35,10 @@ const errorMessage = ref<string | null>(null);
 const errorRequestId = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
 const activeQueueItemId = ref<number | null>(null);
+const auth = useAuthStore();
 const runStatus = useRunStatusStore();
 const userSettings = useUserSettingsStore();
+const isCancelAnimating = ref(false);
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -62,7 +66,7 @@ function queueHealth() {
 }
 
 const queueCounts = computed(() => queueHealth());
-const activeRunId = computed(() => runStatus.latestRun?.status === "running" ? runStatus.latestRun.id : null);
+const activeRunId = computed(() => runStatus.isRunActive && runStatus.latestRun ? runStatus.latestRun.id : null);
 const isStartBlocked = computed(
   () =>
     runStatus.isRunActive ||
@@ -86,6 +90,10 @@ const runButtonLabel = computed(() => {
     return "Manual checks disabled";
   }
   if (runStatus.safetyState.cooldown_active) {
+    const remaining = runStatus.safetyState.cooldown_remaining_seconds;
+    if (remaining > 0) {
+      return `Cooldown (${formatCooldownCountdown(remaining)})`;
+    }
     return "Safety cooldown";
   }
   if (runStatus.isLikelyRunning) {
@@ -151,6 +159,28 @@ async function onTriggerManualRun(): Promise<void> {
   }
 }
 
+async function onCancelRun(): Promise<void> {
+  if (!activeRunId.value) return;
+  errorMessage.value = null;
+  errorRequestId.value = null;
+  successMessage.value = null;
+  isCancelAnimating.value = true;
+
+  try {
+    const result = await runStatus.cancelActiveCheck();
+    if (result.kind === "success") {
+      successMessage.value = "Update check canceled successfully.";
+      await loadData();
+    } else {
+      errorMessage.value = result.message;
+    }
+  } catch {
+    errorMessage.value = "Unable to cancel the update check.";
+  } finally {
+    isCancelAnimating.value = false;
+  }
+}
+
 async function runQueueAction(itemId: number, action: "retry" | "drop" | "clear"): Promise<void> {
   activeQueueItemId.value = itemId;
   successMessage.value = null;
@@ -208,6 +238,22 @@ onMounted(() => {
         :manual-run-allowed="userSettings.manualRunAllowed"
       />
       <div class="flex flex-wrap items-center gap-2">
+        <AppButton
+          v-if="runStatus.isRunActive"
+          variant="danger"
+          :disabled="!activeRunId || isCancelAnimating"
+          @click="onCancelRun"
+        >
+          <span class="inline-flex items-center gap-2">
+            <span v-if="isCancelAnimating" class="relative inline-flex h-2.5 w-2.5">
+              <span
+                class="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60"
+              />
+              <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-current" />
+            </span>
+            Cancel check
+          </span>
+        </AppButton>
         <AppButton :disabled="isStartBlocked" :title="startCheckDisabledReason || undefined" @click="onTriggerManualRun">
           {{ runButtonLabel }}
         </AppButton>

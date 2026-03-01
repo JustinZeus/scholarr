@@ -39,6 +39,10 @@ const navRunStateStatus = computed(() => {
   if (runStatus.isSubmitting && !runStatus.isLikelyRunning) {
     return "starting";
   }
+  const s = runStatus.latestRun?.status;
+  if (s === "resolving") {
+    return "resolving";
+  }
   if (runStatus.isLikelyRunning) {
     return "running";
   }

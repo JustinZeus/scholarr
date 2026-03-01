@@ -2,8 +2,8 @@
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: "scholarr",
-  tagline: "Self-hosted scholar tracking docs",
+  title: "Scholarr",
+  tagline: "Self-hosted academic publication tracker",
   favicon: "img/favicon.ico",
 
   url: "https://justinzeus.github.io",
@@ -23,59 +23,52 @@ const config = {
   presets: [
     [
       "classic",
-      {
+      /** @type {import('@docusaurus/preset-classic').Options} */
+      ({
         docs: {
           path: "..",
-          exclude: ["website/**", "README.md"],
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: "https://github.com/JustinZeus/scholarr/tree/main/",
+          exclude: ["website/**", "README.md"],
         },
         blog: false,
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
         },
-      },
+      }),
     ],
   ],
 
-  themeConfig: {
-    navbar: {
-      title: "scholarr",
-      items: [
-        {
-          type: "docSidebar",
-          sidebarId: "docsSidebar",
-          position: "left",
-          label: "Docs",
-        },
-        {
-          href: "https://github.com/JustinZeus/scholarr",
-          label: "GitHub",
-          position: "right",
-        },
-      ],
-    },
-    footer: {
-      style: "dark",
-      links: [
-        {
-          title: "Docs",
-          items: [{ label: "Index", to: "/" }],
-        },
-        {
-          title: "Community",
-          items: [
-            {
-              label: "GitHub",
-              href: "https://github.com/JustinZeus/scholarr",
-            },
-          ],
-        },
-      ],
-      copyright: `Copyright © ${new Date().getFullYear()} scholarr.`,
-    },
-  },
+  themeConfig:
+    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+    ({
+      navbar: {
+        title: "Scholarr",
+        items: [
+          { to: "/user/overview", label: "User Guide", position: "left" },
+          {
+            to: "/developer/overview",
+            label: "Developer",
+            position: "left",
+          },
+          {
+            to: "/operations/overview",
+            label: "Operations",
+            position: "left",
+          },
+          { to: "/reference/overview", label: "Reference", position: "left" },
+          {
+            href: "https://github.com/JustinZeus/scholarr",
+            label: "GitHub",
+            position: "right",
+          },
+        ],
+      },
+      footer: {
+        style: "dark",
+        copyright: `Copyright \u00a9 ${new Date().getFullYear()} Scholarr. Built with Docusaurus.`,
+      },
+    }),
 };
 
 module.exports = config;

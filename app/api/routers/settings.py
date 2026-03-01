@@ -11,8 +11,9 @@ from app.api.responses import success_payload
 from app.api.schemas import SettingsEnvelope, SettingsUpdateRequest
 from app.db.models import User
 from app.db.session import get_db_session
-from app.services.domains.ingestion import safety as run_safety_service
-from app.services.domains.settings import application as user_settings_service
+from app.logging_utils import structured_log
+from app.services.ingestion import safety as run_safety_service
+from app.services.settings import application as user_settings_service
 from app.settings import settings as settings_module
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,9 @@ def _serialize_settings(user_settings) -> dict[str, object]:
             "cooldown_network_seconds": max(60, int(settings_module.ingestion_safety_cooldown_network_seconds)),
         },
         "safety_state": run_safety_service.get_safety_state_payload(user_settings),
+        "openalex_api_key": user_settings.openalex_api_key,
+        "crossref_api_token": user_settings.crossref_api_token,
+        "crossref_api_mailto": user_settings.crossref_api_mailto,
     }
 
 
@@ -80,35 +84,18 @@ async def _clear_expired_cooldown_with_log(
         return
     await db_session.commit()
     await db_session.refresh(user_settings)
-    logger.info(
+    structured_log(
+        logger,
+        "info",
         "api.settings.safety_cooldown_cleared",
-        extra={
-            "event": "api.settings.safety_cooldown_cleared",
-            "user_id": user_id,
-            "reason": previous_safety_state.get("cooldown_reason"),
-            "cooldown_until": previous_safety_state.get("cooldown_until"),
-            "metric_name": "api_settings_safety_cooldown_cleared_total",
-            "metric_value": 1,
-        },
+        user_id=user_id,
+        reason=previous_safety_state.get("cooldown_reason"),
+        cooldown_until=previous_safety_state.get("cooldown_until"),
     )
 
 
 def _effective_auto_run_enabled(payload: SettingsUpdateRequest) -> bool:
     return bool(payload.auto_run_enabled) and settings_module.ingestion_automation_allowed
-
-
-def _log_settings_update(*, user_id: int, updated) -> None:
-    logger.info(
-        "api.settings.updated",
-        extra={
-            "event": "api.settings.updated",
-            "user_id": user_id,
-            "auto_run_enabled": updated.auto_run_enabled,
-            "run_interval_minutes": updated.run_interval_minutes,
-            "request_delay_seconds": updated.request_delay_seconds,
-            "nav_visible_pages": updated.nav_visible_pages,
-        },
-    )
 
 
 @router.get(
@@ -169,13 +156,26 @@ async def update_settings(
         run_interval_minutes=parsed_interval,
         request_delay_seconds=parsed_delay,
         nav_visible_pages=parsed_nav_visible_pages,
+        openalex_api_key=payload.openalex_api_key,
+        crossref_api_token=payload.crossref_api_token,
+        crossref_api_mailto=payload.crossref_api_mailto,
     )
     await _clear_expired_cooldown_with_log(
         db_session,
         user_id=current_user.id,
         user_settings=updated,
     )
-    _log_settings_update(user_id=current_user.id, updated=updated)
+    structured_log(
+        logger,
+        "info",
+        "api.settings.updated",
+        user_id=current_user.id,
+        auto_run_enabled=updated.auto_run_enabled,
+        run_interval_minutes=updated.run_interval_minutes,
+        request_delay_seconds=updated.request_delay_seconds,
+        nav_visible_pages=updated.nav_visible_pages,
+        openalex_api_key="SET" if updated.openalex_api_key else "UNSET",
+    )
     return success_payload(
         request,
         data=_serialize_settings(updated),

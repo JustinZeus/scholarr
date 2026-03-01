@@ -32,7 +32,7 @@ jobs:
           node-version: "20"
 
       - name: Install docs dependencies
-        run: npm install --prefix docs/website
+        run: npm ci --prefix docs/website
 
       - name: Build docs site
         run: npm --prefix docs/website run build
