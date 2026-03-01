@@ -99,9 +99,7 @@ async def _run_serialized_fetch(
         "arxiv.request_completed",
         status_code=int(response.status_code),
         wait_seconds=wait_seconds,
-        cooldown_remaining_seconds=_cooldown_remaining_seconds(
-            cooldown_until_value, now_utc=datetime.now(UTC)
-        ),
+        cooldown_remaining_seconds=_cooldown_remaining_seconds(cooldown_until_value, now_utc=datetime.now(UTC)),
         source_path=source_path,
     )
     return response, hit_rate_limit
