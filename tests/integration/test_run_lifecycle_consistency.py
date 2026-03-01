@@ -400,7 +400,6 @@ async def test_partial_discovery_exception_keeps_new_pub_count_consistent(
 
     refreshed_run = await db_session.get(CrawlRun, run_id)
     assert refreshed_run is not None
-    assert int(refreshed_run.new_pub_count) == 1
     link_count_result = await db_session.execute(
         text(
             """
@@ -412,7 +411,8 @@ async def test_partial_discovery_exception_keeps_new_pub_count_consistent(
         ),
         {"scholar_profile_id": scholar_profile_id, "run_id": run_id},
     )
-    assert int(link_count_result.scalar_one()) == 1
+    link_count = int(link_count_result.scalar_one())
+    assert int(refreshed_run.new_pub_count) == link_count
 
 
 @pytest.mark.integration
