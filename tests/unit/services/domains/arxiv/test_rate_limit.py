@@ -88,6 +88,7 @@ async def test_arxiv_rate_limit_serializes_concurrent_calls(db_session: AsyncSes
 
 @pytest.mark.asyncio
 async def test_arxiv_rate_limit_logs_request_scheduled_and_completed(
+    db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     logged: list[dict[str, object]] = []
@@ -113,6 +114,7 @@ async def test_arxiv_rate_limit_logs_request_scheduled_and_completed(
 
 @pytest.mark.asyncio
 async def test_arxiv_rate_limit_logs_cooldown_activation(
+    db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     logged_warning: list[dict[str, object]] = []
