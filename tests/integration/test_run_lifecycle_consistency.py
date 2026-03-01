@@ -30,9 +30,7 @@ class _PassthroughSource:
             error=None,
         )
 
-    async def fetch_profile_page_html(
-        self, scholar_id: str, *, cstart: int, pagesize: int
-    ) -> FetchResult:
+    async def fetch_profile_page_html(self, scholar_id: str, *, cstart: int, pagesize: int) -> FetchResult:
         return await self.fetch_profile_html(scholar_id)
 
 

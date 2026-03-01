@@ -56,6 +56,7 @@ def _drop_finished_task(task: asyncio.Task[Any]) -> None:
     except Exception:
         structured_log(logger, "exception", "runs.background_task_failed")
 
+
 router = APIRouter(prefix="/runs", tags=["api-runs"])
 ACTIVE_RUN_STATUSES = {RunStatus.RUNNING, RunStatus.RESOLVING}
 
