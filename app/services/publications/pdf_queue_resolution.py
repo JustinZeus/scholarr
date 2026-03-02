@@ -4,8 +4,8 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
+from app.db.background_session import background_session
 from app.db.models import Publication, PublicationPdfJob
-from app.db.session import get_session_factory
 from app.logging_utils import structured_log
 from app.services.publication_identifiers import application as identifier_service
 from app.services.publications.pdf_queue_common import (
@@ -51,8 +51,7 @@ async def _mark_attempt_started(
     publication_id: int,
     user_id: int,
 ) -> None:
-    session_factory = get_session_factory()
-    async with session_factory() as db_session:
+    async with background_session() as db_session:
         job = await db_session.get(PublicationPdfJob, publication_id)
         if job is None:
             job = queued_job(publication_id=publication_id, user_id=user_id)
@@ -138,8 +137,7 @@ async def _persist_outcome(
     user_id: int,
     outcome: OaResolutionOutcome,
 ) -> None:
-    session_factory = get_session_factory()
-    async with session_factory() as db_session:
+    async with background_session() as db_session:
         publication = await db_session.get(Publication, publication_id)
         job = await db_session.get(PublicationPdfJob, publication_id)
         if publication is None or job is None:
@@ -220,8 +218,7 @@ async def _run_resolution_task(
 
     openalex_api_key: str | None = None
     try:
-        session_factory = get_session_factory()
-        async with session_factory() as key_session:
+        async with background_session() as key_session:
             user_settings = await user_settings_service.get_or_create_settings(key_session, user_id=user_id)
             openalex_api_key = getattr(user_settings, "openalex_api_key", None) or settings.openalex_api_key
     except Exception:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -238,8 +239,10 @@ async def test_run_resolution_task_disables_arxiv_for_remaining_batch(
     first = _row()
     second: Any = SimpleNamespace(**{**first.__dict__, "publication_id": 2})
 
-    def _raise_session_factory_error():
+    @contextlib.asynccontextmanager
+    async def _raise_background_session_error():
         raise RuntimeError("skip user settings lookup in test")
+        yield  # pragma: no cover
 
     async def _fake_resolve_publication_row(
         *,
@@ -253,7 +256,7 @@ async def test_run_resolution_task_disables_arxiv_for_remaining_batch(
         calls.append((int(row.publication_id), bool(allow_arxiv_lookup)))
         return row.publication_id == 1
 
-    monkeypatch.setattr(pdf_queue_resolution, "get_session_factory", _raise_session_factory_error)
+    monkeypatch.setattr(pdf_queue_resolution, "background_session", _raise_background_session_error)
     monkeypatch.setattr(pdf_queue_resolution, "_resolve_publication_row", _fake_resolve_publication_row)
 
     await pdf_queue_resolution._run_resolution_task(

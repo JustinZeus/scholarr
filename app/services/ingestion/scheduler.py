@@ -8,13 +8,13 @@ from typing import Any
 
 from sqlalchemy import select
 
+from app.db.background_session import background_session
 from app.db.models import (
     CrawlRun,
     RunTriggerType,
     User,
     UserSetting,
 )
-from app.db.session import get_session_factory
 from app.logging_utils import structured_log
 from app.services.ingestion.application import (
     RunAlreadyInProgressError,
@@ -148,8 +148,7 @@ class SchedulerService:
             await self._run_candidate(candidate)
 
     async def _load_candidate_rows(self) -> list[Any]:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             result = await session.execute(
                 select(
                     UserSetting.user_id,
@@ -204,8 +203,7 @@ class SchedulerService:
         return candidates
 
     async def _is_due(self, candidate: _AutoRunCandidate, *, now: datetime) -> bool:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             result = await session.execute(
                 select(CrawlRun.start_dt)
                 .where(
@@ -227,8 +225,7 @@ class SchedulerService:
         *,
         candidate: _AutoRunCandidate,
     ):
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             ingestion = ScholarIngestionService(source=self._source)
             try:
                 return await ingestion.run_for_user(
@@ -294,8 +291,7 @@ class SchedulerService:
         if is_budget_cooldown_active():
             return
 
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             try:
                 processed = await drain_ready_jobs(
                     session,

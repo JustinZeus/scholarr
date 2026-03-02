@@ -221,11 +221,11 @@ def _spawn_background_execution(
     user_settings: Any,
     idempotency_key: str | None,
 ) -> None:
-    from app.db.session import get_session_factory
+    from app.db.background_session import background_session
 
     task = asyncio.create_task(
         ingest_service.execute_run(
-            session_factory=get_session_factory(),
+            session_factory=background_session,
             run_id=run.id,
             user_id=current_user.id,
             scholars=scholars,
