@@ -275,6 +275,8 @@ class Settings:
     crossref_max_lookups_per_request: int = _env_int("CROSSREF_MAX_LOOKUPS_PER_REQUEST", 8)
 
     openalex_api_key: str | None = os.getenv("OPENALEX_API_KEY")
+    database_reserved_api_connections: int = _env_int("DATABASE_RESERVED_API_CONNECTIONS", 3)
+
     crossref_api_token: str | None = os.getenv("CROSSREF_API_TOKEN")
     crossref_api_mailto: str | None = os.getenv("CROSSREF_API_MAILTO")
 

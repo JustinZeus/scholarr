@@ -9,7 +9,7 @@ import {
 import { type PublicationItem } from "@/features/publications";
 import { ApiRequestError } from "@/lib/api/errors";
 
-export const RUN_STATUS_POLL_INTERVAL_MS = 5000;
+export const RUN_STATUS_POLL_INTERVAL_MS = 15000;
 export const RUN_STATUS_STARTING_PHASE_MS = 1500;
 
 export type StartManualCheckResult =

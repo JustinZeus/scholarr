@@ -277,12 +277,16 @@ export function usePublicationData() {
 
   // --- Run-triggered refresh watcher ---
 
+  let previousRunStatusKey: string | null = null;
+
   watch(
     () => runStatus.latestRun,
-    async (nextRun, previousRun) => {
-      const nextRunId = nextRun && (nextRun.status === "running" || nextRun.status === "resolving") ? nextRun.id : null;
-      const previousRunId = previousRun && (previousRun.status === "running" || previousRun.status === "resolving") ? previousRun.id : null;
-      if (nextRunId === null || nextRunId === previousRunId) return;
+    async (nextRun) => {
+      const nextStatus = nextRun ? `${nextRun.id}:${nextRun.status}` : null;
+      if (nextStatus === previousRunStatusKey) return;
+      previousRunStatusKey = nextStatus;
+      const isActive = nextRun && (nextRun.status === "running" || nextRun.status === "resolving");
+      if (!isActive) return;
       resetPageAndSnapshot();
       await loadPublications();
     },

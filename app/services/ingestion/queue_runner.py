@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
+from app.db.background_session import background_session
 from app.db.models import QueueItemStatus, RunTriggerType, ScholarProfile, UserSetting
-from app.db.session import get_session_factory
 from app.logging_utils import structured_log
 from app.services.ingestion import queue as queue_service
 from app.services.ingestion.application import (
@@ -57,8 +57,7 @@ class QueueJobRunner:
 
     async def drain_continuation_queue(self) -> None:
         now = datetime.now(UTC)
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             jobs = await queue_service.list_due_jobs(
                 session,
                 now=now,
@@ -73,8 +72,7 @@ class QueueJobRunner:
     ) -> bool:
         if job.attempt_count < self._continuation_max_attempts:
             return False
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             dropped = await queue_service.mark_dropped(
                 session,
                 job_id=job.id,
@@ -98,8 +96,7 @@ class QueueJobRunner:
         self,
         job: queue_service.ContinuationQueueJob,
     ) -> bool:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             queue_item = await queue_service.mark_retrying(session, job_id=job.id)
             await session.commit()
         if queue_item is None:
@@ -110,8 +107,7 @@ class QueueJobRunner:
         self,
         job: queue_service.ContinuationQueueJob,
     ) -> bool:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             scholar_result = await session.execute(
                 select(ScholarProfile.id).where(
                     ScholarProfile.user_id == job.user_id,
@@ -140,8 +136,7 @@ class QueueJobRunner:
         return False
 
     async def _reschedule_queue_job_lock_active(self, job: queue_service.ContinuationQueueJob) -> None:
-        session_factory = get_session_factory()
-        async with session_factory() as recovery_session:
+        async with background_session() as recovery_session:
             await queue_service.reschedule_job(
                 recovery_session,
                 job_id=job.id,
@@ -167,8 +162,7 @@ class QueueJobRunner:
             self._tick_seconds,
             int(exc.safety_state.get("cooldown_remaining_seconds") or 0),
         )
-        session_factory = get_session_factory()
-        async with session_factory() as recovery_session:
+        async with background_session() as recovery_session:
             await queue_service.reschedule_job(
                 recovery_session,
                 job_id=job.id,
@@ -193,8 +187,7 @@ class QueueJobRunner:
         *,
         exc: Exception,
     ) -> None:
-        session_factory = get_session_factory()
-        async with session_factory() as recovery_session:
+        async with background_session() as recovery_session:
             queue_item = await queue_service.increment_attempt_count(recovery_session, job_id=job.id)
             if queue_item is None:
                 await recovery_session.commit()
@@ -238,8 +231,7 @@ class QueueJobRunner:
         )
 
     async def _load_request_delay_for_user(self, user_id: int, *, floor: int) -> int:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             result = await session.execute(
                 select(UserSetting.request_delay_seconds).where(UserSetting.user_id == user_id)
             )
@@ -253,8 +245,7 @@ class QueueJobRunner:
         request_delay_floor: int,
     ):
         request_delay_seconds = await self._load_request_delay_for_user(job.user_id, floor=request_delay_floor)
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             ingestion = ScholarIngestionService(source=self._source)
             try:
                 return await ingestion.run_for_user(
@@ -366,8 +357,7 @@ class QueueJobRunner:
         )
 
     async def _finalize_queue_job_after_run(self, job: queue_service.ContinuationQueueJob, run_summary) -> None:
-        session_factory = get_session_factory()
-        async with session_factory() as session:
+        async with background_session() as session:
             if int(run_summary.failed_count) <= 0:
                 await self._finalize_successful_queue_job(session, job, run_summary)
             else:

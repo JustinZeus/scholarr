@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 import AppPage from "@/components/layout/AppPage.vue";
 import AsyncStateGate from "@/components/patterns/AsyncStateGate.vue";
@@ -36,23 +36,6 @@ const bulkAction = ref<BulkAction>("mark_all_unread_read");
 const selectedPublicationKeys = ref<Set<string>>(new Set());
 const retryingPublicationKeys = ref<Set<string>>(new Set());
 const favoriteUpdatingKeys = ref<Set<string>>(new Set());
-
-const PUBLICATIONS_RUN_STATUS_SYNC_INTERVAL_MS = 5000;
-let runStatusSyncTimer: ReturnType<typeof setInterval> | null = null;
-
-function startRunStatusSyncLoop(): void {
-  if (runStatusSyncTimer !== null) return;
-  runStatusSyncTimer = setInterval(() => {
-    if (runStatus.isRunActive) return;
-    void runStatus.syncLatest();
-  }, PUBLICATIONS_RUN_STATUS_SYNC_INTERVAL_MS);
-}
-
-function stopRunStatusSyncLoop(): void {
-  if (runStatusSyncTimer === null) return;
-  clearInterval(runStatusSyncTimer);
-  runStatusSyncTimer = null;
-}
 
 // --- Computed ---
 
@@ -358,12 +341,7 @@ async function onStartRun(): Promise<void> {
 
 onMounted(() => {
   pub.syncFiltersFromRoute();
-  startRunStatusSyncLoop();
   void Promise.all([pub.loadScholarFilters(), pub.loadPublications(), runStatus.syncLatest()]);
-});
-
-onUnmounted(() => {
-  stopRunStatusSyncLoop();
 });
 </script>
 
