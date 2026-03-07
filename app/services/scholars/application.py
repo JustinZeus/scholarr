@@ -65,7 +65,7 @@ async def bulk_toggle_scholars(
 ) -> int:
     from sqlalchemy import update
 
-    result = await db_session.execute(
+    cursor = await db_session.execute(
         update(ScholarProfile)
         .where(
             ScholarProfile.id.in_(scholar_profile_ids),
@@ -74,7 +74,7 @@ async def bulk_toggle_scholars(
         .values(is_enabled=is_enabled)
     )
     await db_session.commit()
-    return result.rowcount  # type: ignore[return-value]
+    return int(cursor.rowcount)
 
 
 __all__ = [
