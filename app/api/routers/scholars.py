@@ -51,7 +51,14 @@ def _parse_ids_param(ids: str | None) -> list[int] | None:
     parts = [p.strip() for p in ids.split(",") if p.strip()]
     if not parts:
         return None
-    return [int(p) for p in parts]
+    try:
+        return [int(p) for p in parts]
+    except ValueError:
+        raise ApiException(
+            status_code=400,
+            code="invalid_ids_param",
+            message="The 'ids' parameter must be a comma-separated list of integers.",
+        )
 
 
 @router.get(
@@ -104,12 +111,19 @@ async def bulk_delete_scholars(
     db_session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_api_current_user),
 ):
-    deleted_count = await scholar_service.bulk_delete_scholars(
-        db_session,
-        user_id=current_user.id,
-        scholar_profile_ids=payload.scholar_profile_ids,
-        upload_dir=settings.scholar_image_upload_dir,
-    )
+    try:
+        deleted_count = await scholar_service.bulk_delete_scholars(
+            db_session,
+            user_id=current_user.id,
+            scholar_profile_ids=payload.scholar_profile_ids,
+            upload_dir=settings.scholar_image_upload_dir,
+        )
+    except scholar_service.ScholarServiceError as exc:
+        raise ApiException(
+            status_code=409,
+            code="scholar_bulk_delete_failed",
+            message=str(exc),
+        ) from exc
     structured_log(
         logger,
         "info",

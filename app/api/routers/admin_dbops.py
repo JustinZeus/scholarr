@@ -57,7 +57,7 @@ def _requested_by_value(*, payload, admin_user: User) -> str:
     return from_payload or admin_user.email
 
 
-def _serialize_pdf_queue_item(item) -> dict[str, object]:
+def _serialize_pdf_queue_item(item, *, is_admin: bool = False) -> dict[str, object]:
     return {
         "publication_id": item.publication_id,
         "title": item.title,
@@ -69,7 +69,7 @@ def _serialize_pdf_queue_item(item) -> dict[str, object]:
         "last_failure_detail": item.last_failure_detail,
         "last_source": item.last_source,
         "requested_by_user_id": item.requested_by_user_id,
-        "requested_by_email": item.requested_by_email,
+        "requested_by_email": item.requested_by_email if is_admin else None,
         "queued_at": item.queued_at,
         "last_attempt_at": item.last_attempt_at,
         "resolved_at": item.resolved_at,
@@ -215,7 +215,7 @@ async def get_pdf_queue(
     return success_payload(
         request,
         data={
-            "items": [_serialize_pdf_queue_item(item) for item in queue_page.items],
+            "items": [_serialize_pdf_queue_item(item, is_admin=current_user.is_admin) for item in queue_page.items],
             **_pdf_queue_page_data(
                 total_count=queue_page.total_count,
                 page=resolved_page,

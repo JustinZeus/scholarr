@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -52,7 +53,11 @@ async def bulk_delete_scholars(
             _safe_remove_upload(upload_root, profile.profile_image_upload_path)
     for profile in profiles:
         await db_session.delete(profile)
-    await db_session.commit()
+    try:
+        await db_session.commit()
+    except IntegrityError as exc:
+        await db_session.rollback()
+        raise ScholarServiceError("Unable to bulk-delete scholars due to a database constraint.") from exc
     return len(profiles)
 
 
@@ -63,8 +68,6 @@ async def bulk_toggle_scholars(
     scholar_profile_ids: list[int],
     is_enabled: bool,
 ) -> int:
-    from typing import Any
-
     from sqlalchemy import CursorResult, update
 
     cursor: CursorResult[Any] = await db_session.execute(  # type: ignore[assignment]
