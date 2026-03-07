@@ -42,6 +42,34 @@ class TestValidateScholarId:
         with pytest.raises(ScholarServiceError, match="12"):
             validate_scholar_id("ABCDEF12345!")
 
+    def test_rejects_empty_string(self) -> None:
+        with pytest.raises(ScholarServiceError, match="12"):
+            validate_scholar_id("")
+
+    def test_rejects_whitespace_only(self) -> None:
+        with pytest.raises(ScholarServiceError, match="12"):
+            validate_scholar_id("   ")
+
+    def test_rejects_embedded_spaces(self) -> None:
+        with pytest.raises(ScholarServiceError, match="12"):
+            validate_scholar_id("ABCDEF 12345")
+
+    def test_rejects_tab_characters(self) -> None:
+        with pytest.raises(ScholarServiceError, match="12"):
+            validate_scholar_id("ABCDEF\t12345")
+
+    def test_rejects_url_as_id(self) -> None:
+        with pytest.raises(ScholarServiceError, match="12"):
+            validate_scholar_id("https://scholar.google.com/citations?user=ABCDEF123456")
+
+    def test_rejects_newline_in_id(self) -> None:
+        with pytest.raises(ScholarServiceError, match="12"):
+            validate_scholar_id("ABCDEF\n12345")
+
+    def test_rejects_unicode_characters(self) -> None:
+        with pytest.raises(ScholarServiceError, match="12"):
+            validate_scholar_id("ABCDEF12345\u00e9")
+
 
 class TestNormalizeDisplayName:
     def test_returns_stripped_name(self) -> None:

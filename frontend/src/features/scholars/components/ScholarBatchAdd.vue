@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import AppButton from "@/components/ui/AppButton.vue";
 import AppCard from "@/components/ui/AppCard.vue";
 import AppHelpHint from "@/components/ui/AppHelpHint.vue";
+import { parseScholarTokens } from "./scholar-batch-parsing";
 
 defineProps<{
   saving: boolean;
@@ -15,38 +16,13 @@ const emit = defineEmits<{
 
 const scholarBatchInput = ref("");
 
-const SCHOLAR_ID_PATTERN = /^[a-zA-Z0-9_-]{12}$/;
-const URL_USER_PARAM_PATTERN = /(?:\?|&)user=([a-zA-Z0-9_-]{12})(?:&|#|$)/i;
-
-function parseScholarIds(raw: string): string[] {
-  const ordered: string[] = [];
-  const seen = new Set<string>();
-  const tokens = raw.split(/[\s,;]+/).map((v) => v.trim()).filter((v) => v.length > 0);
-  for (const token of tokens) {
-    let candidate: string | null = null;
-    if (SCHOLAR_ID_PATTERN.test(token)) candidate = token;
-    if (!candidate) {
-      const directParamMatch = token.match(URL_USER_PARAM_PATTERN);
-      if (directParamMatch) candidate = directParamMatch[1];
-    }
-    if (!candidate && token.includes("scholar.google")) {
-      try {
-        const parsed = new URL(token);
-        const userParam = parsed.searchParams.get("user");
-        if (userParam && SCHOLAR_ID_PATTERN.test(userParam)) candidate = userParam;
-      } catch (_error) { /* Ignore non-URL tokens. */ }
-    }
-    if (!candidate || seen.has(candidate)) continue;
-    seen.add(candidate);
-    ordered.push(candidate);
-  }
-  return ordered;
-}
-
-const parsedBatchCount = computed(() => parseScholarIds(scholarBatchInput.value).length);
+const parsedTokens = computed(() => parseScholarTokens(scholarBatchInput.value));
+const validIds = computed(() => parsedTokens.value.filter((t) => t.id !== null));
+const invalidTokens = computed(() => parsedTokens.value.filter((t) => t.id === null));
+const parsedBatchCount = computed(() => validIds.value.length);
 
 function onSubmit(): void {
-  const ids = parseScholarIds(scholarBatchInput.value);
+  const ids = validIds.value.map((t) => t.id!);
   if (ids.length > 0) {
     emit("add-scholars", ids);
     scholarBatchInput.value = "";
@@ -76,11 +52,33 @@ function onSubmit(): void {
         />
       </label>
 
-      <div class="flex flex-wrap items-center justify-between gap-2">
+      <div v-if="parsedTokens.length > 0" class="space-y-1">
         <p class="text-xs text-secondary">
-          Parsed IDs: <strong class="text-ink-primary">{{ parsedBatchCount }}</strong>
+          <strong class="text-ink-primary">{{ parsedBatchCount }}</strong> valid ID{{ parsedBatchCount === 1 ? "" : "s" }}
+          <template v-if="invalidTokens.length > 0">
+            · <span class="text-state-warning-text">{{ invalidTokens.length }} skipped</span>
+          </template>
         </p>
-        <AppButton type="submit" :disabled="saving || loading">
+        <ul v-if="invalidTokens.length > 0" class="space-y-0.5" data-testid="validation-errors">
+          <li
+            v-for="item in invalidTokens.slice(0, 5)"
+            :key="item.index"
+            class="text-xs text-state-warning-text"
+          >
+            #{{ item.index }}: {{ item.error }}
+            <code class="ml-1 break-all text-ink-muted">{{ item.raw.length > 60 ? item.raw.slice(0, 57) + "..." : item.raw }}</code>
+          </li>
+          <li v-if="invalidTokens.length > 5" class="text-xs text-state-warning-text">
+            +{{ invalidTokens.length - 5 }} more skipped
+          </li>
+        </ul>
+      </div>
+      <div v-else class="text-xs text-secondary">
+        Parsed IDs: <strong class="text-ink-primary">0</strong>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <AppButton type="submit" :disabled="saving || loading || parsedBatchCount === 0">
           {{ saving ? "Adding..." : "Add scholars" }}
         </AppButton>
       </div>

@@ -31,6 +31,7 @@ import ScholarAvatar from "@/features/scholars/components/ScholarAvatar.vue";
 import ScholarBatchAdd from "@/features/scholars/components/ScholarBatchAdd.vue";
 import ScholarNameSearch from "@/features/scholars/components/ScholarNameSearch.vue";
 import ScholarSettingsModal from "@/features/scholars/components/ScholarSettingsModal.vue";
+import ScholarStatusBadges from "@/features/scholars/components/ScholarStatusBadges.vue";
 import { ApiRequestError } from "@/lib/api/errors";
 import { useRunStatusStore } from "@/stores/run_status";
 
@@ -505,7 +506,10 @@ watch(
                     <div class="flex items-start gap-3">
                       <ScholarAvatar :label="item.display_name" :scholar-id="item.scholar_id" :image-url="item.profile_image_url" />
                       <div class="min-w-0 flex-1 space-y-1">
-                        <p class="truncate text-sm font-semibold text-ink-primary">{{ scholarLabel(item) }}</p>
+                        <p class="truncate text-sm font-semibold text-ink-primary">
+                          {{ scholarLabel(item) }}
+                          <ScholarStatusBadges :baseline-completed="item.baseline_completed" :last-run-status="item.last_run_status" />
+                        </p>
                         <div class="flex flex-wrap items-center gap-3">
                           <RouterLink :to="scholarPublicationsRoute(item)" class="link-inline text-xs">Publications</RouterLink>
                           <a :href="scholarProfileUrl(item.scholar_id)" target="_blank" rel="noreferrer" class="link-inline text-xs">Open profile</a>
@@ -529,7 +533,10 @@ watch(
                           <div class="flex items-start gap-3">
                             <ScholarAvatar :label="item.display_name" :scholar-id="item.scholar_id" :image-url="item.profile_image_url" />
                             <div class="grid min-w-0 gap-1">
-                              <strong class="truncate text-ink-primary">{{ scholarLabel(item) }}</strong>
+                              <strong class="truncate text-ink-primary">
+                                {{ scholarLabel(item) }}
+                                <ScholarStatusBadges :baseline-completed="item.baseline_completed" :last-run-status="item.last_run_status" />
+                              </strong>
                               <div class="flex flex-wrap items-center gap-3">
                                 <RouterLink :to="scholarPublicationsRoute(item)" class="link-inline text-xs">Publications</RouterLink>
                                 <a :href="scholarProfileUrl(item.scholar_id)" target="_blank" rel="noreferrer" class="link-inline text-xs">Open profile</a>

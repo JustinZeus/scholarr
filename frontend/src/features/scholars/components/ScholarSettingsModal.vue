@@ -47,7 +47,14 @@ function scholarPublicationsRoute(profile: ScholarProfile): { name: string; quer
           :image-url="scholar.profile_image_url"
         />
         <div class="min-w-0 space-y-1">
-          <p class="truncate text-sm font-semibold text-ink-primary">{{ scholarLabel(scholar) }}</p>
+          <p class="truncate text-sm font-semibold text-ink-primary">
+            {{ scholarLabel(scholar) }}
+            <span
+              v-if="!scholar.baseline_completed"
+              class="ml-1.5 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950 dark:text-amber-400 dark:ring-amber-400/20"
+              title="This scholar hasn't been scraped yet. Publications will appear after the next run."
+            >Pending</span>
+          </p>
           <p class="text-xs text-secondary">ID: <code>{{ scholar.scholar_id }}</code></p>
           <div class="flex flex-wrap items-center gap-3">
             <RouterLink :to="scholarPublicationsRoute(scholar)" class="link-inline text-xs">

@@ -73,6 +73,110 @@ async def test_api_scholars_crud_flow(db_session: AsyncSession) -> None:
 @pytest.mark.integration
 @pytest.mark.db
 @pytest.mark.asyncio
+async def test_api_delete_scholar_returns_404_for_nonexistent(db_session: AsyncSession) -> None:
+    await insert_user(
+        db_session,
+        email="api-delete-404@example.com",
+        password="api-password",
+    )
+
+    client = TestClient(app)
+    login_user(client, email="api-delete-404@example.com", password="api-password")
+    headers = api_csrf_headers(client)
+
+    response = client.delete("/api/v1/scholars/999999", headers=headers)
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "scholar_not_found"
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_api_delete_scholar_cascades_linked_publications(db_session: AsyncSession) -> None:
+    user_id = await insert_user(
+        db_session,
+        email="api-delete-cascade@example.com",
+        password="api-password",
+    )
+    scholar_result = await db_session.execute(
+        text(
+            """
+            INSERT INTO scholar_profiles (user_id, scholar_id, display_name, is_enabled)
+            VALUES (:user_id, :scholar_id, :display_name, true)
+            RETURNING id
+            """
+        ),
+        {"user_id": user_id, "scholar_id": "delCASCADE01", "display_name": "Cascade Test"},
+    )
+    scholar_profile_id = int(scholar_result.scalar_one())
+    pub_result = await db_session.execute(
+        text(
+            """
+            INSERT INTO publications (fingerprint_sha256, title_raw, title_normalized, citation_count)
+            VALUES (:fingerprint, :title_raw, :title_normalized, 0)
+            RETURNING id
+            """
+        ),
+        {
+            "fingerprint": f"{(user_id + 7000):064x}",
+            "title_raw": "Cascade Publication",
+            "title_normalized": "cascadepublication",
+        },
+    )
+    publication_id = int(pub_result.scalar_one())
+    await db_session.execute(
+        text(
+            """
+            INSERT INTO scholar_publications (scholar_profile_id, publication_id, is_read)
+            VALUES (:scholar_profile_id, :publication_id, false)
+            """
+        ),
+        {"scholar_profile_id": scholar_profile_id, "publication_id": publication_id},
+    )
+    await db_session.commit()
+
+    client = TestClient(app)
+    login_user(client, email="api-delete-cascade@example.com", password="api-password")
+    headers = api_csrf_headers(client)
+
+    delete_response = client.delete(f"/api/v1/scholars/{scholar_profile_id}", headers=headers)
+    assert delete_response.status_code == 200
+    assert delete_response.json()["data"]["message"] == "Scholar deleted."
+
+    link_result = await db_session.execute(
+        text("SELECT count(*) FROM scholar_publications WHERE scholar_profile_id = :id"),
+        {"id": scholar_profile_id},
+    )
+    assert int(link_result.scalar_one()) == 0
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_api_create_scholar_rejects_corrupted_id(db_session: AsyncSession) -> None:
+    await insert_user(
+        db_session,
+        email="api-bad-id@example.com",
+        password="api-password",
+    )
+
+    client = TestClient(app)
+    login_user(client, email="api-bad-id@example.com", password="api-password")
+    headers = api_csrf_headers(client)
+
+    for bad_id in ["short", "ABCDEF12345!", "", "   ", "AB CD EF1234"]:
+        response = client.post(
+            "/api/v1/scholars",
+            json={"scholar_id": bad_id},
+            headers=headers,
+        )
+        assert response.status_code == 400, f"Expected 400 for scholar_id={bad_id!r}"
+        assert response.json()["error"]["code"] == "invalid_scholar"
+
+
+@pytest.mark.integration
+@pytest.mark.db
+@pytest.mark.asyncio
 async def test_api_scholars_search_and_profile_image_management(
     db_session: AsyncSession,
     tmp_path: Path,

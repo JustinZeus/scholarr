@@ -494,6 +494,11 @@ watch(
                       <template v-else>
                         Processed {{ displayedLatestRun.scholar_count }} scholars and discovered
                         {{ displayedLatestRun.new_publication_count }} new publications.
+                        <template v-if="displayedLatestRun.failed_count > 0 || displayedLatestRun.partial_count > 0">
+                          <span class="text-state-warning-text">
+                            {{ displayedLatestRun.failed_count > 0 ? `${displayedLatestRun.failed_count} failed` : "" }}{{ displayedLatestRun.failed_count > 0 && displayedLatestRun.partial_count > 0 ? ", " : "" }}{{ displayedLatestRun.partial_count > 0 ? `${displayedLatestRun.partial_count} partial` : "" }}.
+                          </span>
+                        </template>
                       </template>
                     </p>
                   </div>
@@ -527,6 +532,9 @@ watch(
                         </div>
                         <span class="text-xs text-secondary">
                           {{ formatDate(run.start_dt) }} • {{ run.new_publication_count }} new
+                          <template v-if="run.failed_count > 0">
+                            • <span class="text-state-warning-text">{{ run.failed_count }} failed</span>
+                          </template>
                         </span>
                       </li>
                     </ul>

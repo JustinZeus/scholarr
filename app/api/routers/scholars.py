@@ -261,11 +261,18 @@ async def delete_scholar(
             code="scholar_not_found",
             message="Scholar not found.",
         )
-    await scholar_service.delete_scholar(
-        db_session,
-        profile=profile,
-        upload_dir=settings.scholar_image_upload_dir,
-    )
+    try:
+        await scholar_service.delete_scholar(
+            db_session,
+            profile=profile,
+            upload_dir=settings.scholar_image_upload_dir,
+        )
+    except scholar_service.ScholarServiceError as exc:
+        raise ApiException(
+            status_code=409,
+            code="scholar_delete_failed",
+            message=str(exc),
+        ) from exc
     structured_log(
         logger, "info", "api.scholars.deleted", user_id=current_user.id, scholar_profile_id=scholar_profile_id
     )

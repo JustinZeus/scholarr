@@ -125,7 +125,11 @@ async def delete_scholar(
         _safe_remove_upload(upload_root, profile.profile_image_upload_path)
 
     await db_session.delete(profile)
-    await db_session.commit()
+    try:
+        await db_session.commit()
+    except IntegrityError as exc:
+        await db_session.rollback()
+        raise ScholarServiceError("Unable to delete scholar due to a database constraint.") from exc
 
 
 async def hydrate_profile_metadata(
