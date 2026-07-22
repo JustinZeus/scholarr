@@ -24,6 +24,12 @@ from documented APIs such as OpenAlex, Crossref, arXiv, Unpaywall, and ORCID.
 See [AGENTS.md](AGENTS.md) for the full project constraints and [TASKS.md](TASKS.md) for the
 ordered work queue.
 
+## Repositories
+
+- Primary: <https://github.com/JustinZeus/scholarr>
+- Forgejo copy: <https://git.justintime.lol/justinzeus/scholarr>
+- Preserved legacy implementation: <https://github.com/JustinZeus/scholarr-legacy>
+
 ## Frozen interface contract
 
 The reviewed interface contract is in [design/DESIGN.md](design/DESIGN.md). Its tokens, component

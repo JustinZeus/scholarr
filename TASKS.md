@@ -3,12 +3,13 @@
 Work in order. A card is complete only when its acceptance criteria are met. Specs are reviewed
 and frozen one at a time before implementation begins.
 
-## Card 0: publish the clean repository  **IN PROGRESS**
+## Card 0: publish the clean repository  **COMPLETE 2026-07-22**
 
 **Goal:** publish this clean-history bootstrap as the public project.
 
-The local bootstrap is complete and the personal GitHub identity is authenticated on tank. Publish
-this same history to GitHub first, then to the Forgejo copy.
+The legacy GitHub repository was preserved as `JustinZeus/scholarr-legacy`. The clean bootstrap is
+public at `JustinZeus/scholarr` on GitHub, with the same history copied to Forgejo. GitHub is the
+primary remote.
 
 **Acceptance:** public `justinzeus/scholarr` repositories exist on GitHub (primary) and Forgejo
 (copy), both point at this clean history, no legacy history is present, and no secret or work
