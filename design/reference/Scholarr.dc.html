@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .app {
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    --paper: oklch(0.986 0.006 85); --surface: oklch(0.998 0.003 85); --surface-2: oklch(0.965 0.008 84);
+    --ink: oklch(0.26 0.014 62); --ink-soft: oklch(0.46 0.012 62); --ink-faint: oklch(0.53 0.011 64);
+    --line: oklch(0.9 0.007 72); --line-strong: oklch(0.83 0.009 72);
+    --accent: oklch(0.5 0.1 248); --accent-soft: oklch(0.94 0.03 248); --accent-ink: oklch(0.42 0.11 248);
+    --hi: oklch(0.6 0.1 150); --hi-soft: oklch(0.94 0.04 150);
+    --mid: oklch(0.66 0.12 74); --mid-soft: oklch(0.94 0.05 82);
+    --low: oklch(0.56 0.16 26); --low-soft: oklch(0.94 0.05 30);
+    --hi-ink: oklch(0.44 0.11 150); --mid-ink: oklch(0.45 0.09 74); --low-ink: oklch(0.47 0.17 26); --on-accent: oklch(0.99 0 0);
+    --unread: oklch(0.5 0.1 248);
+    --sh-1: 0 1px 2px oklch(0.26 0.02 62 / 0.06), 0 2px 8px oklch(0.26 0.02 62 / 0.05);
+    --sh-2: 0 2px 6px oklch(0.26 0.02 62 / 0.08), 0 12px 32px oklch(0.26 0.02 62 / 0.09);
+    --r-sm: 6px; --r-md: 10px; --r-lg: 16px;
+    background: var(--paper); color: var(--ink); font-family: var(--font-sans);
+  }
+  @media (prefers-color-scheme: dark) { .app:not([data-theme="light"]) {
+    --paper: oklch(0.205 0.004 255); --surface: oklch(0.247 0.005 255); --surface-2: oklch(0.295 0.006 255);
+    --ink: oklch(0.94 0.004 255); --ink-soft: oklch(0.76 0.005 255); --ink-faint: oklch(0.68 0.006 255);
+    --line: oklch(0.335 0.006 255); --line-strong: oklch(0.44 0.008 255);
+    --accent: oklch(0.72 0.11 248); --accent-soft: oklch(0.33 0.06 255); --accent-ink: oklch(0.83 0.09 248);
+    --hi: oklch(0.74 0.12 152); --hi-soft: oklch(0.33 0.05 165); --mid: oklch(0.78 0.12 82); --mid-soft: oklch(0.35 0.05 85); --low: oklch(0.72 0.15 28); --low-soft: oklch(0.35 0.06 30);
+    --hi-ink: oklch(0.85 0.11 152); --mid-ink: oklch(0.86 0.11 85); --low-ink: oklch(0.84 0.13 28); --on-accent: oklch(0.17 0.02 255);
+    --unread: oklch(0.74 0.11 248);
+    --sh-1: 0 1px 2px oklch(0 0 0 / 0.3), 0 2px 8px oklch(0 0 0 / 0.28); --sh-2: 0 2px 8px oklch(0 0 0 / 0.4), 0 16px 40px oklch(0 0 0 / 0.4);
+  } }
+  .app[data-theme="dark"] {
+    --paper: oklch(0.205 0.004 255); --surface: oklch(0.247 0.005 255); --surface-2: oklch(0.295 0.006 255);
+    --ink: oklch(0.94 0.004 255); --ink-soft: oklch(0.76 0.005 255); --ink-faint: oklch(0.68 0.006 255);
+    --line: oklch(0.335 0.006 255); --line-strong: oklch(0.44 0.008 255);
+    --accent: oklch(0.72 0.11 248); --accent-soft: oklch(0.33 0.06 255); --accent-ink: oklch(0.83 0.09 248);
+    --hi: oklch(0.74 0.12 152); --hi-soft: oklch(0.33 0.05 165); --mid: oklch(0.78 0.12 82); --mid-soft: oklch(0.35 0.05 85); --low: oklch(0.72 0.15 28); --low-soft: oklch(0.35 0.06 30);
+    --hi-ink: oklch(0.85 0.11 152); --mid-ink: oklch(0.86 0.11 85); --low-ink: oklch(0.84 0.13 28); --on-accent: oklch(0.17 0.02 255);
+    --unread: oklch(0.74 0.11 248);
+    --sh-1: 0 1px 2px oklch(0 0 0 / 0.3), 0 2px 8px oklch(0 0 0 / 0.28); --sh-2: 0 2px 8px oklch(0 0 0 / 0.4), 0 16px 40px oklch(0 0 0 / 0.4);
+  }
+  .app *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  .pubrow:hover { background: var(--surface-2); }
+  .logo-on-light{display:inline-block} .logo-on-dark{display:none}
+  @media (prefers-color-scheme: dark){ .app:not([data-theme="light"]) .logo-on-light{display:none} .app:not([data-theme="light"]) .logo-on-dark{display:inline-block} }
+  .app[data-theme="dark"] .logo-on-light{display:none} .app[data-theme="dark"] .logo-on-dark{display:inline-block}
+  .app[data-theme="light"] .logo-on-light{display:inline-block} .app[data-theme="light"] .logo-on-dark{display:none}
+  .tip { position: relative; }
+  .tip > .tip-pop { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px); background: var(--ink); color: var(--paper); font-family: var(--font-sans); font-weight: 500; font-size: 11.5px; line-height: 1.4; letter-spacing: normal; text-transform: none; text-align: left; white-space: normal; width: max-content; max-width: 220px; padding: 8px 11px; border-radius: 8px; box-shadow: var(--sh-2); opacity: 0; visibility: hidden; transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); z-index: 60; pointer-events: none; }
+  .tip:hover > .tip-pop, .tip:focus-visible > .tip-pop { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+  .tip > .tip-pop::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--ink); }
+  kbd { font-family: var(--font-mono); font-size: 10.5px; background: var(--surface-2); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; color: var(--ink-soft); }
+  @media (prefers-reduced-motion: reduce) { .app *, .app *::before, .app *::after { animation-duration:.001ms !important; transition-duration:.001ms !important; } }
+</style>
+</helmet>
+
+<div class="app" data-theme="{{ themeAttr }}" style="min-height:100vh; display:grid; grid-template-columns:{{ sidebarCols }};">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+    <symbol id="ic-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="8" rx="1.5"/><rect x="14" y="15" width="7" height="6" rx="1.5"/></symbol>
+    <symbol id="ic-publications" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></symbol>
+    <symbol id="ic-authors" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17.5" cy="9.5" r="2.3"/><path d="M16 15c2.4.2 4 2.1 4 5"/></symbol>
+    <symbol id="ic-review" viewBox="0 0 24 24"><path d="M12 3v18"/><line x1="6" y1="7" x2="18" y2="7"/><path d="M6 7l-3 6.5h6z"/><path d="M18 7l-3 6.5h6z"/><line x1="8" y1="21" x2="16" y2="21"/></symbol>
+    <symbol id="ic-sources" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v13c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-13"/><path d="M5 12c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8"/></symbol>
+    <symbol id="ic-activity" viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></symbol>
+    <symbol id="ic-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></symbol>
+    <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></symbol>
+    <symbol id="ic-check" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5 10-11"/></symbol>
+    <symbol id="ic-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
+    <symbol id="ic-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="ic-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="ic-external" viewBox="0 0 24 24"><path d="M14 4h6v6"/><line x1="20" y1="4" x2="10.5" y2="13.5"/><path d="M18 13.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5.5"/></symbol>
+    <symbol id="ic-chev-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="ic-chev-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="ic-arrow-left" viewBox="0 0 24 24"><line x1="20" y1="12" x2="5" y2="12"/><path d="M11 6l-6 6 6 6"/></symbol>
+    <symbol id="ic-undo" viewBox="0 0 24 24"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12h-1.5"/></symbol>
+    <symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></symbol>
+    <symbol id="ic-moon" viewBox="0 0 24 24"><path d="M20 13.5A8 8 0 1 1 10.5 4a6.3 6.3 0 0 0 9.5 9.5z"/></symbol>
+    <symbol id="ic-system" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/></symbol>
+    <symbol id="ic-signout" viewBox="0 0 24 24"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><line x1="19" y1="12" x2="9" y2="12"/><path d="M16 9l3 3-3 3"/></symbol>
+    <symbol id="ic-warning" viewBox="0 0 24 24"><path d="M12 3.5l9 16.5H3z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="ic-x" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></symbol>
+    <symbol id="ic-oa" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 7.3-2.3"/></symbol>
+    <symbol id="ic-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></symbol>
+    <symbol id="ic-pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="2.6 3"/></symbol>
+    <symbol id="ic-book" viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5C4.7 20 4 20.5 4 21.3z"/><path d="M20 5.5C20 4.7 19.3 4 18.5 4H13v16h5.5c.8 0 1.5.5 1.5 1.3z"/></symbol>
+    <symbol id="ic-upload" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 15v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"/></symbol>
+    <symbol id="ic-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs></svg>
+
+  <aside style="display:{{ asideDisplay }}; position:sticky; top:0; height:100vh; border-right:1px solid var(--line); background:var(--surface); flex-direction:column; overflow:hidden;">
+    <div style="padding:16px 14px 14px; border-bottom:1px solid var(--line);">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <img class="logo-on-light" src="uploads/logo-light-tight.png" alt="Scholarr" style="width:40px; height:40px; object-fit:contain; flex:none;"/><img class="logo-on-dark" src="uploads/logo-dark-tight.png" alt="" style="width:40px; height:40px; object-fit:contain; flex:none;"/>
+        <div class="lbl" style="min-width:0;">
+          <div style="font-family:var(--font-serif); font-size:20px; font-weight:700; letter-spacing:-.015em; line-height:1;">Scholarr</div>
+          <button onClick="{{ goNotFound }}" title="Show the not-found screen (demo)" style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); letter-spacing:.02em; margin-top:3px; border:none; background:transparent; padding:0; cursor:pointer; text-align:left;">self-hosted · v2.0</button>
+        </div>
+      </div>
+    </div>
+    <nav style="flex:1; overflow-y:auto; padding:12px 10px;">
+      <div class="lbl" style="font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-faint); padding:6px 8px 8px;">Reading</div>
+      <sc-for list="{{ navMain }}" as="item" hint-placeholder-count="4">
+        <button onClick="{{ item.go }}" title="{{ item.label }}" style="{{ item.style }}">
+          <span style="width:20px; height:20px; display:inline-grid; place-items:center; font-size:15px; line-height:1; flex:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ item.icon }}"></use></svg></span>
+          <span class="lbl" style="flex:1; text-align:left; white-space:nowrap;">{{ item.label }}</span>
+          <sc-if value="{{ item.badge }}" hint-placeholder-val="{{ true }}"><span class="lbl" style="{{ item.badgeStyle }}">{{ item.badge }}</span></sc-if>
+        </button>
+      </sc-for>
+      <div class="lbl" style="font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-faint); padding:16px 8px 8px;">Instance</div>
+      <sc-for list="{{ navAdmin }}" as="item" hint-placeholder-count="3">
+        <button onClick="{{ item.go }}" title="{{ item.label }}" style="{{ item.style }}">
+          <span style="width:20px; height:20px; display:inline-grid; place-items:center; font-size:15px; line-height:1; flex:none;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ item.icon }}"></use></svg></span>
+          <span class="lbl" style="flex:1; text-align:left; white-space:nowrap;">{{ item.label }}</span>
+        </button>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid var(--line); padding:12px 10px; display:flex; flex-direction:column; gap:6px;">
+      <div class="lbl" style="display:flex; align-items:center; gap:8px; padding:2px 2px 4px;"><span style="font-family:var(--font-mono); font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); flex:none;">View as</span><button onClick="{{ setReader }}" style="{{ roleReaderStyle }}">Reader</button><button onClick="{{ setAdmin }}" style="{{ roleAdminStyle }}">Admin</button></div>
+      <div class="lbl" style="display:flex; gap:4px; padding:2px;">
+        <sc-for list="{{ themeOpts }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.go }}" title="{{ t.label }}" style="{{ t.style }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ t.icon }}"></use></svg></button></sc-for>
+      </div>
+      <button onClick="{{ toggleSidebar }}" title="Collapse sidebar" style="display:flex; align-items:center; gap:11px; width:100%; padding:9px 10px; border:none; background:transparent; color:var(--ink-faint); font-family:var(--font-sans); font-size:13px; border-radius:var(--r-sm); cursor:pointer;">
+        <span style="width:20px; height:20px; display:inline-grid; place-items:center; font-size:15px; line-height:1; flex:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ collapseIcon }}"></use></svg></span>
+        <span class="lbl" style="white-space:nowrap;">Collapse</span>
+      </button>
+      <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--r-sm); background:var(--surface-2);">
+        <div style="width:26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-size:11px; font-weight:700; flex:none;">HB</div>
+        <div class="lbl" style="min-width:0; line-height:1.2; flex:1;">
+          <div style="font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Herman Bakker</div>
+          <div style="font-size:10.5px; color:var(--ink-faint);">reader</div>
+        </div>
+        <button onClick="{{ goLogin }}" class="lbl" title="Sign out" style="border:none; background:transparent; color:var(--ink-faint); font-size:15px; cursor:pointer; flex:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-signout"></use></svg></button>
+      </div>
+    </div>
+  </aside>
+
+  <div style="display:flex; flex-direction:column; min-width:0; padding-bottom:{{ mainPadBottom }};">
+
+    <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+      <header style="position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:10px; padding:11px 16px; background:var(--surface); border-bottom:1px solid var(--line);">
+        <img class="logo-on-light" src="uploads/logo-light-tight.png" alt="Scholarr" style="width:28px; height:28px; object-fit:contain;"/><img class="logo-on-dark" src="uploads/logo-dark-tight.png" alt="" style="width:28px; height:28px; object-fit:contain;"/>
+        <span style="font-family:var(--font-serif); font-size:18px; font-weight:700;">{{ mobileTitle }}</span>
+        <button onClick="{{ cycleTheme }}" title="Theme" style="margin-left:auto; width:34px; height:34px; border:1px solid var(--line); background:transparent; border-radius:var(--r-sm); color:var(--ink-soft); font-size:15px; cursor:pointer;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ themeIcon }}"></use></svg></button>
+      </header>
+    </sc-if>
+
+    <!-- ============ DASHBOARD ============ -->
+    <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:780px; width:100%; margin:0 auto; padding:{{ pagePad }}; display:flex; flex-direction:column; gap:16px;">
+        <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+          <div style="padding:20px 22px 18px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+              <div style="min-width:0; flex:1;">
+                <div style="font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--ink-faint); text-transform:uppercase;">Good morning, Herman</div>
+                <h1 style="font-family:var(--font-serif); font-weight:700; margin:9px 0 0; letter-spacing:-.015em; line-height:1.08; font-size:clamp(21px,4vw,27px); text-wrap:balance;"><span style="color:var(--accent-ink);">{{ newCount }} new publications</span> since your last visit</h1>
+                <div style="font-size:13px; color:var(--ink-soft); margin-top:7px;">from {{ newAuthorCount }} of the {{ followCount }} researchers you follow · {{ unreadCount }} unread in total</div>
+              </div>
+              <span style="{{ freshPillStyle }}"><span style="width:7px; height:7px; border-radius:50%; background:var(--hi); flex:none;"></span>Up to date · {{ lastChecked }}</span>
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--line); background:var(--surface-2); padding:12px 22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+            <span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); flex:none;">New work from</span>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex:1; min-width:0;">
+              <sc-for list="{{ newByAuthor }}" as="a" hint-placeholder-count="5">
+                <button onClick="{{ a.open }}" title="{{ a.name }} · {{ a.field }}" style="display:inline-flex; align-items:center; gap:7px; padding:4px 10px 4px 4px; border:1px solid var(--line); border-radius:20px; background:var(--surface); cursor:pointer; color:var(--ink);">
+                  <span style="width:22px; height:22px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-size:9.5px; font-weight:700; flex:none;">{{ a.initials }}</span>
+                  <span style="font-size:12px; font-weight:600; white-space:nowrap;">{{ a.short }}</span>
+                  <span style="font-family:var(--font-mono); font-size:10px; font-weight:700; color:var(--accent-ink);">+{{ a.n }}</span>
+                </button>
+              </sc-for>
+            </div>
+            <button onClick="{{ goAuthors }}" style="border:none; background:transparent; color:var(--accent-ink); font-size:12px; font-weight:600; cursor:pointer; flex:none;">All authors →</button>
+          </div>
+        </section>
+
+        <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+          <div style="padding:14px 20px 11px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <h2 style="font-family:var(--font-serif); font-size:16px; font-weight:700; margin:0;">Fresh in your feed</h2>
+            <div style="display:flex; align-items:center; gap:6px;"><sc-for list="{{ demoOpts }}" as="d" hint-placeholder-count="3"><button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div>
+          </div>
+          <sc-if value="{{ demoLoading }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ skel }}" as="s" hint-placeholder-count="3">
+              <div style="display:flex; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); align-items:center;">
+                <span style="width:9px; height:9px; border-radius:50%; background:var(--surface-2); flex:none;"></span>
+                <div style="flex:1;"><div style="height:14px; width:66%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div><div style="height:10px; width:44%; margin-top:8px; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div></div>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ demoEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="text-align:center; padding:44px 20px;">
+              <div style="color:var(--hi); line-height:0;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-check"></use></svg></div>
+              <h3 style="font-family:var(--font-serif); font-size:18px; font-weight:700; margin:10px 0 5px;">You are all caught up</h3>
+              <p style="font-size:13px; color:var(--ink-soft); margin:0;">Nothing new since your last visit. We will keep checking your sources on schedule.</p>
+            </div>
+          </sc-if>
+          <sc-for list="{{ dashPubs }}" as="p" hint-placeholder-count="3">
+            <article onClick="{{ goPubs }}" class="pubrow" style="display:flex; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); align-items:flex-start; cursor:pointer;">
+              <span style="{{ p.dotStyle }}"></span>
+              <div style="min-width:0; flex:1;">
+                <div style="display:flex; align-items:baseline; gap:8px;"><span style="{{ p.fieldStyle }}">{{ p.fieldShort }}</span><span style="font-family:var(--font-serif); font-size:15px; line-height:1.3; font-weight:{{ p.titleWeight }}; text-wrap:pretty; flex:1; min-width:0;">{{ p.title }}</span></div>
+                <div style="font-size:12px; color:var(--ink-soft); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ p.authors }} · <span style="font-style:italic;">{{ p.venue }}</span> · {{ p.year }}</div>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:7px; flex-wrap:wrap;"><span class="tip" tabindex="0" style="{{ p.oaStyle }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ p.oaIcon }}"></use></svg>{{ p.oaLabel }}<span class="tip-pop">{{ p.oaTitle }}</span></span><span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint);">{{ p.ident }} · via {{ p.source }}</span></div>
+              </div>
+            </article>
+          </sc-for>
+          <button onClick="{{ goPubs }}" style="width:100%; padding:13px; border:none; background:transparent; color:var(--accent-ink); font-size:13px; font-weight:700; cursor:pointer;">Open reading list · {{ unreadCount }} unread →</button>
+        </section>
+
+        <p style="font-size:12px; color:var(--ink-faint); line-height:1.5; margin:2px 4px 0; text-align:center;">All sources checked {{ lastChecked }}. arXiv can run a day or two behind. That is normal, and nothing is missing. <button onClick="{{ goSources }}" style="border:none; background:transparent; color:var(--accent-ink); font-size:12px; font-weight:600; cursor:pointer; padding:0;">Source health →</button></p>
+      </div>
+    </sc-if>
+
+    <!-- ============ PUBLICATIONS ============ -->
+    <sc-if value="{{ isPubs }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:1100px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <header style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px;">
+          <div>
+            <h1 style="font-family:var(--font-serif); font-size:clamp(22px,4vw,27px); font-weight:700; margin:0; letter-spacing:-.015em;">Publications</h1>
+            <p style="font-size:12.5px; color:var(--ink-soft); margin:5px 0 0;"><span style="font-family:var(--font-mono);">{{ pubLibraryTotal }}</span> in your library · {{ newCount }} new · {{ unreadCount }} unread</p>
+          </div>
+          <div style="font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); text-align:right;">last delivered {{ pubFreshness }}</div>
+        </header>
+        <div style="position:sticky; top:{{ filterTop }}; z-index:10; background:var(--paper); display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 0 10px; border-bottom:1px solid var(--line);">
+          <div style="display:flex; gap:6px; align-items:center; overflow-x:auto; flex-wrap:{{ filterWrap }};">
+            <sc-for list="{{ pubFilters }}" as="f" hint-placeholder-count="4">
+              <button onClick="{{ f.go }}" style="{{ f.style }}">{{ f.label }}<sc-if value="{{ f.count }}" hint-placeholder-val="{{ true }}"><span style="{{ f.countStyle }}">{{ f.count }}</span></sc-if></button>
+            </sc-for>
+          </div>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:var(--r-sm); padding:6px 10px; background:var(--surface); min-width:160px; flex:{{ searchFlex }};">
+            <span style="color:var(--ink-faint); font-size:13px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-search"></use></svg></span>
+            <span style="font-size:12.5px; color:var(--ink-faint);">Search author or title</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin:12px 0 2px;">
+          <span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint);">Preview state</span>
+          <sc-for list="{{ demoOpts }}" as="d" hint-placeholder-count="3"><button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for>
+        </div>
+        <sc-if value="{{ demoLoading }}" hint-placeholder-val="{{ false }}">
+          <sc-for list="{{ skel }}" as="s" hint-placeholder-count="8">
+            <div style="display:flex; gap:11px; padding:12px 8px; border-bottom:1px solid var(--line); align-items:center;">
+              <span style="width:9px; height:9px; border-radius:50%; background:var(--surface-2); flex:none;"></span>
+              <div style="flex:1;">
+                <div style="height:13px; width:62%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div>
+                <div style="height:10px; width:40%; margin-top:8px; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div>
+              </div>
+              <div style="width:60px; height:24px; background:var(--surface-2); border-radius:var(--r-sm); flex:none;"></div>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ demoEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center; padding:56px 20px;">
+            <div style="color:var(--ink-faint); line-height:0;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-book"></use></svg></div>
+            <h2 style="font-family:var(--font-serif); font-size:20px; font-weight:700; margin:12px 0 6px;">Nothing to read yet</h2>
+            <p style="font-size:13px; color:var(--ink-soft); max-width:380px; margin:0 auto; line-height:1.5;">When the researchers you follow publish, their work will appear here. Follow a few more people to widen your feed.</p>
+            <button onClick="{{ goAdd }}" style="margin-top:16px; padding:9px 15px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r-sm); font-size:13px; font-weight:600; cursor:pointer;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><use href="#ic-plus"></use></svg> Add authors</button>
+          </div>
+        </sc-if>
+        <sc-for list="{{ pubs }}" as="p" hint-placeholder-count="10">
+          <article class="pubrow" style="display:flex; gap:11px; padding:11px 8px; border-bottom:1px solid var(--line); align-items:center;">
+            <span class="tip" tabindex="0" style="{{ p.dotStyle }}"><span class="tip-pop">{{ p.readTip }}</span></span>
+            <div style="min-width:0; flex:1;">
+              <div style="display:flex; align-items:baseline; gap:8px; min-width:0;">
+                <span style="{{ p.fieldStyle }}">{{ p.fieldShort }}</span>
+                <h3 style="font-family:var(--font-serif); font-size:15px; line-height:1.25; font-weight:{{ p.titleWeight }}; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1;">{{ p.title }}</h3>
+              </div>
+              <div style="font-size:11.5px; color:var(--ink-soft); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ p.authors }} · <span style="font-style:italic;">{{ p.venue }}</span> · {{ p.year }} · <span style="font-family:var(--font-mono); color:var(--ink-faint);">{{ p.ident }}</span> · <span style="color:var(--ink-faint);">{{ p.source }}</span></div>
+            </div>
+            <span style="width:38px; flex:none; text-align:center;"><sc-if value="{{ p.isNew }}" hint-placeholder-val="{{ true }}"><span style="font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:.06em; color:var(--on-accent); background:var(--unread); padding:2px 5px; border-radius:4px;" class="tip" tabindex="0">NEW<span class="tip-pop" style="text-transform:none; letter-spacing:normal;">Arrived since your last visit.</span></span></sc-if></span>
+            <span class="tip" tabindex="0" style="{{ p.oaStyle }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ p.oaIcon }}"></use></svg>{{ p.oaShort }}<span class="tip-pop">{{ p.oaTitle }}</span></span>
+            <button onClick="{{ p.openPdf }}" style="{{ p.pdfBtnStyle }}" title="{{ p.pdfTitle }}">{{ p.pdfLabel }}</button>
+            <button onClick="{{ p.toggleRead }}" style="{{ p.readBtnStyle }}" title="{{ p.readAction }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ p.readIcon }}"></use></svg></button>
+          </article>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ============ AUTHORS ============ -->
+    <sc-if value="{{ isAuthors }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:1100px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <header style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px;">
+          <div>
+            <h1 style="font-family:var(--font-serif); font-size:clamp(22px,4vw,27px); font-weight:700; margin:0; letter-spacing:-.015em;">Authors you follow</h1>
+            <p style="font-size:12.5px; color:var(--ink-soft); margin:5px 0 0;"><span style="font-family:var(--font-mono);">247</span> followed · {{ shellCount }} not yet identified · {{ reviewCount }} awaiting review</p>
+          </div>
+          <button onClick="{{ goAdd }}" style="padding:9px 15px; border-radius:var(--r-sm); border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); font-size:13px; font-weight:600; cursor:pointer; box-shadow:var(--sh-1);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><use href="#ic-plus"></use></svg> Add authors</button>
+        </header>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 0 10px; border-bottom:1px solid var(--line);">
+          <div style="display:flex; gap:6px; align-items:center; overflow-x:auto;">
+            <sc-for list="{{ authorFilters }}" as="f" hint-placeholder-count="4"><button onClick="{{ f.go }}" style="{{ f.style }}">{{ f.label }}<sc-if value="{{ f.count }}" hint-placeholder-val="{{ true }}"><span style="{{ f.countStyle }}">{{ f.count }}</span></sc-if></button></sc-for>
+          </div>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:var(--r-sm); padding:6px 10px; background:var(--surface); min-width:170px;">
+            <span style="color:var(--ink-faint); font-size:13px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-search"></use></svg></span><span style="font-size:12.5px; color:var(--ink-faint);">Search authors</span>
+          </div>
+        </div>
+
+        <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; margin-top:10px; background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--r-sm);">
+            <span style="font-size:13px; font-weight:600; color:var(--accent-ink);">{{ selCount }} selected</span>
+            <button onClick="{{ bulkResync }}" style="padding:5px 11px; border:1px solid var(--accent-ink); background:var(--surface); color:var(--accent-ink); border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer;">Re-sync now</button>
+            <button onClick="{{ bulkReview }}" style="padding:5px 11px; border:1px solid var(--accent-ink); background:var(--surface); color:var(--accent-ink); border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer;">Send to review</button>
+            <button onClick="{{ clearSel }}" style="margin-left:auto; padding:5px 11px; border:none; background:transparent; color:var(--ink-soft); font-size:12px; cursor:pointer;">Clear</button>
+          </div>
+        </sc-if>
+
+        <div style="display:flex; align-items:center; gap:8px; margin:14px 0 2px;">
+          <span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint);">Preview state</span>
+          <sc-for list="{{ demoOpts }}" as="d" hint-placeholder-count="3"><button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for>
+        </div>
+        <sc-if value="{{ demoFull }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex; align-items:center; gap:12px; padding:9px 12px; margin-top:6px; font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); border-bottom:1px solid var(--line);">
+            <span style="width:16px; flex:none;"></span>
+            <span style="flex:1;">Author</span>
+            <span style="width:120px; flex:none;">Field</span>
+            <span style="width:150px; flex:none;">Identity</span>
+            <span style="width:80px; flex:none; text-align:right;">Last sync</span>
+            <span style="width:54px; flex:none; text-align:right;">New</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ demoLoading }}" hint-placeholder-val="{{ false }}">
+          <sc-for list="{{ skel }}" as="s" hint-placeholder-count="8">
+            <div style="display:flex; align-items:center; gap:12px; padding:11px 12px; border-bottom:1px solid var(--line);">
+              <span style="width:18px; height:18px; border-radius:5px; background:var(--surface-2); flex:none;"></span>
+              <span style="width:30px; height:30px; border-radius:50%; background:var(--surface-2); flex:none;"></span>
+              <div style="flex:1;"><div style="height:13px; width:42%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div></div>
+              <span style="width:84px; height:11px; background:var(--surface-2); border-radius:6px; flex:none;"></span>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ demoEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center; padding:56px 20px;">
+            <div style="color:var(--ink-faint); line-height:0;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-authors"></use></svg></div>
+            <h2 style="font-family:var(--font-serif); font-size:20px; font-weight:700; margin:12px 0 6px;">You are not following anyone yet</h2>
+            <p style="font-size:13px; color:var(--ink-soft); max-width:400px; margin:0 auto; line-height:1.5;">Search for a researcher by name, or bring in your whole list at once. Scholarr matches each to a database identity before anything is followed.</p>
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:16px; flex-wrap:wrap;">
+              <button onClick="{{ goAdd }}" style="padding:9px 15px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r-sm); font-size:13px; font-weight:600; cursor:pointer;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><use href="#ic-plus"></use></svg> Add an author</button>
+              <button onClick="{{ goBulk }}" style="padding:9px 15px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:var(--r-sm); font-size:13px; font-weight:600; cursor:pointer;">Bulk import</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-for list="{{ authorRows }}" as="a" hint-placeholder-count="10">
+          <div class="pubrow" style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid var(--line);">
+            <button onClick="{{ a.toggleSel }}" title="Select" style="{{ a.checkStyle }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-check"></use></svg></button>
+            <button onClick="{{ a.open }}" style="display:flex; align-items:center; gap:11px; flex:1; min-width:0; border:none; background:transparent; cursor:pointer; text-align:left; color:var(--ink); padding:0;">
+              <span style="width:30px; height:30px; border-radius:50%; background:var(--surface-2); color:var(--ink-soft); display:grid; place-items:center; font-size:11px; font-weight:700; flex:none;">{{ a.initials }}</span>
+              <span style="min-width:0;">
+                <span style="display:block; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ a.name }}</span>
+                <sc-if value="{{ a.nonlatin }}" hint-placeholder-val="{{ true }}"><span style="display:block; font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);">{{ a.nonlatin }}</span></sc-if>
+              </span>
+            </button>
+            <span style="width:120px; flex:none; font-size:12px; color:var(--ink-soft);">{{ a.field }}</span>
+            <span style="width:150px; flex:none;"><span class="tip" tabindex="0" style="{{ a.confStyle }}">{{ a.confDot }}{{ a.confLabel }}<span class="tip-pop">{{ a.confTitle }}</span></span></span>
+            <span style="width:80px; flex:none; text-align:right; font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);">{{ a.lastSync }}</span>
+            <span style="width:54px; flex:none; text-align:right;"><sc-if value="{{ a.newN }}" hint-placeholder-val="{{ true }}"><span style="font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--accent-ink);">+{{ a.newN }}</span></sc-if></span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ demoFull }}" hint-placeholder-val="{{ true }}"><p style="text-align:center; font-size:12px; color:var(--ink-faint); padding:16px;">Showing 12 of 247 followed authors</p></sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ AUTHOR DETAIL ============ -->
+    <sc-if value="{{ isAuthorDetail }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:900px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <button onClick="{{ goAuthors }}" style="border:none; background:transparent; color:var(--accent-ink); font-size:13px; font-weight:600; cursor:pointer; padding:0 0 14px;">← All authors</button>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;"><span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint);">Preview state</span><sc-for list="{{ demoOpts }}" as="d" hint-placeholder-count="3"><button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div>
+        <div style="display:grid; grid-template-columns:{{ detailCols }}; gap:18px; align-items:start;">
+          <div>
+            <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+              <span style="width:52px; height:52px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-size:17px; font-weight:700; flex:none;">{{ detail.initials }}</span>
+              <div>
+                <h1 style="font-family:var(--font-serif); font-size:24px; font-weight:700; margin:0; letter-spacing:-.01em;">{{ detail.name }}</h1>
+                <div style="font-size:13px; color:var(--ink-soft); margin-top:3px;"><sc-if value="{{ detail.nonlatin }}" hint-placeholder-val="{{ true }}"><span style="font-family:var(--font-mono);">{{ detail.nonlatin }} · </span></sc-if>{{ detail.field }} · {{ detail.works }} works</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin:22px 0 10px;">
+              <h2 style="font-family:var(--font-serif); font-size:17px; font-weight:700; margin:0;">Publications</h2>
+              <span style="font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);">{{ detail.pubCount }} in your library</span>
+            </div>
+            <sc-if value="{{ demoLoading }}" hint-placeholder-val="{{ false }}"><div style="display:flex; gap:11px; padding:12px 8px; border-bottom:1px solid var(--line); align-items:center;"><span style="width:9px; height:9px; border-radius:50%; background:var(--surface-2); flex:none;"></span><div style="flex:1;"><div style="height:13px; width:60%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div><div style="height:10px; width:38%; margin-top:8px; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div></div></div><div style="display:flex; gap:11px; padding:12px 8px; border-bottom:1px solid var(--line); align-items:center;"><span style="width:9px; height:9px; border-radius:50%; background:var(--surface-2); flex:none;"></span><div style="flex:1;"><div style="height:13px; width:60%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div><div style="height:10px; width:38%; margin-top:8px; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div></div></div><div style="display:flex; gap:11px; padding:12px 8px; border-bottom:1px solid var(--line); align-items:center;"><span style="width:9px; height:9px; border-radius:50%; background:var(--surface-2); flex:none;"></span><div style="flex:1;"><div style="height:13px; width:60%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div><div style="height:10px; width:38%; margin-top:8px; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div></div></div></sc-if><sc-if value="{{ demoEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:28px 8px; text-align:center; color:var(--ink-soft); font-size:13px;">No publications from this author are in your library yet. New work will appear here after the next sync.</div></sc-if><sc-for list="{{ detail.pubs }}" as="p" hint-placeholder-count="3">
+              <article class="pubrow" style="display:flex; gap:11px; padding:12px 8px; border-bottom:1px solid var(--line); align-items:flex-start;">
+                <span style="{{ p.dotStyle }}"></span>
+                <div style="min-width:0; flex:1;">
+                  <div style="font-family:var(--font-serif); font-size:14.5px; line-height:1.3; font-weight:{{ p.titleWeight }}; text-wrap:pretty;">{{ p.title }}</div>
+                  <div style="font-size:11.5px; color:var(--ink-soft); margin-top:3px;"><span style="font-style:italic;">{{ p.venue }}</span> · {{ p.year }} · <span style="font-family:var(--font-mono); color:var(--ink-faint);">{{ p.ident }}</span></div>
+                </div>
+                <span class="tip" tabindex="0" style="{{ p.oaStyle }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ p.oaIcon }}"></use></svg>{{ p.oaShort }}<span class="tip-pop">{{ p.oaTitle }}</span></span>
+              </article>
+            </sc-for>
+          </div>
+
+          <aside style="display:flex; flex-direction:column; gap:16px;">
+            <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+              <div style="padding:13px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px;">
+                <h2 style="font-family:var(--font-serif); font-size:15px; font-weight:700; margin:0; flex:1;">Identity</h2>
+                <span style="{{ detail.confStyle }}">{{ detail.confDot }}{{ detail.confLabel }} · {{ detail.confPct }}</span>
+              </div>
+              <div style="padding:12px 16px;">
+                <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:8px;">Matched in</div>
+                <sc-for list="{{ detail.matched }}" as="m" hint-placeholder-count="3">
+                  <div style="display:flex; align-items:center; gap:9px; padding:5px 0;"><span style="color:var(--hi);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-check"></use></svg></span><span style="font-size:12.5px; flex:1;">{{ m.name }}</span><span style="font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);">{{ m.id }}</span></div>
+                </sc-for>
+              </div>
+              <div style="padding:0 16px 12px;">
+                <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin:6px 0 8px;">External links</div>
+                <div style="display:flex; flex-wrap:wrap; gap:7px;">
+                  <a href="#" onClick="{{ noop }}" style="font-size:12px; color:var(--accent-ink); text-decoration:none; border:1px solid var(--line); border-radius:var(--r-sm); padding:4px 9px;">ORCID  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-external"></use></svg></a>
+                  <a href="#" onClick="{{ noop }}" style="font-size:12px; color:var(--accent-ink); text-decoration:none; border:1px solid var(--line); border-radius:var(--r-sm); padding:4px 9px;">OpenAlex  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-external"></use></svg></a>
+                  <a href="#" onClick="{{ noop }}" style="font-size:12px; color:var(--accent-ink); text-decoration:none; border:1px solid var(--line); border-radius:var(--r-sm); padding:4px 9px;">Scholar profile  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-external"></use></svg></a>
+                </div>
+              </div>
+              <div style="padding:12px 16px; border-top:1px solid var(--line);">
+                <button onClick="{{ goReview }}" style="width:100%; padding:8px; border:1px solid var(--line-strong); background:transparent; color:var(--low); border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer;">Not this person? Re-match →</button>
+              </div>
+            </section>
+            <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+              <div style="padding:13px 16px 10px; border-bottom:1px solid var(--line);"><h2 style="font-family:var(--font-serif); font-size:15px; font-weight:700; margin:0;">Sync history</h2></div>
+              <sc-for list="{{ detail.sync }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex; align-items:baseline; gap:10px; padding:9px 16px; border-bottom:1px solid var(--line);"><span style="{{ s.dotStyle }}"></span><span style="font-size:12px; flex:1;">{{ s.text }}</span><span style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); white-space:nowrap;">{{ s.when }}</span></div>
+              </sc-for>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ REVIEW QUEUE ============ -->
+    <sc-if value="{{ isReview }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:820px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <header style="margin-bottom:14px;">
+          <h1 style="font-family:var(--font-serif); font-size:clamp(22px,4vw,27px); font-weight:700; margin:0; letter-spacing:-.015em;">Review queue</h1>
+          <p style="font-size:12.5px; color:var(--ink-soft); margin:5px 0 0;">Resolve one identity question at a time. Nothing changes until you decide, and every decision can be undone.</p>
+        </header>
+
+        <sc-if value="{{ reviewEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center; padding:60px 20px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);">
+            <div style="color:var(--hi); line-height:0;"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-check"></use></svg></div>
+            <h2 style="font-family:var(--font-serif); font-size:20px; font-weight:700; margin:10px 0 6px;">Queue is clear</h2>
+            <p style="font-size:13px; color:var(--ink-soft); margin:0;">Every author has been identified. New ambiguous matches will appear here as they arrive.</p>
+            <button onClick="{{ resetReview }}" style="margin-top:16px; padding:8px 14px; border:1px solid var(--line-strong); background:transparent; color:var(--ink-soft); border-radius:var(--r-sm); font-size:12.5px; cursor:pointer;">Replay demo queue</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ reviewActive }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <div style="flex:1; height:6px; background:var(--surface-2); border-radius:20px; overflow:hidden;"><div style="width:{{ reviewProgress }}; height:100%; background:var(--accent);"></div></div>
+            <span style="font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); white-space:nowrap;">{{ reviewPos }} of {{ reviewTotal }}</span>
+            <button onClick="{{ reviewUndo }}" style="{{ undoStyle }}" title="Undo last decision"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-undo"></use></svg> Undo</button>
+          </div>
+
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+            <div style="padding:14px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px;">
+              <span style="{{ review.typeStyle }}">{{ review.typeLabel }}</span>
+              <h2 style="font-family:var(--font-serif); font-size:17px; font-weight:700; margin:0; flex:1;">{{ review.title }}</h2>
+            </div>
+            <div style="padding:14px 18px;">
+              <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px; line-height:1.5;">{{ review.prompt }}</p>
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <sc-for list="{{ review.options }}" as="o" hint-placeholder-count="3">
+                  <button onClick="{{ o.choose }}" class="pubrow" style="{{ o.style }}">
+                    <div style="display:flex; align-items:flex-start; gap:11px;">
+                      <span style="font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--ink-faint); flex:none; margin-top:2px;">{{ o.key }}</span>
+                      <div style="flex:1; min-width:0;">
+                        <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;"><span style="font-size:14px; font-weight:700;">{{ o.name }}</span><span style="font-size:12px; color:var(--ink-soft);">{{ o.affil }}</span></div>
+                        <div style="font-size:12px; color:var(--ink-soft); margin-top:4px;">{{ o.detail }}</div>
+                        <sc-if value="{{ o.sample }}" hint-placeholder-val="{{ true }}"><div style="font-family:var(--font-serif); font-style:italic; font-size:12.5px; color:var(--ink-faint); margin-top:6px; text-wrap:pretty;">“{{ o.sample }}”</div></sc-if>
+                        <sc-if value="{{ o.ids }}" hint-placeholder-val="{{ true }}"><div style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-faint); margin-top:6px;">{{ o.ids }}</div></sc-if>
+                      </div>
+                      <span style="{{ o.confStyle }}">{{ o.conf }}</span>
+                    </div>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="padding:12px 18px; border-top:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--surface-2);">
+              <button onClick="{{ review.skip }}" style="padding:8px 14px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-soft); border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer;">Skip for now</button>
+              <button onClick="{{ review.reject }}" style="padding:8px 14px; border:1px solid var(--line-strong); background:var(--surface); color:var(--low); border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer;">{{ review.rejectLabel }}</button>
+              <span style="margin-left:auto; font-size:11px; color:var(--ink-faint); display:flex; gap:10px; align-items:center; flex-wrap:wrap;"><span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> choose</span><span><kbd>S</kbd> skip</span><span><kbd>U</kbd> undo</span><span><kbd>J</kbd>/<kbd>K</kbd> move</span></span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ ADD AUTHOR ============ -->
+    <sc-if value="{{ isAdd }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:820px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <header style="margin-bottom:16px;">
+          <h1 style="font-family:var(--font-serif); font-size:clamp(22px,4vw,27px); font-weight:700; margin:0; letter-spacing:-.015em;">Add an author</h1>
+          <p style="font-size:12.5px; color:var(--ink-soft); margin:5px 0 0;">Search by name, then confirm which researcher you mean. Following hundreds at once? <button onClick="{{ goBulk }}" style="border:none; background:transparent; color:var(--accent-ink); font-size:12.5px; font-weight:600; cursor:pointer; padding:0;">Bulk import →</button></p>
+        </header>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;"><span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint);">Preview state</span><sc-for list="{{ addViewOpts }}" as="d" hint-placeholder-count="3"><button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div>
+        <div style="display:flex; align-items:center; gap:10px; border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:11px 14px; background:var(--surface); box-shadow:var(--sh-1);">
+          <span style="color:var(--ink-faint); font-size:16px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-search"></use></svg></span>
+          <span style="font-size:15px; font-weight:600; flex:1;">{{ addQuery }}</span>
+          <span style="font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);">{{ addCountLabel }}</span>
+        </div>
+        <sc-if value="{{ addHasResults }}" hint-placeholder-val="{{ true }}"><div style="display:flex; align-items:center; gap:8px; margin:16px 0 10px;">
+          <span style="width:8px; height:8px; border-radius:50%; background:var(--mid); flex:none;"></span>
+          <p style="font-size:12.5px; color:var(--ink-soft); margin:0;">Several researchers publish under this name. Compare affiliation, field and recent work, then pick the one you follow.</p>
+        </div></sc-if>
+        <sc-if value="{{ addCooling }}" hint-placeholder-val="{{ false }}"><div style="display:flex; align-items:flex-start; gap:10px; margin:0 0 12px; padding:11px 14px; background:var(--mid-soft); border:1px solid var(--mid); border-radius:var(--r-md);"><span style="color:var(--mid-ink); line-height:0; margin-top:1px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-warning"></use></svg></span><p style="font-size:12.5px; color:var(--ink); margin:0; line-height:1.45;">ORCID is cooling down right now, so identity confidence may read lower than usual. You can still follow the best match; its confidence firms up automatically once ORCID resumes.</p></div></sc-if>
+        <sc-if value="{{ addEmpty }}" hint-placeholder-val="{{ false }}"><div style="text-align:center; padding:48px 20px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);"><div style="color:var(--ink-faint); line-height:0;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-search"></use></svg></div><h2 style="font-family:var(--font-serif); font-size:19px; font-weight:700; margin:12px 0 6px;">No researcher found</h2><p style="font-size:13px; color:var(--ink-soft); max-width:400px; margin:0 auto; line-height:1.5;">Nothing in OpenAlex or ORCID matches that name. Check the spelling, try the full name, or paste their Scholar profile URL instead.</p></div></sc-if>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <sc-for list="{{ addCandidates }}" as="c" hint-placeholder-count="3">
+            <div style="background:var(--surface); border:1px solid {{ c.borderColor }}; border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+              <div style="padding:15px 18px; display:flex; gap:14px; align-items:flex-start;">
+                <span style="width:40px; height:40px; border-radius:50%; background:var(--surface-2); color:var(--ink-soft); display:grid; place-items:center; font-size:13px; font-weight:700; flex:none;">{{ c.initials }}</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;"><span style="font-size:16px; font-weight:700;">{{ c.name }}</span><span style="{{ c.confStyle }}">{{ c.confDot }}{{ c.conf }}</span></div>
+                  <div style="font-size:13px; color:var(--ink-soft); margin-top:4px;">{{ c.affil }} · {{ c.field }}</div>
+                  <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap;">
+                    <span style="font-size:12px; color:var(--ink-soft);"><span style="font-family:var(--font-mono); font-weight:700; color:var(--ink);">{{ c.works }}</span> works</span>
+                    <span style="font-size:12px; color:var(--ink-soft);">since <span style="font-family:var(--font-mono);">{{ c.since }}</span></span>
+                    <span style="font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint);">{{ c.ids }}</span>
+                  </div>
+                  <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);">
+                    <div style="font-family:var(--font-mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:5px;">Recent work</div>
+                    <sc-for list="{{ c.samples }}" as="s" hint-placeholder-count="2"><div style="font-family:var(--font-serif); font-style:italic; font-size:12.5px; color:var(--ink-soft); line-height:1.4;">“{{ s.t }}” · {{ s.v }}</div></sc-for>
+                  </div>
+                </div>
+                <button onClick="{{ c.confirm }}" style="{{ c.btnStyle }}">{{ c.btnLabel }}</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ addConfirmed }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px; padding:12px 16px; background:var(--hi-soft); border:1px solid var(--hi); border-radius:var(--r-sm); display:flex; align-items:center; gap:10px;">
+            <span style="color:var(--hi);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-check"></use></svg></span><span style="font-size:13px; flex:1;">Now following <strong>{{ addConfirmedName }}</strong>. Their back catalogue is being imported.</span>
+            <button onClick="{{ goAuthors }}" style="padding:6px 12px; border:1px solid var(--hi); background:var(--surface); color:var(--ink); border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer;">View authors →</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ BULK IMPORT ============ -->
+    <sc-if value="{{ isBulk }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:860px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <header style="margin-bottom:16px;">
+          <h1 style="font-family:var(--font-serif); font-size:clamp(22px,4vw,27px); font-weight:700; margin:0; letter-spacing:-.015em;">Bulk import authors</h1>
+          <p style="font-size:12.5px; color:var(--ink-soft); margin:5px 0 0;">Paste a list of Scholar profile URLs or upload an export. We match each to a database identity. Nothing is followed until you approve it.</p>
+        </header>
+        <div style="display:flex; gap:6px; margin-bottom:18px;">
+          <sc-for list="{{ bulkSteps }}" as="s" hint-placeholder-count="3"><div style="{{ s.style }}"><span style="font-family:var(--font-mono); font-size:10px; font-weight:700;">{{ s.n }}</span><span style="font-size:12px; font-weight:600;">{{ s.label }}</span></div></sc-for>
+        </div>
+
+        <sc-if value="{{ bulkInput }}" hint-placeholder-val="{{ true }}">
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:18px;">
+            <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:8px;">Paste profile URLs, one per line</div>
+            <div style="font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); padding:12px; line-height:1.7; white-space:pre-wrap;">scholar.google.com/citations?user=aB1cD2e
+scholar.google.com/citations?user=Xy9Zk3m
+scholar.google.com/citations?user=Qp4Rt7n
+… 244 more lines</div>
+            <div style="margin-top:14px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface-2);">
+              <div style="font-size:12.5px; font-weight:600; margin-bottom:9px;">We checked your 247 lines before importing anything</div>
+              <div style="display:flex; flex-direction:column; gap:7px; font-size:12px; color:var(--ink-soft);">
+                <span style="display:flex; align-items:center; gap:9px; color:var(--hi-ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><use href="#ic-check"></use></svg><span style="color:var(--ink-soft);">241 look valid and are ready to match</span></span>
+                <span style="display:flex; align-items:center; gap:9px; color:var(--low-ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><use href="#ic-warning"></use></svg><span style="color:var(--ink-soft);">3 could not be read (not a Scholar profile link) &mdash; lines 44, 108, 231</span></span>
+                <span style="display:flex; align-items:center; gap:9px; color:var(--mid-ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><use href="#ic-warning"></use></svg><span style="color:var(--ink-soft);">2 are duplicates within your list &mdash; we will keep one of each</span></span>
+                <span style="display:flex; align-items:center; gap:9px; color:var(--ink-faint);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><use href="#ic-circle"></use></svg><span style="color:var(--ink-soft);">1 is already in your followed list and will be skipped</span></span>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:14px; flex-wrap:wrap;">
+              <button onClick="{{ bulkStartMatch }}" style="padding:9px 16px; border-radius:var(--r-sm); border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); font-size:13px; font-weight:600; cursor:pointer;">Match 247 authors →</button>
+              <span style="font-size:12px; color:var(--ink-faint);">or</span>
+              <button onClick="{{ noop }}" style="padding:9px 16px; border-radius:var(--r-sm); border:1px dashed var(--line-strong); background:transparent; color:var(--ink-soft); font-size:13px; font-weight:600; cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><use href="#ic-upload"></use></svg> Upload export file</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ bulkMatching }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:26px 18px; text-align:center;">
+            <div style="font-family:var(--font-serif); font-size:22px; font-weight:700;">Matching against OpenAlex &amp; ORCID…</div>
+            <div style="max-width:420px; margin:16px auto 0; height:8px; background:var(--surface-2); border-radius:20px; overflow:hidden;"><div style="width:63%; height:100%; background:var(--accent);"></div></div>
+            <div style="font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); margin-top:10px;">156 of 247 resolved · Unpaywall paused (cooling down)</div>
+            <button onClick="{{ bulkShowSummary }}" style="margin-top:16px; padding:8px 14px; border:1px solid var(--line-strong); background:transparent; color:var(--ink-soft); border-radius:var(--r-sm); font-size:12.5px; cursor:pointer;">Skip to results (demo)</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ bulkSummary }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid; grid-template-columns:{{ bulkGridCols }}; gap:12px; margin-bottom:16px;">
+            <div style="background:var(--surface); border:1px solid var(--hi); border-radius:var(--r-lg); padding:16px;"><div style="font-family:var(--font-serif); font-size:32px; font-weight:700; color:var(--hi);">198</div><div style="font-size:13px; font-weight:600; margin-top:2px;">Confident matches</div><div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">Ready to follow automatically</div></div>
+            <div style="background:var(--surface); border:1px solid var(--mid); border-radius:var(--r-lg); padding:16px;"><div style="font-family:var(--font-serif); font-size:32px; font-weight:700; color:var(--mid);">33</div><div style="font-size:13px; font-weight:600; margin-top:2px;">Likely, need a look</div><div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">One tap each in review</div></div>
+            <div style="background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--r-lg); padding:16px;"><div style="font-family:var(--font-serif); font-size:32px; font-weight:700; color:var(--ink-faint);">16</div><div style="font-size:13px; font-weight:600; margin-top:2px;">Uncertain or shells</div><div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">Kept aside for review</div></div>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+            <div style="padding:13px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px;"><h2 style="font-family:var(--font-serif); font-size:15px; font-weight:700; margin:0; flex:1;">Preview · confident matches</h2><span style="font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);">showing 4 of 198</span></div>
+            <sc-for list="{{ bulkPreview }}" as="b" hint-placeholder-count="4"><div style="display:flex; align-items:center; gap:11px; padding:10px 16px; border-bottom:1px solid var(--line);"><span style="width:28px; height:28px; border-radius:50%; background:var(--surface-2); color:var(--ink-soft); display:grid; place-items:center; font-size:10.5px; font-weight:700; flex:none;">{{ b.initials }}</span><span style="flex:1; min-width:0;"><span style="display:block; font-size:13.5px; font-weight:600;">{{ b.name }}</span><span style="display:block; font-size:11.5px; color:var(--ink-soft);">{{ b.affil }}</span></span><span style="{{ b.confStyle }}">{{ b.confDot }}{{ b.conf }}</span></div></sc-for>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap:wrap;">
+            <button onClick="{{ bulkAccept }}" style="padding:10px 16px; border-radius:var(--r-sm); border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); font-size:13px; font-weight:600; cursor:pointer;">Follow 198 confident matches</button>
+            <button onClick="{{ goReview }}" style="padding:10px 16px; border-radius:var(--r-sm); border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); font-size:13px; font-weight:600; cursor:pointer;">Send 49 to review</button>
+            <span style="font-size:11.5px; color:var(--ink-faint); flex:1; min-width:160px;">Safe by default: nothing is followed and no duplicates are created until you confirm. You can undo the whole import from Activity.</span>
+          </div>
+          <sc-if value="{{ bulkAccepted }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:14px; padding:12px 16px; background:var(--hi-soft); border:1px solid var(--hi); border-radius:var(--r-sm); display:flex; align-items:center; gap:10px;"><span style="color:var(--hi);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-check"></use></svg></span><span style="font-size:13px; flex:1;">Now following 198 new authors. 49 remain in the review queue.</span><button onClick="{{ goAuthors }}" style="padding:6px 12px; border:1px solid var(--hi); background:var(--surface); color:var(--ink); border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:pointer;">View authors →</button></div>
+          </sc-if>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ SOURCES ============ -->
+    <sc-if value="{{ isSources }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:900px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <header style="margin-bottom:16px;">
+          <h1 style="font-family:var(--font-serif); font-size:clamp(22px,4vw,27px); font-weight:700; margin:0; letter-spacing:-.015em;">Sources</h1>
+          <p style="font-size:12.5px; color:var(--ink-soft); margin:5px 0 0;">Where Scholarr gets its facts. Health and freshness are shown honestly. Publication data lags reality by days to weeks; that is expected.</p>
+        </header>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;"><span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint);">Preview state</span><sc-for list="{{ demoOpts }}" as="d" hint-placeholder-count="3"><button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <sc-if value="{{ demoLoading }}" hint-placeholder-val="{{ false }}"><div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px 18px;"><div style="height:16px; width:30%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div><div style="height:11px; width:78%; margin-top:12px; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div></div><div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px 18px;"><div style="height:16px; width:30%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div><div style="height:11px; width:78%; margin-top:12px; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div></div><div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px 18px;"><div style="height:16px; width:30%; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div><div style="height:11px; width:78%; margin-top:12px; background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:6px;"></div></div></sc-if>
+          <sc-if value="{{ demoEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:44px 20px; text-align:center; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);"><div style="color:var(--ink-faint); line-height:0;"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-sources"></use></svg></div><h2 style="font-family:var(--font-serif); font-size:19px; font-weight:700; margin:10px 0 6px;">No sources connected yet</h2><p style="font-size:13px; color:var(--ink-soft); margin:0;">Connect a data source in Settings to start delivering publications.</p></div></sc-if>
+          <sc-for list="{{ sources }}" as="s" hint-placeholder-count="5">
+            <div style="background:var(--surface); border:1px solid {{ s.borderColor }}; border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:16px 18px;">
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <span style="{{ s.dotStyle }}"></span>
+                <h2 style="font-family:var(--font-serif); font-size:17px; font-weight:700; margin:0;">{{ s.name }}</h2>
+                <span class="tip" tabindex="0" style="{{ s.badgeStyle }}">{{ s.stateLabel }}<span class="tip-pop">{{ s.tip }}</span></span>
+                <span style="margin-left:auto; font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);">last delivered {{ s.last }}</span>
+              </div>
+              <p style="font-size:12.5px; color:var(--ink-soft); margin:9px 0 0; line-height:1.45;">{{ s.provides }}</p>
+              <sc-if value="{{ s.note }}" hint-placeholder-val="{{ true }}"><p style="font-size:12.5px; margin:9px 0 0; padding:9px 12px; background:{{ s.noteBg }}; border-radius:var(--r-sm); color:var(--ink); line-height:1.45;">{{ s.note }}</p><sc-if value="{{ s.canReconnect }}" hint-placeholder-val="{{ false }}"><button onClick="{{ s.onReconnect }}" style="margin-top:10px; padding:7px 13px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer;">Reconnect {{ s.name }}</button></sc-if></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ ACTIVITY ============ -->
+    <sc-if value="{{ isActivity }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:900px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <header style="margin-bottom:16px;">
+          <h1 style="font-family:var(--font-serif); font-size:clamp(22px,4vw,27px); font-weight:700; margin:0; letter-spacing:-.015em;">Activity</h1>
+          <p style="font-size:12.5px; color:var(--ink-soft); margin:5px 0 0;">Every sync run and its outcome. Runs happen on a schedule and when you trigger them.</p>
+        </header>
+        <div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+          <sc-for list="{{ activity }}" as="r" hint-placeholder-count="8">
+            <div style="display:flex; align-items:flex-start; gap:12px; padding:13px 18px; border-bottom:1px solid var(--line);">
+              <span style="{{ r.dotStyle }}"></span>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:13.5px; font-weight:600;">{{ r.title }}</div>
+                <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">{{ r.detail }}</div>
+              </div>
+              <span style="{{ r.badgeStyle }}">{{ r.outcome }}</span>
+              <span style="font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); white-space:nowrap; width:78px; text-align:right; flex:none;">{{ r.when }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ SETTINGS ============ -->
+    <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width:820px; width:100%; margin:0 auto; padding:{{ pagePad }};">
+        <header style="margin-bottom:16px;"><h1 style="font-family:var(--font-serif); font-size:clamp(22px,4vw,27px); font-weight:700; margin:0; letter-spacing:-.015em;">Settings</h1></header>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+            <div style="padding:13px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><h2 style="font-family:var(--font-serif); font-size:15px; font-weight:700; margin:0;">Your profile</h2><div style="margin-left:auto; display:flex; gap:5px; flex-wrap:wrap;"><sc-for list="{{ profileOpts }}" as="d" hint-placeholder-count="5"><button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div></div>
+            <sc-if value="{{ profileView }}" hint-placeholder-val="{{ true }}"><div style="padding:16px 18px; display:flex; flex-direction:column; gap:14px;"><div><div style="font-size:12px; font-weight:600; color:var(--ink-soft); margin-bottom:3px;">Display name</div><div style="font-size:14px;">Herman Bakker</div></div><div><div style="font-size:12px; font-weight:600; color:var(--ink-soft); margin-bottom:3px;">Email</div><div style="font-size:14px;">h.bakker@example.org</div></div><div><button onClick="{{ profileEdit }}" style="padding:8px 14px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); border-radius:var(--r-sm); font-size:13px; font-weight:600; cursor:pointer;">Edit profile</button></div></div></sc-if>
+            <sc-if value="{{ profileForm }}" hint-placeholder-val="{{ false }}"><div style="padding:16px 18px; display:flex; flex-direction:column; gap:14px;"><sc-if value="{{ profileSaved }}" hint-placeholder-val="{{ false }}"><div style="display:flex; align-items:center; gap:9px; padding:10px 12px; background:var(--hi-soft); border:1px solid var(--hi); border-radius:var(--r-sm);"><span style="color:var(--hi-ink); line-height:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><use href="#ic-check"></use></svg></span><span style="font-size:12.5px; color:var(--hi-ink);">Your changes have been saved.</span></div></sc-if><label style="display:flex; flex-direction:column; gap:5px;"><span style="font-size:12px; font-weight:600; color:var(--ink-soft);">Display name <span style="color:var(--low-ink);">*</span></span><span style="font-size:14px; border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:9px 12px; background:var(--surface);">Herman Bakker</span></label><label style="display:flex; flex-direction:column; gap:5px;"><span style="font-size:12px; font-weight:600; color:var(--ink-soft);">Email <span style="color:var(--low-ink);">*</span></span><span style="font-size:14px; border:1px solid {{ emailBorder }}; border-radius:var(--r-sm); padding:9px 12px; background:var(--surface);">{{ emailVal }}</span><sc-if value="{{ profileError }}" hint-placeholder-val="{{ false }}"><span style="display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--low-ink); margin-top:1px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><use href="#ic-warning"></use></svg>Enter a valid email address, for example name@example.org.</span></sc-if></label><div style="display:flex; gap:10px;"><button onClick="{{ profileSave }}" style="padding:9px 15px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r-sm); font-size:13px; font-weight:600; cursor:pointer;">{{ profileSaveLabel }}</button><button onClick="{{ profileCancel }}" style="padding:9px 15px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); border-radius:var(--r-sm); font-size:13px; font-weight:600; cursor:pointer;">Cancel</button></div><div style="font-size:11.5px; color:var(--ink-faint);">Fields marked <span style="color:var(--low-ink);">*</span> are required. Changes are validated when you save.</div></div></sc-if>
+          </section>
+
+          <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+            <div style="padding:13px 18px; border-bottom:1px solid var(--line);"><h2 style="font-family:var(--font-serif); font-size:15px; font-weight:700; margin:0;">Accessibility</h2></div>
+            <div style="padding:16px 18px; display:flex; flex-direction:column; gap:16px;">
+              <div style="display:flex; align-items:flex-start; gap:14px;">
+                <div style="flex:1;">
+                  <div style="font-size:13.5px; font-weight:600;">Colour-blind friendly badges</div>
+                  <div style="font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.45;">Adds a distinct outline to each status badge (solid, dashed, dotted) so confidence and source health can be told apart without relying on colour. Every badge already carries a word as well.</div>
+                </div>
+                <button onClick="{{ toggleCb }}" role="switch" aria-checked="{{ colorblind }}" style="{{ cbTrackStyle }}"><span style="{{ cbKnobStyle }}"></span></button>
+              </div>
+              <div style="display:flex; align-items:flex-start; gap:14px;">
+                <div style="flex:1;">
+                  <div style="font-size:13.5px; font-weight:600;">Theme</div>
+                  <div style="font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.45;">Follows your device by default. Light and dark are built from one token set and both meet WCAG AA contrast. Reduced motion is respected automatically.</div>
+                </div>
+                <span style="font-family:var(--font-mono); font-size:12px; color:var(--ink-faint);">System</span>
+              </div>
+            </div>
+          </section>
+          <sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ true }}">
+
+          <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+            <div style="padding:13px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px;"><h2 style="font-family:var(--font-serif); font-size:15px; font-weight:700; margin:0; flex:1;">Users &amp; roles</h2><span style="font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); background:var(--surface-2); padding:2px 7px; border-radius:20px;">Admin only</span></div>
+            <sc-for list="{{ users }}" as="u" hint-placeholder-count="3"><div style="display:flex; align-items:center; gap:11px; padding:11px 18px; border-bottom:1px solid var(--line);"><span style="width:28px; height:28px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-size:10.5px; font-weight:700; flex:none;">{{ u.initials }}</span><span style="flex:1; min-width:0;"><span style="display:block; font-size:13.5px; font-weight:600;">{{ u.name }}</span><span style="display:block; font-size:11.5px; color:var(--ink-soft);">{{ u.email }}</span></span><span style="{{ u.roleStyle }}">{{ u.role }}</span><button onClick="{{ u.onRemove }}" title="Remove user" style="width:28px; height:28px; border:1px solid var(--line-strong); background:transparent; color:var(--low-ink); border-radius:var(--r-sm); cursor:pointer; flex:none; display:grid; place-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-x"></use></svg></button></div></sc-for>
+            <div style="padding:12px 18px;"><button onClick="{{ noop }}" style="padding:7px 13px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><use href="#ic-plus"></use></svg> Invite user</button></div>
+          </section>
+
+          <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+            <div style="padding:13px 18px; border-bottom:1px solid var(--line);"><h2 style="font-family:var(--font-serif); font-size:15px; font-weight:700; margin:0;">Sign-in</h2></div>
+            <div style="padding:16px 18px; display:flex; flex-direction:column; gap:14px;">
+              <div style="display:flex; align-items:flex-start; gap:12px;"><span style="color:var(--hi); margin-top:2px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-dot"></use></svg></span><div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">Username &amp; password</div><div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">On. Accounts are created by an admin. Passwords stay on this server.</div></div><span style="font-size:12px; color:var(--ink-faint);">Enabled</span></div>
+              <div style="display:flex; align-items:flex-start; gap:12px;"><span style="color:var(--hi); margin-top:2px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-dot"></use></svg></span><div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">Single sign-on (OIDC)</div><div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">On. People sign in with your organisation account. Connected to “university-idp”.</div></div><span style="font-size:12px; color:var(--ink-faint);">Enabled</span></div>
+              <div style="display:flex; align-items:flex-start; gap:12px;"><span style="color:var(--ink-faint); margin-top:2px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-circle"></use></svg></span><div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">Trusted proxy</div><div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">Off. If your server sits behind a proxy that already signs people in, Scholarr can skip its own login.</div></div><span style="font-size:12px; color:var(--ink-faint);">Disabled</span></div>
+            </div>
+          </section>
+
+          <section style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); overflow:hidden;">
+            <div style="padding:13px 18px; border-bottom:1px solid var(--line);"><h2 style="font-family:var(--font-serif); font-size:15px; font-weight:700; margin:0;">Source credentials &amp; schedule</h2></div>
+            <div style="padding:16px 18px; display:flex; flex-direction:column; gap:12px;">
+              <label style="display:flex; flex-direction:column; gap:5px;"><span style="font-size:12px; font-weight:600; color:var(--ink-soft);">Contact email for API politeness pool</span><span style="font-size:14px; font-family:var(--font-mono); border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:9px 12px; background:var(--surface-2);">admin@example.org</span></label>
+              <label style="display:flex; flex-direction:column; gap:5px;"><span style="font-size:12px; font-weight:600; color:var(--ink-soft);">Crossref / Unpaywall API key</span><span style="font-size:14px; font-family:var(--font-mono); border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:9px 12px; background:var(--surface-2); color:var(--ink-faint);">•••••••••••••••• 4f2a</span></label>
+              <label style="display:flex; flex-direction:column; gap:5px;"><span style="font-size:12px; font-weight:600; color:var(--ink-soft);">Sync schedule</span><span style="font-size:14px; border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:9px 12px; background:var(--surface-2);">Every 6 hours · next run 14:00</span></label>
+            </div>
+            <div style="padding:12px 18px; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap;"><button onClick="{{ noop }}" style="padding:7px 13px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer;">Export data</button><button onClick="{{ noop }}" style="padding:7px 13px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer;">Import data</button></div>
+          </section>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ LOGIN ============ -->
+    <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+      <div style="min-height:100vh; display:grid; place-items:center; padding:24px;">
+        <div style="width:100%; max-width:360px;">
+          <div style="display:flex; flex-direction:column; align-items:center; text-align:center; margin-bottom:22px;">
+            <img class="logo-on-light" src="uploads/logo-light-tight.png" alt="Scholarr" style="width:56px; height:56px; object-fit:contain;"/><img class="logo-on-dark" src="uploads/logo-dark-tight.png" alt="" style="width:56px; height:56px; object-fit:contain;"/>
+            <h1 style="font-family:var(--font-serif); font-size:26px; font-weight:700; margin:12px 0 4px;">Scholarr</h1>
+            <p style="font-size:12.5px; color:var(--ink-soft); margin:0;">Sign in to your instance</p>
+          </div>
+          <div style="display:flex; justify-content:center; gap:6px; margin-bottom:14px; flex-wrap:wrap;"><sc-for list="{{ loginVariantOpts }}" as="d" hint-placeholder-count="3"><button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div>
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:22px; display:flex; flex-direction:column; gap:13px;">
+            <sc-if value="{{ loginFailed }}" hint-placeholder-val="{{ false }}"><div style="display:flex; align-items:flex-start; gap:9px; padding:10px 12px; background:var(--low-soft); border:1px solid var(--low); border-radius:var(--r-sm);"><span style="color:var(--low-ink); line-height:0; margin-top:1px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-warning"></use></svg></span><span style="font-size:12.5px; color:var(--low-ink);">That username or password was not recognised. Please try again.</span></div></sc-if>
+            <sc-if value="{{ loginPwForm }}" hint-placeholder-val="{{ true }}">
+            <label style="display:flex; flex-direction:column; gap:5px;"><span style="font-size:12px; font-weight:600; color:var(--ink-soft);">Username</span><span style="font-size:14px; border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:10px 12px; background:var(--surface-2); color:var(--ink-faint);">herman</span></label>
+            <label style="display:flex; flex-direction:column; gap:5px;"><span style="font-size:12px; font-weight:600; color:var(--ink-soft);">Password</span><span style="font-size:14px; border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:10px 12px; background:var(--surface-2); color:var(--ink-faint); letter-spacing:2px;">••••••••</span></label>
+            <button onClick="{{ doLogin }}" style="margin-top:4px; padding:11px; border-radius:var(--r-sm); border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); font-size:14px; font-weight:600; cursor:pointer;">Sign in</button>
+            <div style="display:flex; align-items:center; gap:10px; color:var(--ink-faint); font-size:11px;"><span style="flex:1; height:1px; background:var(--line);"></span>or<span style="flex:1; height:1px; background:var(--line);"></span></div>
+            </sc-if>
+            <sc-if value="{{ loginSSO }}" hint-placeholder-val="{{ false }}"><p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 2px; text-align:center; line-height:1.45;">This instance uses single sign-on. There is no local password to enter.</p></sc-if>
+            <button onClick="{{ doLogin }}" style="padding:11px; border-radius:var(--r-sm); border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); font-size:14px; font-weight:600; cursor:pointer;">Continue with university SSO</button>
+          </div>
+          <p style="text-align:center; font-size:11.5px; color:var(--ink-faint); margin-top:16px; line-height:1.5;">Fresh install? <button onClick="{{ goOnboarding }}" style="border:none; background:transparent; color:var(--accent-ink); font-size:11.5px; font-weight:600; cursor:pointer; padding:0;">Set up this instance →</button><br/>Some installs sign you in automatically via a trusted proxy.</p>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ ONBOARDING ============ -->
+    <sc-if value="{{ isOnboarding }}" hint-placeholder-val="{{ false }}">
+      <div style="min-height:100vh; display:grid; place-items:center; padding:24px;">
+        <div style="width:100%; max-width:640px;">
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+            <img class="logo-on-light" src="uploads/logo-light-tight.png" alt="Scholarr" style="width:40px; height:40px; object-fit:contain;"/><img class="logo-on-dark" src="uploads/logo-dark-tight.png" alt="" style="width:40px; height:40px; object-fit:contain;"/>
+            <div><div style="font-family:var(--font-serif); font-size:20px; font-weight:700;">Set up Scholarr</div><div style="font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);">Step 3 of 4 · Add your first authors</div></div>
+          </div>
+          <div style="display:flex; gap:6px; margin-bottom:20px;">
+            <sc-for list="{{ onbSteps }}" as="s" hint-placeholder-count="4"><div style="flex:1; height:5px; border-radius:20px; background:{{ s.color }};"></div></sc-for>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:24px;">
+            <h1 style="font-family:var(--font-serif); font-size:23px; font-weight:700; margin:0 0 6px;">Who do you want to follow?</h1>
+            <p style="font-size:13px; color:var(--ink-soft); margin:0 0 18px; line-height:1.5;">Add a few researchers by name now, or bring in your whole list at once. You can always add more later.</p>
+            <div style="display:flex; align-items:center; gap:10px; border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:11px 14px; background:var(--surface-2);"><span style="color:var(--ink-faint); font-size:16px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-search"></use></svg></span><span style="font-size:14px; color:var(--ink-faint); flex:1;">Search a researcher by name…</span><button onClick="{{ goAdd }}" style="padding:6px 12px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r-sm); font-size:12.5px; font-weight:600; cursor:pointer;">Search</button></div>
+            <div style="display:flex; align-items:center; gap:12px; margin:16px 0; color:var(--ink-faint); font-size:12px;"><span style="flex:1; height:1px; background:var(--line);"></span>following hundreds already?<span style="flex:1; height:1px; background:var(--line);"></span></div>
+            <button onClick="{{ goBulk }}" style="width:100%; padding:13px; border-radius:var(--r-sm); border:1px dashed var(--line-strong); background:transparent; color:var(--ink); font-size:13.5px; font-weight:600; cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><use href="#ic-upload"></use></svg> Paste a list of Scholar URLs or upload an export</button>
+            <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--line); display:flex; align-items:center; gap:12px;">
+              <button onClick="{{ goDash }}" style="padding:10px 16px; border-radius:var(--r-sm); border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); font-size:13.5px; font-weight:600; cursor:pointer;">Finish &amp; go to dashboard →</button>
+              <span style="font-size:12px; color:var(--ink-faint);">You will land on a dashboard that explains what happens next.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ isNotFound }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:100vh; display:grid; place-items:center; padding:24px; text-align:center;">
+      <div style="max-width:430px;">
+        <div style="font-family:var(--font-serif); font-size:64px; font-weight:700; color:var(--accent-ink); line-height:1;">404</div>
+        <h1 style="font-family:var(--font-serif); font-size:24px; font-weight:700; margin:14px 0 8px;">That page is not on the shelf</h1>
+        <p style="font-size:14px; color:var(--ink-soft); line-height:1.5; margin:0;">We could not find what you were looking for. It may have been merged, removed, or never existed. Nothing is broken, and your library is safe.</p>
+        <button onClick="{{ goDash }}" style="margin-top:20px; padding:10px 18px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r-sm); font-size:13.5px; font-weight:600; cursor:pointer;">Back to dashboard</button>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; inset:0; z-index:80; background:oklch(0.2 0.02 60 / 0.5); display:grid; place-items:center; padding:20px;">
+      <div role="dialog" aria-modal="true" style="width:100%; max-width:420px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-2); overflow:hidden;">
+        <div style="padding:18px 20px 4px;"><h2 style="font-family:var(--font-serif); font-size:19px; font-weight:700; margin:0;">{{ modalTitle }}</h2></div>
+        <div style="padding:6px 20px 16px;"><p style="font-size:13.5px; color:var(--ink-soft); margin:0; line-height:1.5;">{{ modalBody }}</p></div>
+        <div style="padding:12px 20px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px; background:var(--surface-2);">
+          <button onClick="{{ closeModal }}" style="padding:8px 15px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:var(--r-sm); font-size:13px; font-weight:600; cursor:pointer;">Cancel</button>
+          <button onClick="{{ confirmModal }}" style="padding:8px 15px; border:1px solid var(--low); background:var(--low); color:var(--on-accent); border-radius:var(--r-sm); font-size:13px; font-weight:600; cursor:pointer;">{{ modalConfirmLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:90; display:flex; align-items:center; gap:16px; background:var(--ink); color:var(--paper); padding:11px 14px 11px 16px; border-radius:var(--r-md); box-shadow:var(--sh-2); max-width:calc(100vw - 32px);">
+      <span style="font-size:13px;">{{ toastMsg }}</span>
+      <button onClick="{{ toastUndo }}" style="border:none; background:transparent; color:var(--paper); font-size:13px; font-weight:700; text-decoration:underline; cursor:pointer;">Undo</button>
+    </div>
+  </sc-if>
+  <nav style="position:fixed; bottom:0; left:0; right:0; z-index:40; background:var(--surface); border-top:1px solid var(--line); box-shadow:var(--sh-2); display:{{ mobileNavDisplay }}; justify-content:space-around; padding:6px 4px calc(6px + env(safe-area-inset-bottom));">
+    <sc-for list="{{ mobileNav }}" as="m" hint-placeholder-count="5">
+      <button onClick="{{ m.go }}" style="{{ m.style }}">
+        <span style="position:relative; font-size:19px; line-height:1;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-{{ m.icon }}"></use></svg><sc-if value="{{ m.badge }}" hint-placeholder-val="{{ true }}"><span style="position:absolute; top:-4px; right:-9px; min-width:15px; height:15px; padding:0 3px; border-radius:8px; background:var(--mid-soft); color:var(--mid-ink); font-family:var(--font-mono); font-size:9px; font-weight:700; display:grid; place-items:center;">{{ m.badge }}</span></sc-if></span>
+        <span style="font-size:10px; font-weight:600;">{{ m.label }}</span>
+      </button>
+    </sc-for>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:860}}">
+class Component extends DCLogic {
+  state = { screen:"dashboard", theme:"system", collapsed:false, filter:"all", read:{}, prefersDark:false, vw:1200,
+    detailId:"a1", authorFilter:"all", selected:{}, demo:"full", colorblind:false, legendOpen:false, role:"admin", modal:null, toast:null, addView:"candidates", loginVariant:"standard", profileState:"view",
+    reviewIndex:0, reviewDone:{}, reviewHistory:[],
+    addConfirmed:null, bulkPhase:"input", bulkAccepted:false };
+
+  componentDidMount(){
+    try{ const mq=window.matchMedia("(prefers-color-scheme: dark)"); this.setState({prefersDark:mq.matches}); this._mq=mq; this._onMq=(e)=>this.setState({prefersDark:e.matches}); mq.addEventListener("change",this._onMq); }catch(e){}
+    this._onResize=()=>this.setState({vw:window.innerWidth}); window.addEventListener("resize",this._onResize); this._onResize();
+    try{ if(localStorage.getItem("scholarr-cb")==="1") this.setState({colorblind:true}); }catch(e){}
+    this._onKey=(e)=>{ if(this.state.screen!=="review")return; const items=this.reviewItems().filter(it=>!this.state.reviewDone[it.id]); const cur=items[Math.min(this.state.reviewIndex,items.length-1)]; if(!cur)return; const k=e.key.toLowerCase();
+      if(k==="j"||e.key==="ArrowDown"){e.preventDefault(); this.setState(s=>({reviewIndex:Math.min(s.reviewIndex+1,items.length-1)}));}
+      else if(k==="k"||e.key==="ArrowUp"){e.preventDefault(); this.setState(s=>({reviewIndex:Math.max(s.reviewIndex-1,0)}));}
+      else if(k==="s"){e.preventDefault(); this.decide(cur.id,"skip");}
+      else if(k==="u"){e.preventDefault(); this.undo();}
+      else if(["1","2","3"].includes(k)){ const opt=(cur.options||[])[parseInt(k)-1]; if(opt){e.preventDefault(); this.decide(cur.id,"choose");} }
+    };
+    window.addEventListener("keydown",this._onKey);
+  }
+  componentWillUnmount(){ if(this._mq&&this._onMq)this._mq.removeEventListener("change",this._onMq); if(this._onResize)window.removeEventListener("resize",this._onResize); if(this._onKey)window.removeEventListener("keydown",this._onKey); }
+
+  effectiveDark(){ if(this.state.theme==="dark")return true; if(this.state.theme==="light")return false; return this.state.prefersDark; }
+  isMobile(){ return this.state.vw<760; }
+
+  allPubs(){ return [
+    {id:"p1",field:"Psychology",title:"Reappraisal flexibility predicts affective recovery: a 21-day experience-sampling study",authors:"K. Ramaswamy, E. Lindqvist, M. J. Fernández",venue:"Psychological Science",year:2026,ident:"doi:10.1177/09567976251234567",source:"OpenAlex",delivered:"2h ago",oa:"pdf",read:false,isNew:true,auth:["a1","a8","a6"]},
+    {id:"p2",field:"Physics",title:"Nonreciprocal magnon transport in a chiral antiferromagnet",authors:"S. Andersson, L. Zhang, И. Кузнецов",venue:"Physical Review Letters",year:2026,ident:"arXiv:2603.11245",source:"arXiv",delivered:"1h ago",oa:"pdf",read:false,isNew:true,auth:["a2","a4"]},
+    {id:"p3",field:"Computing science",title:"Sparse mixture routing under bandwidth constraints",authors:"W. Chen, D. Okafor, 中村 寛",venue:"NeurIPS",year:2025,ident:"doi:10.5555/3666122.3666481",source:"Crossref",delivered:"5h ago",oa:"none",read:false,isNew:true,auth:["a3","a7","a5"]},
+    {id:"p13",field:"Computing science",title:"Retrieval-augmented reasoning without parametric memory",authors:"中村 寛, W. Chen",venue:"arXiv preprint",year:2026,ident:"arXiv:2604.00218",source:"arXiv",delivered:"6h ago",oa:"pdf",read:true,isNew:false,auth:["a5","a3"]},
+    {id:"p4",field:"Psychology",title:"Ego depletion revisited: a registered replication across twelve laboratories",authors:"M. J. Fernández, P. Sørensen, A. Blomqvist",venue:"Nature Human Behaviour",year:2025,ident:"doi:10.1038/s41562-025-02011-4",source:"OpenAlex",delivered:"yesterday",oa:"pdf",read:true,isNew:false,fav:true,auth:["a6","a11"]},
+    {id:"p5",field:"Physics",title:"Tunable Josephson diode effect in twisted trilayer graphene",authors:"И. Кузнецов, R. Haddad, Y. Fujimoto",venue:"arXiv preprint",year:2026,ident:"arXiv:2601.09934",source:"arXiv",delivered:"yesterday",oa:"pdf",read:true,isNew:false,fav:true,auth:["a4","a9","a10"]},
+    {id:"p6",field:"Computing science",title:"Formal verification of Byzantine consensus under partial synchrony",authors:"中村 寛, T. Halvorsen",venue:"POPL",year:2026,ident:"doi:10.1145/3632851.3632910",source:"Crossref",delivered:"2d ago",oa:"pdf",read:true,isNew:false,auth:["a5","a12"]},
+    {id:"p7",field:"Psychology",title:"Interoceptive accuracy and anxiety: a preregistered heartbeat-counting study",authors:"E. Lindqvist, N. Abdullahi",venue:"Biological Psychology",year:2025,ident:"doi:10.1016/j.biopsycho.2025.108844",source:"OpenAlex",delivered:"3d ago",oa:"pending",read:true,isNew:false,auth:["a8"]},
+    {id:"p8",field:"Psychology",title:"Sleep spindle density and overnight memory consolidation in older adults",authors:"J. Park, E. Lindqvist",venue:"Journal of Cognitive Neuroscience",year:2025,ident:"doi:10.1162/jocn_a_02189",source:"OpenAlex",delivered:"4d ago",oa:"pdf",read:true,isNew:false,auth:["a8"]},
+    {id:"p9",field:"Physics",title:"Observation of anyonic braiding statistics in a fractional quantum Hall interferometer",authors:"S. Andersson, R. Haddad",venue:"Nature Physics",year:2025,ident:"doi:10.1038/s41567-025-02744-9",source:"Crossref",delivered:"5d ago",oa:"pdf",read:true,isNew:false,auth:["a2","a9"]},
+    {id:"p10",field:"Computing science",title:"Differentially private federated averaging with adaptive clipping",authors:"D. Okafor, W. Chen",venue:"ICML",year:2025,ident:"arXiv:2502.14477",source:"arXiv",delivered:"1w ago",oa:"pdf",read:true,isNew:false,auth:["a7","a3"]},
+    {id:"p11",field:"Psychology",title:"Bayesian models of cognitive control: a meta-analytic synthesis",authors:"M. J. Fernández",venue:"Psychological Bulletin",year:2024,ident:"doi:10.1037/bul0000431",source:"OpenAlex",delivered:"1w ago",oa:"pending",read:true,isNew:false,auth:["a6"]},
+    {id:"p12",field:"Physics",title:"Quantum error correction below the surface-code threshold",authors:"Y. Fujimoto, R. Haddad, L. Zhang",venue:"arXiv preprint",year:2025,ident:"arXiv:2412.13801",source:"arXiv",delivered:"2w ago",oa:"pdf",read:true,isNew:false,auth:["a10","a9"]},
+    {id:"p14",field:"Psychology",title:"Longitudinal trajectories of loneliness across the adult lifespan",authors:"P. Sørensen, K. Ramaswamy",venue:"Developmental Psychology",year:2024,ident:"doi:10.1037/dev0001702",source:"OpenAlex",delivered:"3w ago",oa:"none",read:true,isNew:false,auth:["a11","a1"]},
+  ]; }
+
+  authorsData(){ return [
+    {id:"a1",name:"Kavita Ramaswamy",field:"Psychology",conf:"high",works:112,lastSync:"2h ago",newN:2,initials:"KR"},
+    {id:"a2",name:"Sofia Andersson",field:"Physics",conf:"high",works:88,lastSync:"1h ago",newN:1,initials:"SA"},
+    {id:"a3",name:"Wei Chen",field:"Computing science",conf:"medium",works:64,lastSync:"5h ago",newN:1,initials:"WC"},
+    {id:"a4",name:"Ivan Kuznetsov",nonlatin:"И. Кузнецов",field:"Physics",conf:"high",works:143,lastSync:"1d ago",newN:1,initials:"IK"},
+    {id:"a5",name:"Hiroshi Nakamura",nonlatin:"中村 寛",field:"Computing science",conf:"high",works:59,lastSync:"6h ago",newN:1,initials:"HN"},
+    {id:"a6",name:"María José Fernández",field:"Psychology",conf:"high",works:97,lastSync:"1d ago",newN:0,initials:"MF"},
+    {id:"a7",name:"Daniel Okafor",field:"Computing science",conf:"medium",works:41,lastSync:"3d ago",newN:0,initials:"DO"},
+    {id:"a8",name:"Emma Lindqvist",field:"Psychology",conf:"high",works:73,lastSync:"2d ago",newN:0,initials:"EL"},
+    {id:"a9",name:"R. Haddad",field:"Physics",conf:"shell",works:null,lastSync:"never",newN:0,initials:"RH"},
+    {id:"a10",name:"Yuki Fujimoto",nonlatin:"藤本 由紀",field:"Physics",conf:"high",works:52,lastSync:"4d ago",newN:0,initials:"YF"},
+    {id:"a11",name:"Peter Sørensen",field:"Psychology",conf:"low",works:28,lastSync:"1w ago",newN:0,initials:"PS"},
+    {id:"a12",name:"Tomas Halvorsen",field:"Computing science",conf:"high",works:66,lastSync:"5d ago",newN:0,initials:"TH"},
+  ]; }
+
+  confMeta(c){ if(c==="high")return{label:"Confident",t:"hi",soft:"hi-soft",pct:"98%",title:"Confident match: identifiers and works line up across sources."}; if(c==="medium")return{label:"Likely",t:"mid",soft:"mid-soft",pct:"71%",title:"Likely match, but the name is shared. A quick look confirms it."}; if(c==="low")return{label:"Uncertain",t:"low",soft:"low-soft",pct:"48%",title:"Uncertain match. Please review before trusting."}; return{label:"Not identified",t:"faint",soft:"surface-2",pct:"—",title:"An author shell: we have a name but no database identity yet."}; }
+  confStyle(c){ const m=this.confMeta(c); const col=m.t==="faint"?"var(--ink-faint)":"var(--"+m.t+"-ink)"; const bd=this.state.colorblind?` border:1.5px ${m.t==="hi"?"solid":m.t==="mid"?"dashed":m.t==="low"?"dotted":"solid"} ${col};`:""; return `display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; padding:2px 9px; border-radius:20px; white-space:nowrap; background:var(--${m.soft}); color:${col};${bd}`; }
+  confDot(c){ const m=this.confMeta(c); const col=m.t==="faint"?"var(--ink-faint)":"var(--"+m.t+"-ink)"; return null; }
+
+  isRead(p){ const o=this.state.read[p.id]; return o===undefined?p.read:o; }
+  filtered(){ const f=this.state.filter; return this.allPubs().filter(p=>{ if(f==="unread")return !this.isRead(p); if(f==="new")return p.isNew; if(f==="favorite")return !!p.fav; if(f==="psych")return p.field==="Psychology"; if(f==="phys")return p.field==="Physics"; if(f==="cs")return p.field==="Computing science"; return true; }); }
+  oaChip(p){ if(p.oa==="pdf")return{icon:"oa",short:"OA",long:"open-access PDF",title:"A free, legal open-access copy is available",bg:"var(--hi-soft)",fg:"var(--hi-ink)"}; if(p.oa==="pending")return{icon:"pending",short:"checking",long:"checking Unpaywall",title:"Unpaywall is still resolving a free copy",bg:"var(--surface-2)",fg:"var(--ink-faint)"}; return{icon:"lock",short:"none",long:"no free PDF",title:"No legal open-access copy was found",bg:"var(--low-soft)",fg:"var(--low-ink)"}; }
+  oaStyleFn(p,compact){ const c=this.oaChip(p); const bd=this.state.colorblind?` border:1.5px ${p.oa==="pdf"?"solid":p.oa==="pending"?"dotted":"dashed"} ${c.fg};`:""; return `display:inline-flex; align-items:center; gap:4px; font-size:${compact?"10.5px":"11px"}; font-weight:600; padding:2px ${compact?"8px":"9px"}; border-radius:20px; white-space:nowrap; flex:none; background:${c.bg}; color:${c.fg};${bd}`; }
+  fieldShort(f){ return f==="Psychology"?"PSY":f==="Physics"?"PHY":"CS"; }
+  fieldColor(f,d){ if(f==="Psychology")return d?"oklch(0.78 0.1 300)":"oklch(0.55 0.11 300)"; if(f==="Physics")return d?"oklch(0.78 0.09 232)":"oklch(0.5 0.1 232)"; return d?"oklch(0.78 0.09 152)":"oklch(0.5 0.1 152)"; }
+  dot(read){ return read?`width:9px; height:9px; border-radius:50%; flex:none; background:transparent; border:1.5px solid var(--line-strong);`:`width:9px; height:9px; border-radius:50%; flex:none; background:var(--unread); box-shadow:0 0 0 3px var(--accent-soft);`; }
+  navStyle(a){ return `display:flex; align-items:center; gap:11px; width:100%; padding:9px 10px; border:none; border-radius:var(--r-sm); cursor:pointer; font-family:var(--font-sans); font-size:13.5px; font-weight:${a?600:500}; margin-bottom:2px; background:${a?"var(--accent-soft)":"transparent"}; color:${a?"var(--accent-ink)":"var(--ink-soft)"};`; }
+  badgePill(k){ if(k==="review")return "margin-left:auto; font-family:var(--font-mono); font-size:10px; font-weight:700; background:var(--mid-soft); color:var(--mid-ink); border-radius:9px; padding:1px 6px;"; return "margin-left:auto; font-family:var(--font-mono); font-size:10px; font-weight:700; background:var(--accent); color:var(--on-accent); border-radius:9px; padding:1px 6px;"; }
+
+  reviewItems(){ return [
+    {id:"rv1",type:"ambiguous",title:"Which “Wei Chen” do you follow?",prompt:"Three researchers publish computing-science work under this name. Pick the one whose work you recognise, or skip to decide later.",rejectLabel:"None of these",options:[
+      {key:"1",name:"Wei Chen",affil:"Tsinghua University",detail:"Machine-learning systems · 64 works · active 2018–2026",sample:"Sparse mixture routing under bandwidth constraints",ids:"OpenAlex A5100299831 · no ORCID",conf:"likely"},
+      {key:"2",name:"Wei Chen",affil:"Stanford University",detail:"Databases & query optimisation · 203 works · active 2004–2026",sample:"Adaptive indexing for hybrid transactional workloads",ids:"OpenAlex A5100411762 · ORCID 0000-0002-7781-3390",conf:"likely"},
+      {key:"3",name:"Wei Chen",affil:"Zhejiang University",detail:"Silicon photonics · 51 works · active 2012–2025",sample:"Low-loss micro-ring modulators for on-chip links",ids:"OpenAlex A5100522991 · no ORCID",conf:"maybe"},
+    ]},
+    {id:"rv2",type:"ambiguous",title:"Which “J. Park” do you follow?",prompt:"Two psychologists match this shortened name. Their fields differ; pick the right one.",rejectLabel:"None of these",options:[
+      {key:"1",name:"Jung-ho Park",affil:"Seoul National University",detail:"Sleep & memory · 47 works",sample:"Sleep spindle density and overnight memory consolidation",ids:"OpenAlex A5133220981 · ORCID 0000-0001-9982-1122",conf:"likely"},
+      {key:"2",name:"Jiyeon Park",affil:"KU Leuven",detail:"Developmental psychology · 22 works",sample:"Attachment stability in middle childhood",ids:"OpenAlex A5133887610",conf:"maybe"},
+    ]},
+    {id:"rv3",type:"ambiguous",title:"Confirm match for “L. Zhang”",prompt:"A likely match was found, but the name is very common. Confirm or reject.",rejectLabel:"Reject match",options:[
+      {key:"1",name:"Lei Zhang",affil:"Max Planck Institute for Solid State Research",detail:"Condensed-matter physics · 130 works",sample:"Nonreciprocal magnon transport in a chiral antiferromagnet",ids:"OpenAlex A5041992001 · ORCID 0000-0003-2210-9987",conf:"likely"},
+    ]},
+    {id:"rv4",type:"shell",title:"Identify author shell “R. Haddad”",prompt:"This author was imported as a name only, with no database identity. We found one strong candidate. Identify them, or leave as a shell.",rejectLabel:"Leave as shell",options:[
+      {key:"1",name:"Rami Haddad",affil:"EPFL",detail:"Quantum devices · 38 works · active 2015–2026",sample:"Tunable Josephson diode effect in twisted trilayer graphene",ids:"OpenAlex A5029019844 · ORCID 0000-0002-5561-7788",conf:"likely"},
+    ]},
+    {id:"rv5",type:"shell",title:"Identify author shell “A. Blomqvist”",prompt:"Imported as a name only. No confident candidate was found in psychology. You can search manually or leave as a shell.",rejectLabel:"Leave as shell",options:[
+      {key:"1",name:"Anna Blomqvist",affil:"Karolinska Institutet",detail:"Clinical psychology · 12 works · sparse record",sample:"Ego depletion revisited: a registered replication",ids:"OpenAlex A5150220118 · no ORCID",conf:"maybe"},
+    ]},
+    {id:"rv6",type:"dupAuthor",title:"Possible duplicate author",prompt:"These two followed authors may be the same person imported twice. Merge them into one identity, or keep them separate.",rejectLabel:"Keep separate",options:[
+      {key:"1",name:"Merge into “María José Fernández”",affil:"Universidad Autónoma de Madrid",detail:"97 works · ORCID 0000-0001-2298-5541. Absorbs the shell “M. J. Fernández” (0 works).",ids:"Recommended",conf:"likely"},
+    ]},
+    {id:"rv7",type:"dupPub",title:"Possible duplicate publication",prompt:"The same paper arrived from two sources with slightly different metadata. Keep one record, or keep both.",rejectLabel:"Keep both",options:[
+      {key:"1",name:"Merge to the OpenAlex record",affil:"",detail:"“Formal verification of Byzantine consensus…” · OpenAlex has DOI, venue (POPL) and OA link; the Crossref copy is missing the OA link.",ids:"doi:10.1145/3632851.3632910",conf:"likely"},
+    ]},
+  ]; }
+  decide(id,kind){ this.setState(s=>({ reviewDone:{...s.reviewDone,[id]:kind}, reviewHistory:[...s.reviewHistory,id], reviewIndex:0 })); }
+  undo(){ this.setState(s=>{ const h=[...s.reviewHistory]; const last=h.pop(); if(!last)return {}; const d={...s.reviewDone}; delete d[last]; return {reviewDone:d,reviewHistory:h,reviewIndex:0}; }); }
+
+  _toast(msg){ if(this._tt)clearTimeout(this._tt); this.setState({toast:{msg}}); this._tt=setTimeout(()=>this.setState({toast:null}),5000); }
+
+  renderVals(){
+    const S=this.state, dark=this.effectiveDark(), mob=this.isMobile();
+    const cb=S.colorblind;
+    const set=(screen)=>()=>this.setState({screen});
+    const openAuthor=(id)=>()=>this.setState({screen:"authorDetail",detailId:id});
+    const unread=this.allPubs().filter(p=>!this.isRead(p)).length;
+    const newCount=this.allPubs().filter(p=>p.isNew).length;
+    const reviewItemsAll=this.reviewItems();
+    const reviewRemaining=reviewItemsAll.filter(it=>!S.reviewDone[it.id]);
+    const reviewTotal=reviewItemsAll.length;
+    const reviewCount=reviewRemaining.length;
+    const shellCount=this.authorsData().filter(a=>a.conf==="shell").length;
+
+    const mkNav=(items)=>items.map(it=>({...it,style:this.navStyle(S.screen===it.key||(it.key==="authors"&&S.screen==="authorDetail")),go:set(it.key),badgeStyle:this.badgePill(it.key==="review"?"review":"accent")}));
+    const navMain=mkNav([{key:"dashboard",label:"Dashboard",icon:"dashboard",badge:null},{key:"publications",label:"Publications",icon:"publications",badge:unread},{key:"authors",label:"Authors",icon:"authors",badge:null},{key:"review",label:"Review queue",icon:"review",badge:reviewCount||null}]);
+    const adminNav=[{key:"sources",label:"Sources",icon:"sources",admin:true},{key:"activity",label:"Activity",icon:"activity",admin:true},{key:"settings",label:"Settings",icon:"settings",admin:false}].filter(i=>S.role==="admin"||!i.admin);
+    const navAdmin=mkNav(adminNav);
+    const themeOpts=[{k:"system",icon:"system",label:"Match system theme"},{k:"light",icon:"sun",label:"Light theme"},{k:"dark",icon:"moon",label:"Dark theme"}].map(o=>({icon:o.icon,label:o.label,go:()=>this.setState({theme:o.k}),style:`flex:1; padding:7px 0; border:1px solid ${S.theme===o.k?"var(--accent)":"var(--line)"}; background:${S.theme===o.k?"var(--accent-soft)":"transparent"}; color:${S.theme===o.k?"var(--accent-ink)":"var(--ink-soft)"}; border-radius:var(--r-sm); cursor:pointer; font-size:13px;`}));
+
+    const dashPubs=this.allPubs().filter(p=>p.isNew).slice(0,3).map(p=>{const r=this.isRead(p);const c=this.oaChip(p);return{...p,dotStyle:this.dot(r)+"margin-top:6px;",titleWeight:r?500:700,fieldShort:this.fieldShort(p.field),fieldStyle:`font-family:var(--font-mono); font-size:9.5px; font-weight:700; letter-spacing:.05em; color:${this.fieldColor(p.field,dark)}; flex:none;`,oaStyle:this.oaStyleFn(p,false),oaIcon:c.icon,oaLabel:c.long,oaTitle:c.title};});
+    const newByAuthor=[{id:"a1",short:"K. Ramaswamy",name:"Kavita Ramaswamy",field:"Psychology",n:2,initials:"KR"},{id:"a2",short:"S. Andersson",name:"Sofia Andersson",field:"Physics",n:1,initials:"SA"},{id:"a3",short:"W. Chen",name:"Wei Chen",field:"Computing science",n:1,initials:"WC"},{id:"a4",short:"И. Кузнецов",name:"Ivan Kuznetsov",field:"Physics",n:1,initials:"IK"},{id:"a5",short:"中村 寛",name:"Hiroshi Nakamura",field:"Computing science",n:1,initials:"HN"}].map(a=>({...a,open:openAuthor(a.id)}));
+    const freshPillStyle="display:inline-flex; align-items:center; gap:7px; flex:none; font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--ink-soft); background:var(--hi-soft); padding:5px 11px; border-radius:20px;";
+
+    const pubs=this.filtered().map(p=>{const r=this.isRead(p),canPdf=p.oa==="pdf",c=this.oaChip(p);return{...p,dotStyle:this.dot(r),readTitle:r?"Read":"Unread",readTip:r?"You have read this paper.":"Unread. You have not opened this yet.",titleWeight:r?500:700,fieldShort:this.fieldShort(p.field),fieldStyle:`font-family:var(--font-mono); font-size:9.5px; font-weight:700; letter-spacing:.05em; color:${this.fieldColor(p.field,dark)}; flex:none;`,oaStyle:this.oaStyleFn(p,true),oaIcon:c.icon,oaShort:c.short,oaTitle:c.title,openPdf:()=>{},pdfLabel:canPdf?"PDF":(p.oa==="pending"?"…":"—"),pdfTitle:c.title,pdfBtnStyle:canPdf?`padding:5px 10px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r-sm); font-size:11.5px; font-weight:600; cursor:pointer; flex:none;`:`padding:5px 10px; border:1px dashed var(--line-strong); background:transparent; color:var(--ink-faint); border-radius:var(--r-sm); font-size:11.5px; font-weight:600; cursor:not-allowed; flex:none;`,readIcon:r?"check":"circle",readAction:r?"Mark unread":"Mark read",readBtnStyle:`width:28px; height:28px; border:1px solid var(--line-strong); background:transparent; color:${r?"var(--hi)":"var(--ink-faint)"}; border-radius:var(--r-sm); font-size:13px; cursor:pointer; flex:none;`,toggleRead:()=>this.setState(st=>({read:{...st.read,[p.id]:!this.isRead(p)}}))};});
+    const counts={all:this.allPubs().length,unread,new:newCount,favorite:this.allPubs().filter(p=>p.fav).length,psych:this.allPubs().filter(p=>p.field==="Psychology").length,phys:this.allPubs().filter(p=>p.field==="Physics").length,cs:this.allPubs().filter(p=>p.field==="Computing science").length};
+    const chip=(active)=>`display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; white-space:nowrap; border:1px solid ${active?"var(--accent)":"var(--line)"}; background:${active?"var(--accent-soft)":"var(--surface)"}; color:${active?"var(--accent-ink)":"var(--ink-soft)"}; font-size:12.5px; font-weight:${active?600:500}; cursor:pointer;`;
+    const countChip=(active)=>`font-family:var(--font-mono); font-size:10px; font-weight:700; padding:0 5px; border-radius:8px; background:${active?"var(--accent)":"var(--surface-2)"}; color:${active?"var(--on-accent)":"var(--ink-faint)"};`;
+    const pubFilters=[{k:"all",label:"All"},{k:"unread",label:"Unread"},{k:"new",label:"New"},{k:"favorite",label:"Favorites"},{k:"psych",label:"Psychology"},{k:"phys",label:"Physics"},{k:"cs",label:"CS"}].map(f=>{const a=S.filter===f.k;return{label:f.label,count:counts[f.k],go:()=>this.setState({filter:f.k}),style:chip(a),countStyle:countChip(a)};});
+
+    // authors
+    const afCounts={all:12,confident:this.authorsData().filter(a=>a.conf==="high").length,needs:this.authorsData().filter(a=>a.conf==="medium"||a.conf==="low").length,shells:shellCount,new:this.authorsData().filter(a=>a.newN>0).length};
+    const authorFilters=[{k:"all",label:"All"},{k:"new",label:"With new work"},{k:"confident",label:"Confident"},{k:"needs",label:"Needs a look"},{k:"shells",label:"Shells"}].map(f=>{const a=S.authorFilter===f.k;return{label:f.label,count:afCounts[f.k],go:()=>this.setState({authorFilter:f.k}),style:chip(a),countStyle:countChip(a)};});
+    const afiltered=this.authorsData().filter(a=>{const f=S.authorFilter; if(f==="new")return a.newN>0; if(f==="confident")return a.conf==="high"; if(f==="needs")return a.conf==="medium"||a.conf==="low"; if(f==="shells")return a.conf==="shell"; return true;});
+    const authorRows=afiltered.map(a=>{const m=this.confMeta(a.conf);const sel=!!S.selected[a.id];return{...a,open:openAuthor(a.id),toggleSel:()=>this.setState(st=>({selected:{...st.selected,[a.id]:!st.selected[a.id]}})),checkStyle:`width:18px; height:18px; border-radius:5px; border:1.5px solid ${sel?"var(--accent)":"var(--line-strong)"}; background:${sel?"var(--accent)":"transparent"}; color:${sel?"var(--on-accent)":"transparent"}; font-size:11px; line-height:1; cursor:pointer; flex:none; display:grid; place-items:center;`,checkMark:"",confStyle:this.confStyle(a.conf),confLabel:m.label,confTitle:m.title,confDot:""};});
+    const selCount=Object.values(S.selected).filter(Boolean).length;
+
+    // author detail
+    const da=this.authorsData().find(a=>a.id===S.detailId)||this.authorsData()[0];
+    const dm=this.confMeta(da.conf);
+    const detailPubs=this.allPubs().filter(p=>(p.auth||[]).includes(da.id)).map(p=>{const r=this.isRead(p);const c=this.oaChip(p);return{...p,dotStyle:this.dot(r)+"margin-top:6px;",titleWeight:r?500:700,oaStyle:this.oaStyleFn(p,true),oaIcon:c.icon,oaShort:c.short,oaTitle:c.title};});
+    const detail={initials:da.initials,name:da.name,nonlatin:da.nonlatin||null,field:da.field,works:da.works!=null?da.works:"—",pubCount:detailPubs.length,pubs:(S.demo==="full"?detailPubs:[]),confStyle:this.confStyle(da.conf),confLabel:dm.label,confPct:dm.pct,confDot:"",
+      matched:da.conf==="shell"?[{name:"No database identity yet",id:"shell"}]:[{name:"OpenAlex",id:"A5023481929"},{name:"ORCID",id:"0000-0002-1825-0097"},{name:"Crossref",id:"author index"}],
+      sync:da.conf==="shell"?[{text:"Imported as a name-only shell",when:"3d ago",dotStyle:"width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--ink-faint);"}]:[{text:"2 new works delivered",when:"2h ago",dotStyle:"width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--hi);"},{text:"Metadata refreshed from OpenAlex",when:"2d ago",dotStyle:"width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--hi);"},{text:"Identity confirmed via ORCID",when:"2w ago",dotStyle:"width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background:var(--accent);"}]};
+
+    // review
+    const curItem=reviewRemaining[Math.min(S.reviewIndex,Math.max(reviewRemaining.length-1,0))]||null;
+    const typeMeta={ambiguous:{label:"Ambiguous match",t:"mid",soft:"mid-soft"},shell:{label:"Author shell",t:"faint",soft:"surface-2"},dupAuthor:{label:"Possible duplicate",t:"low",soft:"low-soft"},dupPub:{label:"Possible duplicate",t:"low",soft:"low-soft"}};
+    let review=null;
+    if(curItem){ const tm=typeMeta[curItem.type]; const tcol=tm.t==="faint"?"var(--ink-faint)":"var(--"+tm.t+"-ink)";
+      review={title:curItem.title,prompt:curItem.prompt,rejectLabel:curItem.rejectLabel,typeLabel:tm.label,typeStyle:`font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; background:var(--${tm.soft}); color:${tcol};`,
+        options:(curItem.options||[]).map(o=>{const cm=o.conf==="likely"?{s:"hi-soft",c:"var(--hi-ink)",l:"likely"}:{s:"mid-soft",c:"var(--mid-ink)",l:"maybe"};return{...o,choose:()=>this.decide(curItem.id,"choose"),style:`display:block; width:100%; text-align:left; padding:13px 15px; border:1px solid var(--line-strong); border-radius:var(--r-md); background:var(--surface); color:var(--ink); cursor:pointer;`,confStyle:`font-family:var(--font-mono); font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; white-space:nowrap; flex:none; background:var(--${cm.s}); color:${cm.c};${cb?" border:1.5px "+(cm.l==="likely"?"solid":"dashed")+" "+cm.c+";":""}`,conf:cm.l};}),
+        skip:()=>this.decide(curItem.id,"skip"),reject:()=>this.decide(curItem.id,"reject")};
+    }
+    const donePos=reviewTotal-reviewCount;
+    const reviewProgress=Math.round((donePos/reviewTotal)*100)+"%";
+
+    // add author
+    const cand=[
+      {key:"c1",name:"Wei Chen",initials:"WC",affil:"Tsinghua University",field:"Machine-learning systems",works:64,since:"2018",ids:"OpenAlex A5100299831 · no ORCID",conf:"Likely",confKey:"medium",samples:[{t:"Sparse mixture routing under bandwidth constraints",v:"NeurIPS 2025"},{t:"Differentially private federated averaging",v:"ICML 2025"}],primary:true},
+      {key:"c2",name:"Wei Chen",initials:"WC",affil:"Stanford University",field:"Databases & query optimisation",works:203,since:"2004",ids:"OpenAlex A5100411762 · ORCID 0000-0002-7781-3390",conf:"Likely",confKey:"medium",samples:[{t:"Adaptive indexing for hybrid transactional workloads",v:"SIGMOD 2024"}],primary:false},
+      {key:"c3",name:"Wei Chen",initials:"WC",affil:"Zhejiang University",field:"Silicon photonics",works:51,since:"2012",ids:"OpenAlex A5100522991 · no ORCID",conf:"Maybe",confKey:"low",samples:[{t:"Low-loss micro-ring modulators for on-chip links",v:"Optica 2023"}],primary:false}];
+    const addCandidates=cand.map(c=>{const done=S.addConfirmed===c.key;return{...c,confStyle:this.confStyle(c.confKey),confDot:"",borderColor:done?"var(--hi)":(c.primary?"var(--accent)":"var(--line)"),confirm:()=>this.setState({addConfirmed:c.key}),btnLabel:done?"Following ✓":"Follow",btnStyle:done?`padding:9px 16px; border-radius:var(--r-sm); border:1px solid var(--hi); background:var(--hi-soft); color:var(--hi); font-size:13px; font-weight:600; cursor:default; flex:none; align-self:flex-start;`:`padding:9px 16px; border-radius:var(--r-sm); border:1px solid var(--accent); background:${c.primary?"var(--accent)":"var(--surface)"}; color:${c.primary?"var(--on-accent)":"var(--accent-ink)"}; font-size:13px; font-weight:600; cursor:pointer; flex:none; align-self:flex-start;`};});
+    const addConfirmedName=S.addConfirmed?(cand.find(c=>c.key===S.addConfirmed)||{}).affil:"";
+
+    // bulk
+    const bstep=(active,done)=>`display:flex; align-items:center; gap:8px; flex:1; padding:9px 12px; border-radius:var(--r-sm); border:1px solid ${active?"var(--accent)":"var(--line)"}; background:${active?"var(--accent-soft)":"var(--surface)"}; color:${active?"var(--accent-ink)":(done?"var(--ink-soft)":"var(--ink-faint)")};`;
+    const phase=S.bulkPhase;
+    const bulkSteps=[{n:phase==="input"?"1":"✓",label:"Paste or upload"},{n:phase==="summary"?"✓":"2",label:"Match identities"},{n:"3",label:"Approve"}].map((s,i)=>({...s,style:bstep((i===0&&phase==="input")||(i===1&&phase==="matching")||(i===2&&phase==="summary"),(i===0&&phase!=="input")||(i===1&&phase==="summary"))}));
+    const bulkPreview=[{name:"Kavita Ramaswamy",initials:"KR",affil:"Univ. of Cambridge · Psychology",conf:"98%",confKey:"high"},{name:"Sofia Andersson",initials:"SA",affil:"Lund University · Physics",conf:"97%",confKey:"high"},{name:"中村 寛 (Hiroshi Nakamura)",initials:"HN",affil:"Kyoto University · CS",conf:"96%",confKey:"high"},{name:"María José Fernández",initials:"MF",affil:"UAM Madrid · Psychology",conf:"95%",confKey:"high"}].map(b=>({...b,confStyle:this.confStyle(b.confKey),confDot:""}));
+
+    // sources
+    const srcBadge=(t,soft)=>{const col=t==="faint"?"var(--ink-faint)":"var(--"+t+"-ink)"; const bd=cb?` border:1.5px ${t==="hi"?"solid":t==="mid"?"dashed":"dotted"} ${col};`:""; return `font-family:var(--font-mono); font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:20px; background:var(--${soft}); color:${col};${bd}`;};
+    const sources=[
+      {name:"OpenAlex",state:"healthy",stateLabel:"Healthy",last:"2h ago",t:"hi",soft:"hi-soft",provides:"The backbone. Author identities, works, venues and the links between them. Most publications you see arrive here first.",note:null},
+      {name:"arXiv",state:"healthy",stateLabel:"Healthy",last:"1h ago",t:"hi",soft:"hi-soft",provides:"Preprints in physics and computing science, often weeks before formal publication. Open-access PDFs come straight from arXiv.",note:null},
+      {name:"Crossref",state:"healthy",stateLabel:"Healthy",last:"5h ago",t:"hi",soft:"hi-soft",provides:"DOIs and formal publication records from journals and conferences. Fills in venue and citation details.",note:null},
+      {name:"Unpaywall",state:"cooling",stateLabel:"Cooling down",last:"3h ago",t:"mid",soft:"mid-soft",provides:"Finds free, legal open-access copies of paywalled papers. This is what powers the “open-access PDF” badge.",note:"We asked for too many lookups too quickly, so Unpaywall asked us to slow down. It will resume on its own around 14:20. Nothing is broken and no papers are lost — a few PDF links will just say “checking” until then."},
+      {name:"ORCID",state:"failing",stateLabel:"Not connected",last:"2 days ago",t:"low",soft:"low-soft",provides:"Confirms author identities using researchers’ own ORCID records. Improves match confidence, especially for common names.",note:"Sign-in was rejected (the credentials look out of date). Matching still works from the other sources, but confidence for shared names will be lower until this is reconnected in Settings."},
+    ].map(s=>({...s,borderColor:s.t==="hi"?"var(--line)":"var(--"+s.t+")",dotStyle:`width:10px; height:10px; border-radius:50%; flex:none; background:var(--${s.t}); ${s.t!=="hi"?"box-shadow:0 0 0 3px var(--"+s.soft+");":""}`,badgeStyle:srcBadge(s.t,s.soft),noteBg:"var(--"+s.soft+")",tip:(s.state==="healthy"?"Delivering normally. The time at right is the last successful delivery.":s.state==="cooling"?"Temporarily slowed at the source's request. It resumes on its own and nothing is lost.":"Not delivering. Sign-in or credentials failed; the other sources keep working.")}))
+      .map(s=>({...s,canReconnect:(s.state!=="healthy"),onReconnect:()=>this.setState({modal:{title:"Reconnect "+s.name+"?",body:"We will re-test the connection using the credentials saved in Settings. Matching keeps working from the other sources while this runs.",confirmLabel:"Reconnect",toast:s.name+" is reconnecting. Check Activity for the result."}})}));
+
+    // activity
+    const actBadge=(t,soft)=>{const col=t==="faint"?"var(--ink-faint)":"var(--"+t+"-ink)"; const bd=cb?` border:1.5px ${t==="hi"?"solid":t==="mid"?"dashed":"dotted"} ${col};`:""; return `font-family:var(--font-mono); font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; white-space:nowrap; flex:none; background:var(--${soft}); color:${col};${bd}`;};
+    const activity=[
+      {title:"Scheduled sync",detail:"OpenAlex · 1,204 profiles checked · 3 new works",outcome:"Success",when:"2h ago",t:"hi",soft:"hi-soft"},
+      {title:"Open-access lookup",detail:"Unpaywall paused. Rate limit reached, cooling down",outcome:"Paused",when:"3h ago",t:"mid",soft:"mid-soft"},
+      {title:"Scheduled sync",detail:"arXiv · 41 profiles checked · 2 new preprints",outcome:"Success",when:"1h ago",t:"hi",soft:"hi-soft"},
+      {title:"Identity refresh",detail:"ORCID · sign-in rejected (401). Matching continued without it",outcome:"Failed",when:"2d ago",t:"low",soft:"low-soft"},
+      {title:"Bulk import",detail:"247 authors · 198 followed · 49 sent to review",outcome:"Success",when:"2d ago",t:"hi",soft:"hi-soft"},
+      {title:"Scheduled sync",detail:"Crossref · 890 records checked · 5 updated",outcome:"Success",when:"3d ago",t:"hi",soft:"hi-soft"},
+      {title:"Manual re-sync",detail:"Triggered by admin · all sources",outcome:"Success",when:"4d ago",t:"hi",soft:"hi-soft"},
+      {title:"Scheduled sync",detail:"OpenAlex · no new works",outcome:"Success",when:"4d ago",t:"hi",soft:"hi-soft"},
+    ].map(r=>({...r,dotStyle:`width:9px; height:9px; border-radius:50%; flex:none; margin-top:4px; background:var(--${r.t});`,badgeStyle:actBadge(r.t,r.soft)}));
+
+    const users=[{name:"Herman Bakker",email:"h.bakker@example.org",role:"Reader",initials:"HB",rt:"accent"},{name:"Lucas Bakker",email:"lucas@example.org",role:"Admin",initials:"LB",rt:"hi"},{name:"Lab group (shared)",email:"lab@example.org",role:"Reader",initials:"LG",rt:"accent"}].map(u=>({...u,roleStyle:`font-family:var(--font-mono); font-size:10px; font-weight:700; padding:2px 9px; border-radius:20px; background:var(--${u.rt}-soft); color:var(--${u.rt}-ink, var(--${u.rt}));`,onRemove:()=>this.setState({modal:{title:"Remove "+u.name+"?",body:"This deletes their account and their personal followed list, read state and favourites. The shared publication pool is untouched.",confirmLabel:"Remove user",toast:u.name+" was removed."}})}));
+
+    const onbSteps=[{color:"var(--accent)"},{color:"var(--accent)"},{color:"var(--accent)"},{color:"var(--line)"}];
+
+    const demo=S.demo; const demoFull=demo==="full",demoLoading=demo==="loading",demoEmpty=demo==="empty";
+    const skel=[0,1,2,3,4,5,6];
+    const demoOpts=[{k:"full",label:"Populated"},{k:"loading",label:"Loading"},{k:"empty",label:"Empty"}].map(o=>({label:o.label,go:()=>this.setState({demo:o.k}),style:`padding:4px 10px; border:1px solid ${demo===o.k?"var(--accent)":"var(--line)"}; background:${demo===o.k?"var(--accent-soft)":"transparent"}; color:${demo===o.k?"var(--accent-ink)":"var(--ink-soft)"}; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; font-family:var(--font-sans);`}));
+    const pubsOut=demoFull?pubs:[]; const authorRowsOut=demoFull?authorRows:[]; const dashPubsOut=demoFull?dashPubs:[];
+
+    const mobileNav=mkNav([{key:"dashboard",label:"Home",icon:"dashboard",badge:null},{key:"publications",label:"Reading",icon:"publications",badge:unread},{key:"authors",label:"Authors",icon:"authors",badge:null},{key:"review",label:"Review",icon:"review",badge:reviewCount||null},{key:"settings",label:"More",icon:"settings",badge:null}]).map(m=>({...m,style:`flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 2px; border:none; background:transparent; cursor:pointer; color:${(S.screen===m.key||(m.key==="authors"&&S.screen==="authorDetail"))?"var(--accent-ink)":"var(--ink-faint)"}; font-family:var(--font-sans);`}));
+    const mobileTitles={dashboard:"Scholarr",publications:"Publications",authors:"Authors",authorDetail:"Author",review:"Review",add:"Add author",bulk:"Bulk import",sources:"Sources",activity:"Activity",settings:"Settings"};
+    const themeIcon=S.theme==="light"?"sun":S.theme==="dark"?"moon":"system";
+    const fullBleed=S.screen==="login"||S.screen==="onboarding"||S.screen==="notfound";
+
+    return {
+      themeAttr:S.theme==="system"?"":S.theme,
+      logoSrc:dark?"uploads/logo-dark-tight.png":"uploads/logo-light-tight.png",
+      isMobile:mob&&!fullBleed,
+      asideDisplay:(mob||fullBleed)?"none":"flex",
+      sidebarCols:(mob||fullBleed)?"1fr":(S.collapsed?"64px 1fr":"236px 1fr"),
+      mobileNavDisplay:(mob&&!fullBleed)?"flex":"none",
+      mainPadBottom:(mob&&!fullBleed)?"72px":"0",
+      pagePad:mob?"18px 16px 30px":"32px 30px 56px",
+      filterTop:mob?"56px":"0", filterWrap:mob?"nowrap":"wrap", searchFlex:mob?"1 1 100%":"0 1 auto",
+      detailCols:mob?"1fr":"1.5fr 1fr",
+      bulkGridCols:mob?"1fr":"1fr 1fr 1fr",
+      collapseIcon:S.collapsed?"chev-right":"chev-left",
+      toggleSidebar:()=>this.setState(st=>({collapsed:!st.collapsed})),
+      cycleTheme:()=>this.setState(st=>({theme:st.theme==="system"?"light":st.theme==="light"?"dark":"system"})),
+      themeIcon, navMain,navAdmin,themeOpts,
+      isDashboard:S.screen==="dashboard",isPubs:S.screen==="publications",isAuthors:S.screen==="authors",isAuthorDetail:S.screen==="authorDetail",isReview:S.screen==="review",isAdd:S.screen==="add",isBulk:S.screen==="bulk",isSources:S.screen==="sources",isActivity:S.screen==="activity",isSettings:S.screen==="settings",isLogin:S.screen==="login",isOnboarding:S.screen==="onboarding",
+      goDash:set("dashboard"),goPubs:set("publications"),goAuthors:set("authors"),goReview:set("review"),goSources:set("sources"),goActivity:set("activity"),goSettings:set("settings"),goAdd:set("add"),goBulk:set("bulk"),goLogin:set("login"),goOnboarding:set("onboarding"),goNotFound:set("notfound"),
+      loginPwForm:S.loginVariant!=="sso", loginFailed:S.loginVariant==="failed", loginSSO:S.loginVariant==="sso",
+      loginVariantOpts:[{k:"standard",label:"Standard"},{k:"sso",label:"SSO only"},{k:"failed",label:"Failed sign-in"}].map(o=>({label:o.label,go:()=>this.setState({loginVariant:o.k}),style:`padding:4px 10px; border:1px solid ${S.loginVariant===o.k?"var(--accent)":"var(--line)"}; background:${S.loginVariant===o.k?"var(--accent-soft)":"transparent"}; color:${S.loginVariant===o.k?"var(--accent-ink)":"var(--ink-soft)"}; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; font-family:var(--font-sans);`})),isNotFound:S.screen==="notfound",noop:()=>{},
+      modalOpen:!!S.modal, modalTitle:(S.modal||{}).title, modalBody:(S.modal||{}).body, modalConfirmLabel:(S.modal||{}).confirmLabel, closeModal:()=>this.setState({modal:null}), confirmModal:()=>{const m=S.modal; this.setState({modal:null}); if(m)this._toast(m.toast||"Done.");},
+      toastOpen:!!S.toast, toastMsg:(S.toast||{}).msg, toastUndo:()=>{ if(this._tt)clearTimeout(this._tt); this.setState({toast:null}); },
+      profileView:S.profileState==="view", profileForm:S.profileState!=="view", profileError:S.profileState==="error", profileSaved:S.profileState==="saved", profileSaveLabel:(S.profileState==="saving"?"Saving…":"Save changes"), emailBorder:(S.profileState==="error"?"var(--low)":"var(--line-strong)"), emailVal:(S.profileState==="error"?"h.bakker@example":"h.bakker@example.org"),
+      profileEdit:()=>this.setState({profileState:"editing"}), profileCancel:()=>this.setState({profileState:"view"}), profileSave:()=>{ this.setState({profileState:"saving"}); if(this._ps)clearTimeout(this._ps); this._ps=setTimeout(()=>{ this.setState({profileState:"saved"}); this._toast("Profile saved."); },900); },
+      profileOpts:[{k:"view",label:"View"},{k:"editing",label:"Editing"},{k:"error",label:"Error"},{k:"saving",label:"Saving"},{k:"saved",label:"Saved"}].map(o=>({label:o.label,go:()=>this.setState({profileState:o.k}),style:`padding:3px 9px; border:1px solid ${S.profileState===o.k?"var(--accent)":"var(--line)"}; background:${S.profileState===o.k?"var(--accent-soft)":"transparent"}; color:${S.profileState===o.k?"var(--accent-ink)":"var(--ink-soft)"}; border-radius:20px; font-size:10.5px; font-weight:600; cursor:pointer; font-family:var(--font-sans);`})),
+      lastVisit:"Sun 19 Jul, 20:41",lastChecked:"2 hours ago",
+      newCount,newAuthorCount:5,followCount:247,unreadCount:unread,
+      dashPubs:dashPubsOut,newByAuthor,freshPillStyle,
+      demoOpts,demoFull,demoLoading,demoEmpty,skel,
+      pubs:pubsOut,pubFilters,pubLibraryTotal:"1,284 papers",pubFreshness:"OpenAlex 2h ago · arXiv 1h ago",
+      shellCount,reviewCount,
+      authorFilters,authorRows:authorRowsOut,hasSelection:selCount>0,selCount,clearSel:()=>this.setState({selected:{}}),bulkResync:()=>this.setState({selected:{}}),bulkReview:()=>this.setState({selected:{},screen:"review"}),
+      detail,
+      reviewEmpty:reviewCount===0,reviewActive:reviewCount>0,review,reviewPos:Math.min(donePos+1,reviewTotal),reviewTotal,reviewProgress,reviewUndo:()=>this.undo(),undoStyle:`padding:5px 11px; border:1px solid var(--line-strong); background:var(--surface); color:${S.reviewHistory.length?"var(--ink)":"var(--ink-faint)"}; border-radius:var(--r-sm); font-size:12px; font-weight:600; cursor:${S.reviewHistory.length?"pointer":"default"};`,resetReview:()=>this.setState({reviewDone:{},reviewHistory:[],reviewIndex:0}),
+      addCandidates:(S.addView==="empty"?[]:addCandidates), addConfirmed:!!S.addConfirmed,addConfirmedName,
+      addView:S.addView, addCooling:S.addView==="cooling", addEmpty:S.addView==="empty", addHasResults:S.addView!=="empty", addQuery:(S.addView==="empty"?"Wai Chern":"Wei Chen"), addCountLabel:(S.addView==="empty"?"no matches":"3 candidates"),
+      addViewOpts:[{k:"candidates",label:"Candidates"},{k:"empty",label:"No results"},{k:"cooling",label:"Source cooling"}].map(o=>({label:o.label,go:()=>this.setState({addView:o.k}),style:`padding:4px 10px; border:1px solid ${S.addView===o.k?"var(--accent)":"var(--line)"}; background:${S.addView===o.k?"var(--accent-soft)":"transparent"}; color:${S.addView===o.k?"var(--accent-ink)":"var(--ink-soft)"}; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; font-family:var(--font-sans);`})),
+      bulkSteps,bulkInput:phase==="input",bulkMatching:phase==="matching",bulkSummary:phase==="summary",bulkPreview,bulkAccepted:S.bulkAccepted,
+      bulkStartMatch:()=>this.setState({bulkPhase:"matching"}),bulkShowSummary:()=>this.setState({bulkPhase:"summary"}),bulkAccept:()=>this.setState({bulkAccepted:true}),
+      sources:demoFull?sources:[],activity,users,onbSteps,
+      mobileNav,mobileTitle:mobileTitles[S.screen]||"Scholarr",
+      colorblind:S.colorblind, cbLabel:S.colorblind?"On":"Off",
+      cbSideStyle:`display:flex; align-items:center; gap:9px; width:100%; padding:8px 10px; border:1px solid ${S.colorblind?"var(--accent)":"var(--line)"}; background:${S.colorblind?"var(--accent-soft)":"transparent"}; color:${S.colorblind?"var(--accent-ink)":"var(--ink-soft)"}; border-radius:var(--r-sm); font-family:var(--font-sans); font-size:12.5px; font-weight:600; cursor:pointer;`,
+      toggleCb:()=>this.setState(s=>{const v=!s.colorblind; try{localStorage.setItem("scholarr-cb",v?"1":"0");}catch(e){} return {colorblind:v};}),
+      role:S.role, isAdmin:S.role==="admin", isReader:S.role==="reader",
+      roleReaderStyle:`flex:1; padding:6px 0; border:1px solid ${S.role==="reader"?"var(--accent)":"var(--line)"}; background:${S.role==="reader"?"var(--accent-soft)":"transparent"}; color:${S.role==="reader"?"var(--accent-ink)":"var(--ink-soft)"}; border-radius:var(--r-sm); cursor:pointer; font-size:11.5px; font-weight:600;`,
+      roleAdminStyle:`flex:1; padding:6px 0; border:1px solid ${S.role==="admin"?"var(--accent)":"var(--line)"}; background:${S.role==="admin"?"var(--accent-soft)":"transparent"}; color:${S.role==="admin"?"var(--accent-ink)":"var(--ink-soft)"}; border-radius:var(--r-sm); cursor:pointer; font-size:11.5px; font-weight:600;`,
+      setReader:()=>this.setState({role:"reader",screen:(this.state.screen==="sources"||this.state.screen==="activity")?"dashboard":this.state.screen}), setAdmin:()=>this.setState({role:"admin"}),
+      legendOpen:S.legendOpen, toggleLegend:()=>this.setState(s=>({legendOpen:!s.legendOpen})), legendCaretRot:S.legendOpen?"90deg":"0deg", legendCols:mob?"1fr":"1fr 1fr",
+      cbTrackStyle:`width:38px; height:22px; border-radius:20px; padding:2px; display:inline-flex; align-items:center; background:${S.colorblind?"var(--accent)":"var(--line-strong)"}; cursor:pointer; border:none;`,
+      cbKnobStyle:`width:18px; height:18px; border-radius:50%; background:var(--on-accent); transform:translateX(${S.colorblind?"16px":"0"});`,
+    };
+  }
+}
+</script>
+</body>
+</html>

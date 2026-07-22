@@ -1,0 +1,106 @@
+/* ============================================================
+   Scholarr — design tokens  (FROZEN CONTRACT)
+   Single source of truth for color, type, space, radius,
+   elevation, and motion. Light is default; dark applies by OS
+   preference OR an explicit [data-theme="dark"] on a root
+   element. [data-theme="light"] forces light under a dark OS.
+
+   Colors authored in oklch; sRGB hex beside each is the
+   reference/fallback. See DESIGN.md §3 for the full contrast
+   proof table. Text colors are chosen so every pairing used
+   for text meets WCAG AA in both themes.
+   ============================================================ */
+
+:root {
+  /* Type ---------------------------------------------------- */
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --font-sans:  system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:  ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+
+  /* Type scale (px) ---------------------------------------- */
+  --fs-display: 27px; --fs-title: 17px; --fs-body: 14px;
+  --fs-sm: 12.5px; --fs-xs: 11px; --fs-micro: 10px;
+  --lh-tight: 1.25; --lh-body: 1.45;
+
+  /* Space scale (px) --------------------------------------- */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+
+  /* Radius ------------------------------------------------- */
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-pill: 20px;
+
+  /* Elevation ---------------------------------------------- */
+  --sh-1: 0 1px 2px oklch(0.26 0.02 62 / 0.06), 0 2px 8px oklch(0.26 0.02 62 / 0.05);
+  --sh-2: 0 2px 6px oklch(0.26 0.02 62 / 0.08), 0 12px 32px oklch(0.26 0.02 62 / 0.09);
+
+  /* Motion (see DESIGN.md §Motion). Frozen at 0 by reduced-motion below. */
+  --dur-fast: 120ms; --dur-base: 180ms; --dur-slow: 260ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Breakpoint reference (custom props can't drive @media; documented here
+     and mirrored in DESIGN.md §Responsive): phone < 760px, wide >= 760px. */
+
+  /* Surfaces & ink (warm paper/ink) ------------------------ */
+  --paper:       oklch(0.986 0.006 85);  /* #fcfaf6 */
+  --surface:     oklch(0.998 0.003 85);  /* #fffefc */
+  --surface-2:   oklch(0.965 0.008 84);  /* #f6f3ee */
+  --ink:         oklch(0.26 0.014 62);   /* #29231d */
+  --ink-soft:    oklch(0.46 0.012 62);   /* #5d5751 */
+  --ink-faint:   oklch(0.53 0.011 64);   /* #76706b  (AA on surface) */
+  --line:        oklch(0.9 0.007 72);    /* #e1ddd9 */
+  --line-strong: oklch(0.83 0.009 72);   /* #cbc6c1 */
+
+  /* Accent (scholarly ink-blue) ---------------------------- */
+  --accent:      oklch(0.5 0.1 248);     /* #2e6799 */
+  --accent-soft: oklch(0.94 0.03 248);   /* #dceeff */
+  --accent-ink:  oklch(0.42 0.11 248);   /* #055085  accent text on paper/soft */
+  --unread:      oklch(0.5 0.1 248);     /* #2e6799 */
+  --on-accent:   oklch(0.99 0 0);        /* #fcfcfc  text ON solid fills */
+
+  /* Semantic — confidence AND source health share one scale.
+     -soft = background, -ink = AA-safe text on that -soft.       */
+  --hi:       oklch(0.6 0.1 150);   /* #519160  healthy / confident   */
+  --hi-soft:  oklch(0.94 0.04 150); /* #d9f3dd */
+  --hi-ink:   oklch(0.44 0.11 150); /* #15632f */
+  --mid:      oklch(0.66 0.12 74);  /* #bd8630  cooling / likely      */
+  --mid-soft: oklch(0.94 0.05 82);  /* #fce9c6 */
+  --mid-ink:  oklch(0.45 0.09 74);  /* #734c0c */
+  --low:      oklch(0.56 0.16 26);  /* #c0453f  failing / uncertain   */
+  --low-soft: oklch(0.94 0.05 30);  /* #ffe0d8 */
+  --low-ink:  oklch(0.47 0.17 26);  /* #a51e21 */
+}
+
+/* Dark tokens (shared by OS-preference and explicit opt-in) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: oklch(0.205 0.004 255); --surface: oklch(0.247 0.005 255); --surface-2: oklch(0.295 0.006 255);
+    --ink: oklch(0.94 0.004 255); --ink-soft: oklch(0.76 0.005 255); --ink-faint: oklch(0.68 0.006 255);
+    --line: oklch(0.335 0.006 255); --line-strong: oklch(0.44 0.008 255);
+    --accent: oklch(0.72 0.11 248); --accent-soft: oklch(0.33 0.06 255); --accent-ink: oklch(0.83 0.09 248);
+    --unread: oklch(0.74 0.11 248); --on-accent: oklch(0.17 0.02 255);
+    --hi: oklch(0.74 0.12 152); --hi-soft: oklch(0.33 0.05 165); --hi-ink: oklch(0.85 0.11 152);
+    --mid: oklch(0.78 0.12 82); --mid-soft: oklch(0.35 0.05 85); --mid-ink: oklch(0.86 0.11 85);
+    --low: oklch(0.72 0.15 28); --low-soft: oklch(0.35 0.06 30); --low-ink: oklch(0.84 0.13 28);
+    --sh-1: 0 1px 2px oklch(0 0 0 / 0.3), 0 2px 8px oklch(0 0 0 / 0.28);
+    --sh-2: 0 2px 8px oklch(0 0 0 / 0.4), 0 16px 40px oklch(0 0 0 / 0.4);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: oklch(0.205 0.004 255); --surface: oklch(0.247 0.005 255); --surface-2: oklch(0.295 0.006 255);
+  --ink: oklch(0.94 0.004 255); --ink-soft: oklch(0.76 0.005 255); --ink-faint: oklch(0.68 0.006 255);
+  --line: oklch(0.335 0.006 255); --line-strong: oklch(0.44 0.008 255);
+  --accent: oklch(0.72 0.11 248); --accent-soft: oklch(0.33 0.06 255); --accent-ink: oklch(0.83 0.09 248);
+  --unread: oklch(0.74 0.11 248); --on-accent: oklch(0.17 0.02 255);
+  --hi: oklch(0.74 0.12 152); --hi-soft: oklch(0.33 0.05 165); --hi-ink: oklch(0.85 0.11 152);
+  --mid: oklch(0.78 0.12 82); --mid-soft: oklch(0.35 0.05 85); --mid-ink: oklch(0.86 0.11 85);
+  --low: oklch(0.72 0.15 28); --low-soft: oklch(0.35 0.06 30); --low-ink: oklch(0.84 0.13 28);
+  --sh-1: 0 1px 2px oklch(0 0 0 / 0.3), 0 2px 8px oklch(0 0 0 / 0.28);
+  --sh-2: 0 2px 8px oklch(0 0 0 / 0.4), 0 16px 40px oklch(0 0 0 / 0.4);
+}
+
+/* Global accessibility defaults ---------------------------- */
+*:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}

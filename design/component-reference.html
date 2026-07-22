@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Scholarr — Component Reference</title>
+<link rel="icon" href="assets/favicon.png"/>
+<link rel="stylesheet" href="tokens.css"/>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font-sans);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 24px 80px}
+  .ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-0.13em}
+  h1{font-family:var(--font-serif);font-size:32px;font-weight:700;letter-spacing:-.02em;margin:0 0 4px}
+  h2{font-family:var(--font-serif);font-size:20px;font-weight:700;margin:44px 0 4px;padding-top:22px;border-top:1px solid var(--line)}
+  h2:first-of-type{border-top:none;padding-top:0}
+  .sub{color:var(--ink-soft);font-size:13px;margin:0 0 18px}
+  .lead{color:var(--ink-soft);font-size:14px;margin:0 0 26px;max-width:640px;line-height:1.5}
+  .mono{font-family:var(--font-mono)}
+  .grid{display:grid;gap:14px}
+  .row-wrap{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .cell{border:1px solid var(--line);border-radius:var(--r-md);padding:16px;background:var(--surface)}
+  .cap{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px}
+  /* buttons */
+  .btn{font-family:var(--font-sans);font-size:13.5px;font-weight:600;border-radius:var(--r-sm);padding:9px 15px;cursor:pointer;border:1px solid transparent;transition:background var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn-primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  .btn-primary:hover{filter:brightness(1.06)}
+  .btn-primary:active{filter:brightness(.94)}
+  .btn-secondary{background:var(--surface);color:var(--ink);border-color:var(--line-strong)}
+  .btn-secondary:hover{background:var(--surface-2)}
+  .btn-ghost{background:transparent;color:var(--ink-soft);border-color:transparent}
+  .btn-ghost:hover{background:var(--surface-2)}
+  .btn-danger{background:var(--low);color:var(--on-accent);border-color:var(--low)}
+  .btn-danger:hover{filter:brightness(1.06)}
+  .btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
+  /* fields */
+  .field{font-size:14px;border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:9px 12px;background:var(--surface);color:var(--ink);width:100%;font-family:inherit}
+  .field:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-color:var(--accent)}
+  .field.err{border-color:var(--low)}
+  .lbl{font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:5px}
+  .err-txt{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--low-ink);margin-top:5px}
+  .req{color:var(--low-ink)}
+  /* switch */
+  .sw{width:38px;height:22px;border-radius:20px;padding:2px;display:inline-flex;align-items:center;background:var(--line-strong);border:none;cursor:pointer}
+  .sw[aria-checked=true]{background:var(--accent)}
+  .sw i{width:18px;height:18px;border-radius:50%;background:var(--on-accent);transition:transform var(--dur-base) var(--ease-out)}
+  .sw[aria-checked=true] i{transform:translateX(16px)}
+  /* chips */
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);font-size:12.5px;font-weight:500;cursor:pointer}
+  .chip.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+  /* badges */
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap}
+  .b-hi{background:var(--hi-soft);color:var(--hi-ink)} .b-mid{background:var(--mid-soft);color:var(--mid-ink)}
+  .b-low{background:var(--low-soft);color:var(--low-ink)} .b-faint{background:var(--surface-2);color:var(--ink-faint)}
+  .b-accent{background:var(--accent-soft);color:var(--accent-ink)}
+  body.cb .b-hi{border:1.5px solid var(--hi-ink)} body.cb .b-mid{border:1.5px dashed var(--mid-ink)}
+  body.cb .b-low{border:1.5px dotted var(--low-ink)} body.cb .b-faint{border:1.5px solid var(--ink-faint)}
+  /* misc */
+  .swatch{height:52px;border-radius:8px;border:1px solid var(--line)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1);overflow:hidden}
+  .skel{background:linear-gradient(90deg,var(--surface-2) 25%,var(--line) 37%,var(--surface-2) 63%);background-size:200% 100%;animation:sh 1.4s ease-in-out infinite;border-radius:6px}
+  @keyframes sh{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  .toast{display:inline-flex;align-items:center;gap:16px;background:var(--ink);color:var(--paper);padding:11px 14px 11px 16px;border-radius:var(--r-md);box-shadow:var(--sh-2);font-size:13px}
+  .toast button{border:none;background:transparent;color:var(--paper);font-weight:700;text-decoration:underline;cursor:pointer;font-size:13px}
+  .toolbar{position:sticky;top:0;z-index:10;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--paper);border-bottom:1px solid var(--line);padding:14px 0;margin-bottom:26px}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+    <symbol id="ic-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="8" rx="1.5"/><rect x="14" y="15" width="7" height="6" rx="1.5"/></symbol>
+    <symbol id="ic-publications" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></symbol>
+    <symbol id="ic-authors" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17.5" cy="9.5" r="2.3"/><path d="M16 15c2.4.2 4 2.1 4 5"/></symbol>
+    <symbol id="ic-review" viewBox="0 0 24 24"><path d="M12 3v18"/><line x1="6" y1="7" x2="18" y2="7"/><path d="M6 7l-3 6.5h6z"/><path d="M18 7l-3 6.5h6z"/><line x1="8" y1="21" x2="16" y2="21"/></symbol>
+    <symbol id="ic-sources" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v13c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-13"/><path d="M5 12c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8"/></symbol>
+    <symbol id="ic-activity" viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></symbol>
+    <symbol id="ic-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></symbol>
+    <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></symbol>
+    <symbol id="ic-check" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5 10-11"/></symbol>
+    <symbol id="ic-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
+    <symbol id="ic-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="ic-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="ic-external" viewBox="0 0 24 24"><path d="M14 4h6v6"/><line x1="20" y1="4" x2="10.5" y2="13.5"/><path d="M18 13.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5.5"/></symbol>
+    <symbol id="ic-chev-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="ic-chev-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="ic-arrow-left" viewBox="0 0 24 24"><line x1="20" y1="12" x2="5" y2="12"/><path d="M11 6l-6 6 6 6"/></symbol>
+    <symbol id="ic-undo" viewBox="0 0 24 24"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12h-1.5"/></symbol>
+    <symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></symbol>
+    <symbol id="ic-moon" viewBox="0 0 24 24"><path d="M20 13.5A8 8 0 1 1 10.5 4a6.3 6.3 0 0 0 9.5 9.5z"/></symbol>
+    <symbol id="ic-system" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/></symbol>
+    <symbol id="ic-signout" viewBox="0 0 24 24"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><line x1="19" y1="12" x2="9" y2="12"/><path d="M16 9l3 3-3 3"/></symbol>
+    <symbol id="ic-warning" viewBox="0 0 24 24"><path d="M12 3.5l9 16.5H3z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="ic-x" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></symbol>
+    <symbol id="ic-oa" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 7.3-2.3"/></symbol>
+    <symbol id="ic-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></symbol>
+    <symbol id="ic-pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="2.6 3"/></symbol>
+    <symbol id="ic-book" viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5C4.7 20 4 20.5 4 21.3z"/><path d="M20 5.5C20 4.7 19.3 4 18.5 4H13v16h5.5c.8 0 1.5.5 1.5 1.3z"/></symbol>
+    <symbol id="ic-upload" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 15v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"/></symbol>
+    <symbol id="ic-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs></svg>
+<div class="wrap">
+  <div class="toolbar">
+    <strong style="font-family:var(--font-serif);font-size:16px;flex:1">Scholarr · Component Reference</strong>
+    <span class="cap" style="margin:0">Theme</span>
+    <button class="chip" onclick="setTheme('light')">Light</button>
+    <button class="chip" onclick="setTheme('dark')">Dark</button>
+    <button class="chip" onclick="setTheme('')">System</button>
+    <button class="chip" id="cbBtn" onclick="toggleCb()"><svg class="ic" aria-hidden="true"><use href="#ic-eye"></use></svg> Colour-blind</button>
+  </div>
+  <h1>Component Reference</h1>
+  <p class="lead">Every component and its states, built entirely from <span class="mono">tokens.css</span>. Toggle Light/Dark and Colour-blind above to verify each in context. This page uses only CSS custom properties and a few vanilla-JS toggles; the production Vue app maps each block to the component named in DESIGN.md.</p>
+
+  <h2>Colour tokens</h2>
+  <p class="sub">Switch theme to see both palettes. Text tokens meet WCAG AA on their paired surfaces (see DESIGN.md §3).</p>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">
+    <div><div class="swatch" style="background:var(--paper)"></div><div class="mono" style="font-size:11px;margin-top:6px">--paper</div></div><div><div class="swatch" style="background:var(--surface)"></div><div class="mono" style="font-size:11px;margin-top:6px">--surface</div></div><div><div class="swatch" style="background:var(--surface-2)"></div><div class="mono" style="font-size:11px;margin-top:6px">--surface-2</div></div><div><div class="swatch" style="background:var(--ink)"></div><div class="mono" style="font-size:11px;margin-top:6px">--ink</div></div><div><div class="swatch" style="background:var(--ink-soft)"></div><div class="mono" style="font-size:11px;margin-top:6px">--ink-soft</div></div><div><div class="swatch" style="background:var(--ink-faint)"></div><div class="mono" style="font-size:11px;margin-top:6px">--ink-faint</div></div><div><div class="swatch" style="background:var(--line)"></div><div class="mono" style="font-size:11px;margin-top:6px">--line</div></div><div><div class="swatch" style="background:var(--line-strong)"></div><div class="mono" style="font-size:11px;margin-top:6px">--line-strong</div></div><div><div class="swatch" style="background:var(--accent)"></div><div class="mono" style="font-size:11px;margin-top:6px">--accent</div></div><div><div class="swatch" style="background:var(--accent-soft)"></div><div class="mono" style="font-size:11px;margin-top:6px">--accent-soft</div></div><div><div class="swatch" style="background:var(--accent-ink)"></div><div class="mono" style="font-size:11px;margin-top:6px">--accent-ink</div></div><div><div class="swatch" style="background:var(--hi)"></div><div class="mono" style="font-size:11px;margin-top:6px">--hi</div></div><div><div class="swatch" style="background:var(--hi-soft)"></div><div class="mono" style="font-size:11px;margin-top:6px">--hi-soft</div></div><div><div class="swatch" style="background:var(--hi-ink)"></div><div class="mono" style="font-size:11px;margin-top:6px">--hi-ink</div></div><div><div class="swatch" style="background:var(--mid)"></div><div class="mono" style="font-size:11px;margin-top:6px">--mid</div></div><div><div class="swatch" style="background:var(--mid-soft)"></div><div class="mono" style="font-size:11px;margin-top:6px">--mid-soft</div></div><div><div class="swatch" style="background:var(--mid-ink)"></div><div class="mono" style="font-size:11px;margin-top:6px">--mid-ink</div></div><div><div class="swatch" style="background:var(--low)"></div><div class="mono" style="font-size:11px;margin-top:6px">--low</div></div><div><div class="swatch" style="background:var(--low-soft)"></div><div class="mono" style="font-size:11px;margin-top:6px">--low-soft</div></div><div><div class="swatch" style="background:var(--low-ink)"></div><div class="mono" style="font-size:11px;margin-top:6px">--low-ink</div></div>
+  </div>
+
+  <h2>Typography</h2>
+  <div class="cell grid">
+    <div style="font-family:var(--font-serif);font-size:30px;font-weight:700;letter-spacing:-.02em">Display · serif 700</div>
+    <div style="font-family:var(--font-serif);font-size:17px;font-weight:700">Section title · serif 700</div>
+    <div style="font-size:14px">Body · sans 400. The retired academic reads here every day.</div>
+    <div style="font-size:12.5px;color:var(--ink-soft)">Secondary / meta · sans, ink-soft</div>
+    <div class="mono" style="font-size:11px;color:var(--ink-faint)">doi:10.1177/09567976251234567 · mono, ink-faint</div>
+  </div>
+
+  <h2>Buttons</h2>
+  <div class="cell"><div class="cap">Variants · default / hover / focus / active / disabled (hover & focus are live)</div>
+    <div class="row-wrap">
+      <button class="btn btn-primary">Primary</button>
+      <button class="btn btn-secondary">Secondary</button>
+      <button class="btn btn-ghost">Ghost</button>
+      <button class="btn btn-danger">Destructive</button>
+      <button class="btn btn-primary" disabled>Disabled</button>
+      <button class="btn btn-secondary" style="border-style:dashed;color:var(--ink-faint)">No free PDF</button>
+    </div>
+  </div>
+
+  <h2>Inputs & controls</h2>
+  <div class="cell grid" style="grid-template-columns:1fr 1fr;gap:18px">
+    <div><label class="lbl">Display name <span class="req">*</span></label><input class="field" value="Herman Bakker"/></div>
+    <div><label class="lbl">Email <span class="req">*</span></label><input class="field err" value="h.bakker@example"/><span class="err-txt"><svg class="ic" aria-hidden="true"><use href="#ic-warning"></use></svg> Enter a valid email address.</span></div>
+    <div><label class="lbl">Sync schedule</label><select class="field"><option>Every 6 hours</option><option>Daily</option></select></div>
+    <div><label class="lbl">Toggle (switch)</label><div class="row-wrap"><button class="sw" aria-checked="false" onclick="this.setAttribute('aria-checked', this.getAttribute('aria-checked')==='true'?'false':'true')"><i></i></button><span style="font-size:13px;color:var(--ink-soft)">Colour-blind badges</span></div></div>
+    <div><label class="lbl">Checkbox</label><div class="row-wrap"><input type="checkbox" checked/> Select row</div></div>
+    <div><label class="lbl">Radio</label><div class="row-wrap"><label><input type="radio" name="r" checked/> Candidate A</label><label><input type="radio" name="r"/> Candidate B</label></div></div>
+  </div>
+
+  <h2>Badges — the two status vocabularies</h2>
+  <p class="sub">Confidence and source health share one colour scale. Toggle Colour-blind to add outline patterns (solid / dashed / dotted).</p>
+  <div class="cell grid" style="gap:16px">
+    <div><div class="cap">Matching confidence</div><div class="row-wrap"><span class="badge b-hi">Confident</span><span class="badge b-mid">Likely</span><span class="badge b-low">Uncertain</span><span class="badge b-faint">Not yet identified</span></div></div>
+    <div><div class="cap">Source health</div><div class="row-wrap"><span class="badge b-hi">Healthy</span><span class="badge b-mid">Cooling down</span><span class="badge b-low">Not connected</span></div></div>
+    <div><div class="cap">Open access</div><div class="row-wrap"><span class="badge b-hi"><svg class="ic" aria-hidden="true"><use href="#ic-oa"></use></svg> OA</span><span class="badge b-faint"><svg class="ic" aria-hidden="true"><use href="#ic-pending"></use></svg> checking</span><span class="badge b-low"><svg class="ic" aria-hidden="true"><use href="#ic-lock"></use></svg> none</span></div></div>
+    <div><div class="cap">Role</div><div class="row-wrap"><span class="badge b-accent">Reader</span><span class="badge b-hi">Admin</span></div></div>
+  </div>
+
+  <h2>Filter chips / tabs</h2>
+  <div class="cell row-wrap"><span class="chip active">All <span class="mono" style="font-size:10px">14</span></span><span class="chip">Unread <span class="mono" style="font-size:10px">3</span></span><span class="chip">New</span><span class="chip">Favorites</span><span class="chip">Psychology</span></div>
+
+  <h2>List row — publication</h2>
+  <div class="card">
+    <div style="display:flex;gap:11px;padding:12px;align-items:center;border-bottom:1px solid var(--line)">
+      <span style="width:9px;height:9px;border-radius:50%;background:var(--unread);box-shadow:0 0 0 3px var(--accent-soft);flex:none"></span>
+      <div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:baseline"><span class="mono" style="font-size:9.5px;font-weight:700;color:oklch(.55 .11 300)">PSY</span><span style="font-family:var(--font-serif);font-size:15px;font-weight:700">Reappraisal flexibility predicts affective recovery</span></div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:3px">K. Ramaswamy · <em>Psychological Science</em> · 2026 · <span class="mono" style="color:var(--ink-faint)">doi:10.1177/09567976251234567</span></div></div>
+      <span class="badge b-hi"><svg class="ic" aria-hidden="true"><use href="#ic-oa"></use></svg> OA</span><button class="btn btn-primary" style="padding:5px 10px;font-size:11.5px">PDF</button>
+    </div>
+    <div style="display:flex;gap:11px;padding:12px;align-items:center;opacity:.66">
+      <span style="width:9px;height:9px;border-radius:50%;background:transparent;border:1.5px solid var(--line-strong);flex:none"></span>
+      <div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:baseline"><span class="mono" style="font-size:9.5px;font-weight:700;color:oklch(.5 .1 232)">PHY</span><span style="font-family:var(--font-serif);font-size:15px;font-weight:500">Nonreciprocal magnon transport (read)</span></div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:3px">S. Andersson · <em>Phys. Rev. Lett.</em> · 2026</div></div>
+      <span class="badge b-low"><svg class="ic" aria-hidden="true"><use href="#ic-lock"></use></svg> none</span>
+    </div>
+  </div>
+
+  <h2>Card / panel</h2>
+  <div class="card" style="max-width:420px"><div style="padding:13px 16px;border-bottom:1px solid var(--line);font-family:var(--font-serif);font-weight:700">Where data comes from</div><div style="padding:13px 16px;display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:50%;background:var(--mid);box-shadow:0 0 0 3px var(--mid-soft)"></span><span style="font-weight:600;font-size:13px;flex:1">Unpaywall</span><span class="badge b-mid">Cooling down</span></div></div>
+
+  <h2>Skeleton (loading)</h2>
+  <div class="card" style="padding:14px 12px"><div style="display:flex;gap:11px;align-items:center;margin-bottom:14px"><span class="skel" style="width:9px;height:9px;border-radius:50%"></span><div style="flex:1"><div class="skel" style="height:13px;width:62%"></div><div class="skel" style="height:10px;width:40%;margin-top:8px"></div></div></div><div style="display:flex;gap:11px;align-items:center"><span class="skel" style="width:9px;height:9px;border-radius:50%"></span><div style="flex:1"><div class="skel" style="height:13px;width:52%"></div><div class="skel" style="height:10px;width:34%;margin-top:8px"></div></div></div></div>
+
+  <h2>Empty state</h2>
+  <div class="card" style="text-align:center;padding:44px 20px"><div style="color:var(--ink-faint)"><svg class="ic" style="width:32px;height:32px" aria-hidden="true"><use href="#ic-book"></use></svg></div><div style="font-family:var(--font-serif);font-size:19px;font-weight:700;margin:10px 0 6px">Nothing to read yet</div><p style="font-size:13px;color:var(--ink-soft);margin:0 auto 14px;max-width:340px">When the researchers you follow publish, their work appears here.</p><button class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#ic-plus"></use></svg> Add authors</button></div>
+
+  <h2>Toast + undo</h2>
+  <div class="row-wrap"><span class="toast">Lucas Bakker was removed. <button>Undo</button></span></div>
+  <p class="sub">Auto-dismiss after 5s. Carries an Undo for every consequential change. One toast at a time; new ones replace the old.</p>
+
+  <h2>Modal — destructive confirmation</h2>
+  <div class="card" style="max-width:420px"><div style="padding:18px 20px 4px;font-family:var(--font-serif);font-size:19px;font-weight:700">Remove Lucas Bakker?</div><div style="padding:6px 20px 16px;font-size:13.5px;color:var(--ink-soft);line-height:1.5">This deletes their account and personal followed list. The shared publication pool is untouched.</div><div style="padding:12px 20px;border-top:1px solid var(--line);background:var(--surface-2);display:flex;justify-content:flex-end;gap:10px"><button class="btn btn-secondary">Cancel</button><button class="btn btn-danger">Remove user</button></div></div>
+
+  <h2>Pagination</h2>
+  <div class="row-wrap"><button class="btn btn-secondary" style="padding:6px 10px"><svg class="ic" aria-hidden="true"><use href="#ic-chev-left"></use></svg></button><span class="chip active">1</span><span class="chip">2</span><span class="chip">3</span><span style="color:var(--ink-faint)">…</span><span class="chip">25</span><button class="btn btn-secondary" style="padding:6px 10px"><svg class="ic" aria-hidden="true"><use href="#ic-chev-right"></use></svg></button><span style="font-size:12px;color:var(--ink-faint);margin-left:8px">Showing 1–12 of 247</span></div>
+
+  <h2>Mobile tab bar</h2>
+  <div class="card" style="max-width:380px"><div style="display:flex;justify-content:space-around;padding:6px 4px"><span style="display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--accent-ink)"><span style="font-size:19px"><svg class="ic" aria-hidden="true"><use href="#ic-dashboard"></use></svg></span><span style="font-size:10px;font-weight:600">Home</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink-faint)"><span style="font-size:19px"><svg class="ic" aria-hidden="true"><use href="#ic-publications"></use></svg></span><span style="font-size:10px;font-weight:600">Reading</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink-faint)"><span style="font-size:19px"><svg class="ic" aria-hidden="true"><use href="#ic-authors"></use></svg></span><span style="font-size:10px;font-weight:600">Authors</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink-faint)"><span style="font-size:19px"><svg class="ic" aria-hidden="true"><use href="#ic-review"></use></svg></span><span style="font-size:10px;font-weight:600">Review</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink-faint)"><span style="font-size:19px"><svg class="ic" aria-hidden="true"><use href="#ic-settings"></use></svg></span><span style="font-size:10px;font-weight:600">More</span></span></div></div>
+
+  <h2>Icon set</h2>
+  <div class="cell row-wrap" style="gap:18px">
+    <span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-dashboard"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">dashboard</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-publications"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">publications</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-authors"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">authors</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-review"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">review</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-sources"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">sources</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-activity"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">activity</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-settings"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">settings</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-search"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">search</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-check"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">check</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-circle"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">circle</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-dot"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">dot</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-plus"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">plus</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-external"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">external</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-chev-left"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">chev-left</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-chev-right"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">chev-right</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-arrow-left"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">arrow-left</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-undo"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">undo</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-sun"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">sun</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-moon"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">moon</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-system"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">system</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-signout"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">signout</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-warning"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">warning</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-x"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">x</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-oa"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">oa</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-lock"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">lock</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-pending"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">pending</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-book"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">book</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-upload"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">upload</span></span><span style="display:flex;flex-direction:column;align-items:center;gap:6px;width:64px"><span style="font-size:22px"><svg class="ic" aria-hidden="true"><use href="#ic-eye"></use></svg></span><span class="mono" style="font-size:9.5px;color:var(--ink-faint)">eye</span></span>
+  </div>
+
+  <h2>404</h2>
+  <div class="card" style="text-align:center;padding:40px 20px"><div style="font-family:var(--font-serif);font-size:54px;font-weight:700;color:var(--accent-ink);line-height:1">404</div><div style="font-family:var(--font-serif);font-size:20px;font-weight:700;margin:10px 0 6px">That page is not on the shelf</div><p style="font-size:13px;color:var(--ink-soft);margin:0 auto 14px;max-width:360px">It may have been merged, removed, or never existed. Nothing is broken.</p><button class="btn btn-primary">Back to dashboard</button></div>
+</div>
+<script>
+  function setTheme(t){ if(t) document.documentElement.setAttribute('data-theme',t); else document.documentElement.removeAttribute('data-theme'); }
+  function toggleCb(){ document.body.classList.toggle('cb'); document.getElementById('cbBtn').classList.toggle('active'); }
+</script>
+</body>
+</html>

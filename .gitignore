@@ -1,0 +1,36 @@
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local.yaml
+*.local.yml
+
+# Go
+/bin/
+/dist/
+coverage.out
+*.test
+
+# Vue and Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Runtime data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+/data/
+/backups/
+
+# Temporary files
+*.log
+*.tmp
+.cache/
