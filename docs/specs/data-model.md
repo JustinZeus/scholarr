@@ -1,6 +1,6 @@
 # Scholarr data model
 
-**Status:** DRAFT FOR OWNER REVIEW, 2026-07-22. This spec is review-ready and is not frozen.
+**Status:** DRAFT FOR OWNER REVIEW, 2026-07-23. This spec is review-ready and is not frozen.
 No implementation is authorized by this document.
 
 This is Card 1 in [`TASKS.md`](../../TASKS.md). It defines the persistent domain model for

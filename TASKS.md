@@ -15,7 +15,7 @@ primary remote.
 (copy), both point at this clean history, no legacy history is present, and no secret or work
 identity appears anywhere.
 
-## Card 1: freeze the data model spec  **REVIEW-READY 2026-07-22, NOT FROZEN**
+## Card 1: freeze the data model spec  **REVIEW-READY 2026-07-23, NOT FROZEN**
 
 **Goal:** specify global author/publication identity, per-user follows/read state, review records,
 and merge/undo behavior.
