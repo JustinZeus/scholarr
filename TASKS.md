@@ -15,7 +15,7 @@ primary remote.
 (copy), both point at this clean history, no legacy history is present, and no secret or work
 identity appears anywhere.
 
-## Card 1: freeze the data model spec
+## Card 1: freeze the data model spec  **REVIEW-READY 2026-07-22, NOT FROZEN**
 
 **Goal:** specify global author/publication identity, per-user follows/read state, review records,
 and merge/undo behavior.
@@ -26,6 +26,11 @@ global `FollowedAuthor` plus `AuthorSourceIdentity` direction.
 **Acceptance:** `docs/specs/data-model.md` is owner-reviewed and marked frozen; constraints,
 migrations, duplicate prevention, audit/undo behavior, and every remaining open question are
 explicit.
+
+**Draft result:** [`docs/specs/data-model.md`](docs/specs/data-model.md) is complete for owner and
+independent review. It records fixed decisions, proposes a concrete SQLite model, and isolates five
+owner decisions. Acceptance remains open until the owner reviews those decisions and explicitly
+marks the spec frozen. Do not begin implementation.
 
 ## Card 2: freeze provider contracts and health
 
