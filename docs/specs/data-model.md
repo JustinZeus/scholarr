@@ -155,6 +155,7 @@ This is the single per-user state row for a global publication.
 | `id`, `public_id` | Stable library item identity. |
 | `user_id`, `publication_id` | Required and globally unique as a pair. |
 | `first_seen_at` | Earliest time any follow path delivered this publication to the user. |
+| `first_discovery_kind` | Discovery kind of the earliest origin; does not change when later paths arrive. |
 | `read_at` | Null means unread; non-null means read. |
 | `favorited_at` | Retains legacy favorite state. No v1 UI is implied by this column. |
 | `created_at`, `updated_at`, `row_version` | Shared storage conventions. |
@@ -168,6 +169,7 @@ This table preserves why a user can see a publication and makes unfollow, merge,
 
 | Column | Contract |
 |---|---|
+| `id`, `public_id` | Stable origin identity. |
 | `user_publication_id` | Required parent library item. |
 | `follow_id` | The user's follow that supplied the path. |
 | `author_publication_id` | The canonical authorship path. |
@@ -187,8 +189,9 @@ restore prior state without reconstructing history.
 - a refollow restores that state;
 - `favorited_at` is migrated and retained even though the frozen v1 UI has no favorite control;
 - a legacy publication is read if any legacy link for that user says read;
-- `NEW` is derived only from an `incremental_sync` origin and a configurable age window. Baseline,
-  manual, and legacy imports never appear as new.
+- `NEW` is derived only when `first_discovery_kind = 'incremental_sync'` and `first_seen_at` is in a
+  configurable age window. A later incremental path cannot make an already-known publication new.
+  Baseline, manual, and legacy imports never appear as new.
 
 ## Global author identity
 
@@ -212,6 +215,8 @@ Constraints and application invariants:
 
 - `merged_into_author_id` is null exactly when `status = 'active'`.
 - An author cannot merge into itself, and merge chains must be acyclic.
+- A later merge retargets every existing alias to the final active winner in the same transaction,
+  so stored aliases remain flat rather than forming chains.
 - Reads resolve a merged ID to its active target, but APIs preserve the old public ID as a stable
   alias so imported links and audit records do not break.
 - A shell is a valid active author. It may contain only an inert Scholar import identity and no
@@ -253,11 +258,13 @@ Provider labels, aliases, and transliterations are preserved without gaining ide
 
 | Column | Contract |
 |---|---|
+| `id`, `public_id` | Stable label identity. |
 | `author_id` | Required canonical author. |
 | `name`, `normalized_name` | Display/search forms. Neither is unique. |
 | `kind` | `preferred`, `alias`, or `transliteration`. |
 | `locale` | Optional BCP 47 language tag. |
 | `source_identity_id` | Optional provenance pointer. |
+| `status` | `active` or `retired`. |
 | `created_at` | Immutable creation time. |
 
 At most one active preferred name exists per author. Changing the preferred name does not change
@@ -319,7 +326,7 @@ non-secret dump fingerprint and legacy row ID so repeated dry runs remain idempo
 |---|---|
 | `id`, `public_id` | Stable identifier row. |
 | `publication_id` | Current canonical publication. |
-| `kind` | Initially `doi`, `arxiv`, `openalex`, `pmid`, `pmcid`, or `other`. |
+| `kind` | Registered identifier namespace, initially `doi`, `arxiv`, `openalex`, `pmid`, or `pmcid`. |
 | `value_raw`, `value_normalized` | Display and equality forms. |
 | `normalization_version` | Parser version. |
 | `first_source_record_id` | Provenance for the first accepted assertion. |
@@ -335,12 +342,13 @@ the same transaction or stop for review. It may not insert a duplicate.
 
 `author_publications` is the canonical many-to-many relationship. Its pair
 `(author_id, publication_id)` is unique for all lifecycle states. It carries `status` (`active` or
-`retired`), `first_observed_at`, `last_observed_at`, and the shared audit fields.
+`retired`), stable internal and public IDs, `first_observed_at`, `last_observed_at`, and the shared
+audit fields.
 
 `author_publication_evidence` records why the relationship exists. It references one
 `author_publication`, an optional `author_source_identity`, and one `publication_source_record`.
-The tuple of those three references is unique. Removing or correcting one provider assertion does
-not erase other evidence for the same authorship link.
+It has stable internal and public IDs. The tuple of those three references is unique. Removing or
+correcting one provider assertion does not erase other evidence for the same authorship link.
 
 ## Duplicate prevention and merge rules
 
@@ -371,6 +379,7 @@ not erase other evidence for the same authorship link.
 6. A merge reassigns source records, identifiers, authorship links, library rows, and origins in
    one transaction. Duplicate links are coalesced without losing the per-user read/favorite state
    or provenance. The losing publication remains as `merged` with a stable alias.
+7. A later merge retargets all earlier aliases to the final active winner in the same transaction.
 
 The legacy Scholar cluster ID may be retained as `legacy_import` evidence, but it is not a new
 root identifier and never outranks a sanctioned provider identifier.
@@ -405,13 +414,15 @@ There is at most one non-superseded row per `dedupe_key`. A repeated failure upd
 
 ### `review_candidates` and `review_decisions`
 
-`review_candidates` stores the stable candidate order, referenced existing author or source
-identity, and a versioned evidence summary used by the UI. It never creates an identity attachment
-before the user decides.
+`review_candidates` has stable internal and public IDs and stores the stable candidate order. A
+candidate may reference an existing author or identity, or carry a proposed source plus normalized
+external ID that does not become an `author_source_identities` row until acceptance. A versioned
+evidence summary supplies the UI. No candidate creates an identity attachment before the user
+decides.
 
-`review_decisions` is append-only. It records the item, action, actor, selected candidate or target,
-evidence version, operation ID, creation time, and optional `undone_at`. A later decision never
-overwrites an earlier one.
+`review_decisions` has stable internal and public IDs and is append-only. It records the item,
+action, actor, selected candidate or target, evidence version, operation ID, creation time, and
+optional `undone_at`. A later decision never overwrites an earlier one.
 
 ### Negative identity evidence
 
@@ -567,6 +578,8 @@ tests exist:
 13. Each schema migration passes up, down, foreign-key, integrity, and interrupted-upgrade tests.
 14. Property tests prove normalization idempotence, merge outcome independence from argument order,
     and stable public-ID alias resolution.
+15. Merging an earlier winner into a third entity flattens every author or publication alias to the
+    final active winner; undo restores the prior flat mapping.
 
 ## Owner decisions
 
