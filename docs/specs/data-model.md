@@ -1,7 +1,8 @@
 # Scholarr data model
 
 **Status:** DRAFT FOR OWNER REVIEW, 2026-07-23. This spec is review-ready and is not frozen.
-No implementation is authorized by this document.
+No implementation is authorized by this document. This revision (2026-07-23) incorporates the
+Card 1 architecture review round; owner decisions are now D1 through D7.
 
 This is Card 1 in [`TASKS.md`](../../TASKS.md). It defines the persistent domain model for
 global author and publication identity, per-user follows and reading state, review records,
@@ -52,8 +53,13 @@ but they may not weaken the invariants here without reopening Card 1.
 
 These conventions apply to every table in this spec unless a table says otherwise.
 
-- Internal joins use `INTEGER PRIMARY KEY` row IDs. API and audit references use a separate,
-  immutable UUIDv7 `public_id TEXT NOT NULL UNIQUE`. Internal row IDs never appear in public APIs,
+- Internal joins use `INTEGER PRIMARY KEY` row IDs. Rows referenced by public APIs or resolved as
+  aliases across merges carry a separate, immutable UUIDv7 `public_id TEXT NOT NULL UNIQUE`. Pure
+  display and evidence child rows do not carry their own public_id and are referenced through
+  their parent: `author_names`, `author_publication_evidence`, `review_candidates`,
+  `operation_changes` themselves, `confirmed_different_author_pairs`, and
+  `rejected_author_identity_links`. All other tables keep a public_id because merges and undo
+  touch them. Internal row IDs never appear in public APIs,
   exports, URLs, or logs intended for users.
 - Timestamps are UTC Unix milliseconds in `INTEGER` columns. A timestamp column ending in `_at`
   is nullable only when absence has domain meaning.
@@ -61,8 +67,20 @@ These conventions apply to every table in this spec unless a table says otherwis
 - Mutable rows carry `row_version INTEGER NOT NULL DEFAULT 1`. Every successful update increments
   it. Undo conflict checks use this version.
 - Status and kind values use lower-case text with explicit `CHECK` constraints when the set is
-  closed. Provider/source names stay registry-validated text so adding a sanctioned provider does
-  not require rebuilding unrelated tables.
+  closed. Closed-set status CHECKs are used only where the value set is not expected to grow
+  within Card 1's lifetime; growth-prone sets are registry-validated in application code.
+  Provider/source names stay registry-validated text so adding a sanctioned provider does not
+  require rebuilding unrelated tables.
+- Each stated invariant is labeled as enforced by a table `CHECK` or by application code. Any
+  CHECK-encoded invariant requires a guarded table rebuild (create-copy-verify-swap) to change,
+  because SQLite cannot alter or drop a constraint in place. The null-pairing invariants on
+  `followed_authors`, `publications`, and `user_author_follows` are CHECK-enforced, for example
+  `CHECK ((status = 'active' AND merged_into_author_id IS NULL) OR (status = 'merged' AND merged_into_author_id IS NOT NULL))`.
+- Uniqueness that applies only to rows in a given lifecycle state is enforced with a SQLite partial
+  unique index, never application code, for example
+  `CREATE UNIQUE INDEX idx_author_preferred ON author_names(author_id) WHERE kind = 'preferred' AND status = 'active';`
+  and
+  `CREATE UNIQUE INDEX idx_review_open_dedupe ON review_items(dedupe_key) WHERE status <> 'superseded';`.
 - Flexible evidence and audit snapshots use versioned JSON objects stored as UTF-8 text and
   guarded by `json_valid`. Core identifiers, ownership, status, and timestamps never live only in
   JSON.
@@ -71,9 +89,43 @@ These conventions apply to every table in this spec unless a table says otherwis
   deletion policy permits hard deletion. Actor references use `ON DELETE SET NULL`.
 - Every normalization algorithm stores a `normalization_version`. A later algorithm version may
   add new normalized values, but may not silently reinterpret old uniqueness constraints.
+- The minimum supported SQLite is 3.38: JSON1 is compiled in by default, `RETURNING` has been
+  available since 3.35, UPSERT since 3.24, and partial indexes since 3.8. The migration runner
+  asserts `json_valid` and the required functions at startup and refuses to run on a build lacking
+  them. Idempotent reattach, evidence re-observation, and refollow use
+  `INSERT ... ON CONFLICT(<unique cols>) DO UPDATE ... RETURNING id`, with conflict targets
+  matching the declared UNIQUE constraints exactly.
+- All `confidence_score` columns are nullable `REAL` bounded 0 through 1, internal evidence only,
+  never rendered as a raw user-facing percentage.
 
-**OPEN D1:** approve this internal integer plus public UUIDv7 scheme, or select a different public
-identifier strategy before freeze.
+**OPEN D1:** approve this scoped scheme (public_id only on rows referenced externally or aliased
+across merges; internal integer keys elsewhere), or select a different public identifier strategy
+before freeze.
+
+## Connection and concurrency contract
+
+Every connection opens with `PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON` (set immediately
+after open, before any statement, including by the migration runner), `PRAGMA busy_timeout=5000`,
+and `PRAGMA synchronous=NORMAL`. Exactly one writer exists: all writes funnel through a single
+serialized writer, either one write connection or a process-level write mutex. Merge and undo
+transactions may hold the writer for their full duration; because only one writer exists,
+all-or-nothing holds without relying on `SQLITE_BUSY` retry. Readers use WAL snapshot reads and
+retry transient `SQLITE_BUSY` under `busy_timeout`.
+
+## Index plan
+
+UNIQUE constraints already create their own indexes and are not re-indexed. The non-unique
+secondary indexes required by the query patterns are: `canonical_title_hash` on `publications`;
+`user_id` on `user_publications`; `user_publication_id`, `follow_id`, and `author_publication_id`
+on `user_publication_origins`; each foreign key on `author_publication_evidence`;
+`merged_into_author_id` on `followed_authors`; `merged_into_publication_id` on `publications`;
+`author_id` on `author_source_identities`, `author_names`, and `author_publications`; and
+`publication_id` on `author_publications`, `publication_source_records`, and
+`publication_identifiers`.
+
+Expected v1 scale is low tens of thousands of publications and links, comfortably within SQLite's
+range; growth is dominated by per-provider source and evidence rows, bounded by the sanctioned
+provider count.
 
 ## Relationship map
 
@@ -128,6 +180,9 @@ follows, reading state, review decisions, and operations.
 Login email, username, password hash, OIDC subject, and trusted-header claims belong to the auth
 spec and are not columns on this domain row by implication.
 
+`pending_deletion` is inert in Card 1; no Card 1 workflow sets it. It exists for the future
+privacy deletion flow.
+
 ### `user_author_follows`
 
 One row represents the complete lifecycle of one user's relationship to one canonical author.
@@ -146,6 +201,13 @@ One row represents the complete lifecycle of one user's relationship to one cano
 An exact refollow reactivates this row. It never creates a second active follow. Unfollowing one
 user does not alter the global author, another user's follow, or shared publication metadata.
 
+When an author merge would give one user two follows of the surviving author, the follow with the
+earlier `first_followed_at` survives as active (tie broken by lowest public_id); the other
+transitions to `status = 'merged'` with `superseded_by_follow_id` set to the survivor and
+`ended_at` set. Its origins re-parent to the surviving follow. The survivor's `active_since` and
+`first_followed_at` are unchanged. Undo reverses this exactly: the merged follow returns to its
+prior status and its origins re-parent back.
+
 ### `user_publications`
 
 This is the single per-user state row for a global publication.
@@ -158,10 +220,20 @@ This is the single per-user state row for a global publication.
 | `first_discovery_kind` | Discovery kind of the earliest origin; does not change when later paths arrive. |
 | `read_at` | Null means unread; non-null means read. |
 | `favorited_at` | Retains legacy favorite state. No v1 UI is implied by this column. |
+| `status` | `active` or `coalesced`. |
+| `coalesced_into_user_publication_id` | Required exactly when `coalesced`; references the surviving row. |
 | `created_at`, `updated_at`, `row_version` | Shared storage conventions. |
 
 There is no author ID in this table. Marking a publication read through one author marks the same
 publication read everywhere for that user, while another user's state remains unchanged.
+
+Publication merge coalesce rule: the surviving row is the one on the winning publication. `read_at`
+takes the earliest non-null value, `favorited_at` the earliest non-null value, `first_seen_at` the
+minimum, and `first_discovery_kind` the kind of the globally earliest origin across both rows. The
+losing row is never deleted: it becomes `coalesced` with its original values frozen, and its
+origins re-parent to the survivor. Undo restores the losing row to active with its original ID and
+values, re-parents its origins back, and reverts the survivor's coalesced fields from the recorded
+before snapshot.
 
 ### `user_publication_origins`
 
@@ -175,6 +247,8 @@ This table preserves why a user can see a publication and makes unfollow, merge,
 | `author_publication_id` | The canonical authorship path. |
 | `discovery_kind` | `baseline`, `incremental_sync`, `manual_import`, or `legacy_import`. |
 | `first_seen_at` | When this path first delivered the publication. |
+| `status` | `active` or `superseded`. |
+| `superseded_by_origin_id` | Set only for `superseded`; references the surviving origin. |
 | `created_at` | Immutable creation time. |
 
 The triple `(user_publication_id, follow_id, author_publication_id)` is unique. A library item is
@@ -182,16 +256,33 @@ visible while at least one origin resolves through an active follow and active a
 The row and reading state are retained when the final path becomes inactive, so refollow and undo
 restore prior state without reconstructing history.
 
-**OPEN D2:** approve the user-library semantics as one decision:
+Any merge that retargets an origin's `user_publication_id`, `follow_id`, or
+`author_publication_id` onto a triple already occupied retires the redundant origin in place
+(`superseded`, pointer to the survivor), and never deletes it. The surviving origin keeps the earliest `first_seen_at`, and `first_discovery_kind` on
+the parent library row is taken from the globally earliest origin, so a merge can never make an
+already-known publication NEW.
 
-- unfollow hides publications that have no remaining active follow path but preserves their read
-  and favorite state;
-- a refollow restores that state;
-- `favorited_at` is migrated and retained even though the frozen v1 UI has no favorite control;
-- a legacy publication is read if any legacy link for that user says read;
-- `NEW` is derived only when `first_discovery_kind = 'incremental_sync'` and `first_seen_at` is in a
-  configurable age window. A later incremental path cannot make an already-known publication new.
-  Baseline, manual, and legacy imports never appear as new.
+NEW is a read-time projection, never stored. It is true exactly when
+`first_discovery_kind = 'incremental_sync'` and now minus `first_seen_at` is at most `new_window`,
+a single service-wide configuration value owned by the config spec, with a PROPOSED default of 14
+days. It is not per-user and not persisted.
+
+The user-library semantics split into four independently answerable sub-decisions:
+
+**OPEN D2a:** unfollow hides publications that have no remaining active follow path but preserves
+their read and favorite state; a refollow restores that state.
+
+**OPEN D2b:** `favorited_at` is migrated and retained even though the frozen v1 UI has no favorite
+control. This is a consciously carried dead column.
+
+**OPEN D2c:** a legacy publication is read if any legacy link for that user says read. This is a
+deliberately lossy collapse; the rationale is that unread-that-should-be-read is the worse error
+for a watchlist.
+
+**OPEN D2d:** the NEW rule above: NEW is a read-time projection, true exactly when
+`first_discovery_kind = 'incremental_sync'` and now minus `first_seen_at` is at most the
+service-wide `new_window` (PROPOSED default 14 days). A later incremental path cannot make an
+already-known publication new. Baseline, manual, and legacy imports never appear as new.
 
 ## Global author identity
 
@@ -213,14 +304,20 @@ restore prior state without reconstructing history.
 
 Constraints and application invariants:
 
-- `merged_into_author_id` is null exactly when `status = 'active'`.
-- An author cannot merge into itself, and merge chains must be acyclic.
+- `merged_into_author_id` is null exactly when `status = 'active'` (CHECK-enforced).
+- `confidence_band = 'shell'` exactly when `resolution_state = 'shell'` (CHECK-enforced).
+- An author cannot merge into itself, and merge chains must be acyclic (application code).
 - A later merge retargets every existing alias to the final active winner in the same transaction,
   so stored aliases remain flat rather than forming chains.
 - Reads resolve a merged ID to its active target, but APIs preserve the old public ID as a stable
   alias so imported links and audit records do not break.
 - A shell is a valid active author. It may contain only an inert Scholar import identity and no
   name or works.
+
+On merge, all child rows (`author_source_identities`, `author_names`, `author_publications`,
+`user_author_follows`) are re-pointed to the winning author's internal id in the same transaction;
+the merged row retains only its public-ID alias mapping for external resolution. Integrity checks
+evaluate canonical-author agreement on the re-pointed rows, not through alias resolution.
 
 ### `author_source_identities`
 
@@ -242,7 +339,11 @@ Constraints and application invariants:
 | `created_at`, `updated_at`, `row_version` | Shared storage conventions. |
 
 `(source, external_id_normalized)` is globally unique, including detached rows. Reattaching an
-existing identity updates its author and audit history; it never creates a duplicate identity.
+existing identity updates its author and audit history; it never creates a duplicate identity. When
+the matched existing row is `detached`, ingest reattaches it to a canonical author only if no
+`rejected_author_identity_links` tombstone at or above the current evidence version forbids that
+pairing; otherwise the observation raises or updates the governing review item and the identity
+stays detached. Detached identities are never silently reattached to their prior author.
 
 Exact source identity equality always resolves to the existing canonical author. A name match,
 even an exact one, never does. One author may hold more than one OpenAlex identity when the owner
@@ -258,7 +359,7 @@ Provider labels, aliases, and transliterations are preserved without gaining ide
 
 | Column | Contract |
 |---|---|
-| `id`, `public_id` | Stable label identity. |
+| `id` | Stable internal label identity; no public_id per the scoped D1 convention. |
 | `author_id` | Required canonical author. |
 | `name`, `normalized_name` | Display/search forms. Neither is unique. |
 | `kind` | `preferred`, `alias`, or `transliteration`. |
@@ -274,9 +375,14 @@ identity or create a merge candidate by itself.
 
 - exact reuse of an already stored source identity is automatic;
 - an explicit provider crosswalk, such as an ORCID asserted on the selected OpenAlex record, may
-  attach both identities in the same operation;
+  attach both identities in the same operation, but only when the asserting record is itself the
+  selected identity for the author and the crosswalk target is not already attached to a different
+  active author. A crosswalk whose target already belongs to another active author never
+  auto-attaches; it raises `possible_duplicate`;
 - completed calibration rows classified `auto` may attach the OpenAlex identity to the imported
-  Scholar shell;
+  Scholar shell; but if the matched OpenAlex identity is already attached to a distinct active
+  author, a calibration `auto` result resolves as an author merge under the deterministic target
+  rule, not as a bare attachment;
 - calibration `review`, name-only similarity, works-overlap below the frozen auto threshold, and
   conflicting strong identifiers always create or update a review item;
 - `unmatched` remains a shell.
@@ -347,7 +453,8 @@ audit fields.
 
 `author_publication_evidence` records why the relationship exists. It references one
 `author_publication`, an optional `author_source_identity`, and one `publication_source_record`.
-It has stable internal and public IDs. The tuple of those three references is unique. Removing or
+It has a stable internal ID only, per the scoped D1 convention. The tuple of those three
+references is unique. Removing or
 correcting one provider assertion does not erase other evidence for the same authorship link.
 
 ## Duplicate prevention and merge rules
@@ -363,10 +470,17 @@ correcting one provider assertion does not erase other evidence for the same aut
    not a speculative identity attachment.
 5. A merge target is selected deterministically: resolved beats shell, more accepted strong
    identities beats fewer, older `created_at` wins the next tie, and lowest `public_id` wins the
-   final tie. Caller argument order cannot change the result.
+   final tie. Caller argument order cannot change the result. This deterministic target rule
+   governs every author merge regardless of which author was the review-card subject or the
+   caller's follow context.
 
 ### Publications
 
+0. Publication creation, its source-record insert, and its strong-identifier inserts occur within
+   one serialized-writer transaction; candidate lookup by identifier and by title hash runs inside
+   that same transaction immediately before insert. A UNIQUE violation on `(kind, value_normalized)`
+   is not an error surface: it is caught and routed to the deterministic publication-merge path
+   within the same transaction.
 1. Exact provider record identity or exact normalized DOI, arXiv, PMID, or PMCID resolves to the
    existing publication.
 2. A provider's explicit work crosswalk may add another identifier to that publication.
@@ -414,7 +528,8 @@ There is at most one non-superseded row per `dedupe_key`. A repeated failure upd
 
 ### `review_candidates` and `review_decisions`
 
-`review_candidates` has stable internal and public IDs and stores the stable candidate order. A
+`review_candidates` has a stable internal ID only, per the scoped D1 convention, and stores the
+stable candidate order. A
 candidate may reference an existing author or identity, or carry a proposed source plus normalized
 external ID that does not become an `author_source_identities` row until acceptance. A versioned
 evidence summary supplies the UI. No candidate creates an identity attachment before the user
@@ -441,16 +556,22 @@ reopen the same review item rather than creating a second card.
 ### `operations`
 
 Every consequential write groups into one operation. Kinds include `author_merge`,
-`publication_merge`, `review_decision`, `bulk_import`, `unfollow`, `refollow`, and
-`admin_repair`.
+`publication_merge`, `review_decision`, `bulk_import`, `unfollow`, `refollow`, `undo`, and
+`admin_repair`. The reversing operation has kind `undo` and links to the operation it reverses.
 
 The row stores `id`, `public_id`, kind, actor user if retained, source context, status (`applied` or
 `undone`), a safe summary JSON object, `created_at`, `undone_at`, and a link to the reversing
 operation when applicable.
 
+**PROPOSED:** routine unfollow and refollow write operations rows for a unified Activity and undo
+surface; the owner may cut these two kinds at freeze if audit volume is a concern, since the follow
+lifecycle columns already make them reversible.
+
 ### `operation_changes`
 
-Each row stores an operation-local sequence number, entity type, entity public ID, change kind,
+Each row stores an operation-local sequence number, entity type, entity reference (the entity's
+public ID, or for rows without one the parent's public ID plus the entity's internal row ID, which
+is internal audit data and never a user-facing surface), change kind,
 versioned before and after JSON, and the entity's `row_version` after the write. The pair
 `(operation_id, sequence)` is unique. Snapshots contain only fields required to explain and
 reverse the domain change. Credentials, tokens, raw provider payloads, and password data are
@@ -460,18 +581,44 @@ forbidden.
 
 - The domain write, audit rows, and review decision commit in one SQLite transaction.
 - An undo applies changes in reverse order in a new operation. It is all-or-nothing.
-- Before undo, every touched row must still match the recorded after-version or an explicitly
-  defined non-conflicting successor state. A conflict stops the undo without partial changes and
-  reports the exact blocking entities.
+- A row whose only post-operation change is a provenance-timestamp refresh (`last_observed_at`,
+  `record_version`) or a monotonic `raised_count` / `last_raised_at` bump is a non-conflicting
+  successor and does not block undo; the undo preserves the newer provenance values rather than
+  reverting them. Any change to identity assignment (`author_id`, `publication_id`), `status`,
+  lifecycle pointers, or read/favorite state is a conflict and blocks undo, reporting the exact
+  blocking rows.
+- Merge undo is strict LIFO: an operation may be undone only if no later applied operation touched
+  any entity in its change set; the conflict report names the blocking later operation. The
+  alias-flatten a later merge performs on earlier alias rows is recorded as `operation_changes`
+  rows within that later operation, so undoing the later merge restores those aliases to their
+  pre-flatten target as part of its own reversal.
+- Undo of a merge never re-attaches a source identity that a later review decision detached, nor
+  one a `rejected_author_identity_links` tombstone now forbids; such an identity remains detached
+  and the conflict report names it.
+- Undoing a review decision deletes the negative-evidence tombstone rows that decision created,
+  recorded as delete changes in `operation_changes`; the append-only `review_decisions` row is
+  marked `undone_at`. Undoing a merge decision reopens the originating review item to `open` only
+  if its `evidence_version` is unchanged since resolution; otherwise it stays resolved and new
+  evidence may raise a fresh card.
 - Undo restores moved source identities, follows, authorship links, library origins, review state,
-  and negative-evidence tombstones. Rows coalesced during a merge are restored from their recorded
-  lifecycle states rather than recreated with new IDs.
+  and negative-evidence tombstones. Rows coalesced or superseded during a merge are restored from
+  their recorded lifecycle states (`coalesced`, `superseded`, `merged` returning to active or
+  their prior status) rather than recreated with new IDs.
 - Merged author and publication rows are retained. Undo never depends on recovering a deleted
   canonical row.
 - Immediate UI undo and later Activity undo call the same domain operation.
 
 **OPEN D4:** approve state-based undo with no arbitrary time limit while the conflict preconditions
 still hold. The alternative is a fixed undo window followed by admin-only repair.
+
+### Authority for global identity decisions
+
+Author and publication merges and negative-identity tombstones are global operations.
+
+**OPEN D6:** restrict these global operations to an administrator role; a non-admin user's review
+actions affect only that user's own follow and library rows and never write a global tombstone or
+perform a merge. Rationale: in the multi-user household one user's keep-separate decision would
+otherwise suppress the same card for every other user.
 
 ## Deletion and retention
 
@@ -487,7 +634,18 @@ still hold. The alternative is a fixed undo window followed by admin-only repair
 
 **OPEN D5:** approve no automatic orphan deletion. The proposed policy retains unfollowed authors
 and publications until an explicit admin garbage-collection operation runs with a backup, dry-run
-preview, reference checks, and an audit record.
+preview, reference checks, and an audit record. Note that answering D4 as proposed effectively
+forces D5: indefinite state-based undo cannot coexist with automatic garbage collection of the rows
+undo depends on.
+
+### Deletion vs re-ingestion
+
+**OPEN D7:** admin garbage collection of a shared publication or author is a hard purge with no
+resurrection tombstone; a later sanctioned-provider re-ingest of the same strong identifier
+recreates it as a new canonical row, because the sanctioned corpus is authoritative and
+re-appearance means a live path exists and the row should not have been collected. All-`legacy_import`
+provenance never re-creates a purged row. The alternative, a `purged_identifiers` tombstone keyed
+on `(kind, value_normalized)` that suppresses re-ingest, is recorded as the rejected option.
 
 ## Migration contract
 
@@ -497,7 +655,11 @@ preview, reference checks, and an audit record.
 2. Startup takes an application migration lock before serving traffic.
 3. A pre-migration SQLite backup is mandatory for a version change. Backup verification and
    restore UX are release-gate concerns, but the migration may not proceed after backup failure.
-4. Table rebuilds use create-copy-verify-swap inside the safest transaction SQLite permits.
+4. Table rebuilds follow SQLite's documented procedure: `PRAGMA foreign_keys=OFF` outside the
+   transaction (it cannot change inside one), BEGIN, create the new table, copy, drop old, rename,
+   COMMIT, then `PRAGMA foreign_keys=ON` and `PRAGMA foreign_key_check`; a non-empty check result
+   is a hard failure that triggers restore. Model-specific invariant queries run before COMMIT
+   where possible.
 5. Each migration runs `foreign_key_check` plus model-specific invariant queries before commit.
 6. CI tests every migration up and down from a seeded prior-version database.
 7. A failed migration leaves the prior database usable or restores the verified backup. It never
@@ -516,7 +678,12 @@ The import proceeds in this order:
    and login migration waits for the auth spec. Real emails never appear in logs or fixtures.
 3. Collapse duplicate legacy Scholar IDs into one `scholar_import` source identity and one global
    author. Create separate per-user follow rows. Apply the D3 calibration policy to OpenAlex
-   mappings; unresolved rows remain shells.
+   mappings; unresolved rows remain shells. When two legacy Scholar shells calibrate `auto` to the
+   same OpenAlex identity, the second attachment triggers the standard author merge in the same
+   import transaction, recorded as an `author_merge` operation with a null actor and `legacy_import`
+   source context, auditable and undoable exactly like a runtime merge. Shells that calibrate
+   `review` or conflict produce one review card per pair, never a speculative merge. The dry-run
+   report counts import-time merges separately from residual review cards.
 4. Import global publications and normalized identifiers. Preserve every legacy row as a
    `legacy_import` source record. Strong identifier collisions use the normal merge rules; title
    hash collisions are reported, not silently merged.
@@ -533,6 +700,13 @@ The import proceeds in this order:
 ID and import run. The triple is unique, making reruns idempotent. Applied reruns verify and reuse
 the mapping rather than duplicating domain rows.
 
+Crash-safety and abort contract: each import step commits in bounded transactions; every domain-row
+insert and its `legacy_import_mappings` row commit together, so a crash leaves only fully applied
+rows and the mapping reflects exactly what exists. In-line import merges commit atomically; a
+partially applied merge cannot survive a crash. Resume replays from the first legacy row without a
+mapping entry. An applied import is reversible only by restoring the mandatory pre-import backup;
+there is no incremental un-import. Dry-run mode writes no domain rows and no mappings.
+
 The private real dump and calibration payloads remain outside git. Public tests use synthetic,
 anonymized fixtures that reproduce the same relationship shapes.
 
@@ -542,7 +716,8 @@ The application exposes or logs safe counts for these checks:
 
 - no duplicate active source identity or publication identifier;
 - no user-author or user-publication duplicate;
-- no merged cycle and no merge target that is itself unresolved at query completion;
+- no merge cycle, and no merge target whose own status is `merged` (targets must be `active`;
+  `active` includes shells);
 - every visible user publication has at least one active origin;
 - every origin's follow and authorship link agree on the same canonical author;
 - every active authorship link has at least one evidence row, except an explicit manual import;
@@ -551,6 +726,8 @@ The application exposes or logs safe counts for these checks:
 - no open review duplicate by `dedupe_key`;
 - no foreign-key violations or malformed versioned JSON.
 
+Integrity checks run at transaction boundaries, never mid-transaction.
+
 Logs and reports use public IDs, counts, operation kinds, and error codes. They do not emit raw
 provider payloads, full imported URLs, publication titles, author names, credentials, or personal
 email addresses by default.
@@ -558,28 +735,66 @@ email addresses by default.
 ## Deterministic acceptance tests
 
 Card 1 is ready to implement only after freeze, and implementation is accepted only when these
-tests exist:
+tests exist. The author and publication dedup tests run against the recorded golden corpus and feed
+the golden-corpus ratchet gate, consistent with `testing-strategy.md`.
 
 1. Two users follow the same OpenAlex ID: one author, one source identity, two follow rows.
 2. Two different OpenAlex IDs share an identical name: two authors, no automatic merge.
 3. One user follows two authors who share a publication: one user-publication state, two origins,
-   one read toggle everywhere for that user.
+   one read toggle everywhere for that user. Favoriting through one author path is visible on the
+   same user_publication via the other author path; another user's favorite state is unaffected.
 4. Another user sees the same global publication but retains independent read state.
 5. Unfollow removes the last visible origin, preserves state, and refollow restores it.
-6. Author merge and undo restore identities, follows, origins, review state, and aliases exactly.
-7. A post-merge conflicting edit blocks undo without partial reversal.
+6. Author merge and undo:
+   - 6a. Merge two authors neither user co-follows: both public IDs alias-resolve to the winner,
+     follows and origins retarget, and undo restores the pre-merge state exactly.
+   - 6b. Merge two authors that one user follows both of: the follows collapse to one surviving
+     active follow (earlier `first_followed_at`), the other becomes `merged`; origins coalesce with
+     no duplicate-key violation; undo restores two independent active follows with original IDs and
+     timestamps.
+7. Post-merge undo conflict handling:
+   - 7a. After a merge, a touched row receives a defined conflicting change (status change); undo
+     aborts, names that row, and makes zero writes (asserted via `row_version` snapshots).
+   - 7b. After a merge, a touched row receives only a `last_observed_at` refresh (defined
+     non-conflicting); undo still succeeds and preserves the newer timestamp.
 8. Exact DOI and arXiv identifiers deduplicate; title hash similarity alone does not.
 9. Publication merge preserves all source records, identifiers, authorship evidence, origins, and
-   per-user state; undo restores the prior graph.
-10. Repeated unresolved sync events update one review card. A new evidence version reopens it.
+   per-user state, including `user_publications` rows and origins that coalesced (retired in
+   place); undo restores the prior graph with original rows and public IDs.
+10. Repeated unresolved sync events update one review card. A new evidence version reopens it. A
+    skipped card with unchanged `evidence_version` stays skipped across repeated syncs while
+    `raised_count` increments.
 11. Confirmed-different and rejected-identity tombstones suppress unchanged evidence.
-12. Legacy import is idempotent, any-read collapse follows D2, favorites follow D2, and no legacy
-    origin is marked new.
+12. Legacy import:
+    - 12a. Re-running import over the same fingerprinted dump produces zero new domain rows.
+    - 12b. One read and one unread legacy per-profile state for the same user and publication
+      collapse to a single read row.
+    - 12c. A legacy favorite is preserved in `favorited_at`.
+    - 12d. Every imported origin has discovery_kind `legacy_import` and NEW is false for all of
+      them.
+    - 12e. Import performs zero network calls, asserted via a failing stub transport.
 13. Each schema migration passes up, down, foreign-key, integrity, and interrupted-upgrade tests.
 14. Property tests prove normalization idempotence, merge outcome independence from argument order,
     and stable public-ID alias resolution.
-15. Merging an earlier winner into a third entity flattens every author or publication alias to the
-    final active winner; undo restores the prior flat mapping.
+15. LIFO undo sequence: merge A into B, then B into C (C is the flat winner for A and B); undoing
+    B-into-C restores A's alias target to B and B to active; a subsequent undo of A-into-B restores
+    A; attempting to undo A-into-B before B-into-C is rejected with a conflict naming the B-into-C
+    operation.
+16. After legacy import and after each scenario above, the full integrity-check battery returns
+    zero violations, and a deliberately corrupted fixture (an origin whose follow and authorship
+    disagree on author) is detected and named.
+17. Two near-simultaneous ingests of the same DOI produce one publication: the second ingest's
+    identifier collision is routed to the merge path, never a raw constraint error.
+18. Re-observing a detached identity forbidden by a rejection tombstone raises a review item and
+    does not reattach; undoing the keep-separate decision deletes its tombstone so the pair can be
+    flagged again.
+19. A non-admin keep-separate decision does not suppress the same card for another user (per D6).
+20. Admin garbage collection of a publication followed by sanctioned re-ingest of the same DOI
+    behaves per D7 (recreated as a new canonical row; a purged all-legacy row stays gone).
+21. Import-time collapse of two Scholar shells resolving to one OpenAlex identity yields one author
+    with an auditable, undoable merge operation.
+22. An import killed mid-run resumes without duplicating rows and no half-applied merge exists
+    after resume.
 
 ## Owner decisions
 
@@ -587,12 +802,17 @@ The draft recommends one answer for each unresolved choice:
 
 | ID | Decision | Recommended answer |
 |---|---|---|
-| D1 | Public identity shape | Internal integer keys plus immutable UUIDv7 public IDs. |
-| D2 | User-library semantics | Hide on last unfollow but retain state; any-read wins legacy collapse; preserve favorites; derive `NEW` only from recent incremental sync. |
-| D3 | Cross-source auto-attachment | Auto only exact IDs, explicit provider crosswalks, and completed calibration `auto` rows; review everything weaker or conflicting. |
+| D1 | Public identity shape | Scoped public_id: internal integer keys everywhere, immutable UUIDv7 public IDs only on rows referenced externally or aliased across merges. |
+| D2a | Unfollow retention | Hide publications with no remaining active follow path but retain read and favorite state; refollow restores it. |
+| D2b | Favorite column | Migrate and retain `favorited_at` as a consciously carried dead column despite no v1 favorite control. |
+| D2c | Legacy read collapse | A legacy publication is read if any legacy link for that user says read; deliberately lossy, because unread-that-should-be-read is the worse watchlist error. |
+| D2d | NEW rule | Derive `NEW` at read time only from recent `incremental_sync` origins within the service-wide `new_window`; never persisted. |
+| D3 | Cross-source auto-attachment | Auto only exact IDs, explicit provider crosswalks (asserting record selected, target unattached elsewhere), and completed calibration `auto` rows; targets already on another active author resolve as a deterministic merge or raise a duplicate; review everything weaker or conflicting. |
 | D4 | Undo horizon | No time limit while recorded row-version preconditions still hold; otherwise stop with a conflict. |
-| D5 | Orphan retention | Never delete automatically; require explicit backed-up, dry-run, audited admin garbage collection. |
+| D5 | Orphan retention | Never delete automatically; require explicit backed-up, dry-run, audited admin garbage collection. Answering D4 as proposed effectively forces this. |
+| D6 | Global identity authority | Restrict merges and negative-identity tombstones to an administrator role; non-admin review actions affect only that user's own follow and library rows. |
+| D7 | Deletion vs re-ingestion | Hard purge with no resurrection tombstone; sanctioned re-ingest of the same strong identifier recreates a new canonical row, all-`legacy_import` provenance does not. |
 
-Freezing this spec means the owner has answered D1 through D5, approved any resulting edits, and
+Freezing this spec means the owner has answered D1 through D7, approved any resulting edits, and
 explicitly changed the status at the top to `FROZEN` with the approval date. Until then, no schema
 or implementation work begins.
